@@ -178,6 +178,18 @@ if (els.btnRetry) {
   els.btnRetry.onclick = () => location.reload();
 }
 
+function throttle(fn, ms) {
+  let last = 0;
+  return (...args) => {
+    const now = performance.now();
+    if (now - last >= ms) {
+      last = now;
+      fn(...args);
+    }
+  };
+}
+
+
 // ---------- State ----------
 const state = { perm: "-", sdk: "-", track: "-", cal: "-" };
 function setState(key, val) {
@@ -296,101 +308,59 @@ let lastCollectAt = 0;
 let lastProgressAt = 0;
 
 function attachSeesoCallbacks() {
-  if (!seeso) return;
+// (attachSeesoCallbacks 내부)
 
-  // Gaze
-  if (typeof seeso.addGazeCallback === "function") {
-    seeso.addGazeCallback((gazeInfo) => {
-      lastGazeAt = performance.now();
-      overlay.gaze = {
-        x: gazeInfo?.x,
-        y: gazeInfo?.y,
-        trackingState: gazeInfo?.trackingState,
-        confidence: gazeInfo?.confidence,
-      };
-      if (DEBUG_LEVEL >= 2) {
-        logD("gaze", "sample", overlay.gaze);
-      }
-      renderOverlay();
+// 200ms마다 x,y를 INFO로 로깅(너무 스팸이면 300~500으로 조정)
+const logGazeXY = throttle((gazeInfo) => {
+  const x = gazeInfo?.x;
+  const y = gazeInfo?.y;
+
+  // SDK/브라우저에 따라 키가 다를 수 있어 후보도 같이 찍음
+  const altX = gazeInfo?.screenX ?? gazeInfo?.gazeX ?? gazeInfo?.rawX;
+  const altY = gazeInfo?.screenY ?? gazeInfo?.gazeY ?? gazeInfo?.rawY;
+
+  if (typeof x === "number" && typeof y === "number") {
+    logI("gaze", "xy", {
+      x: Number(x.toFixed(2)),
+      y: Number(y.toFixed(2)),
+      trackingState: gazeInfo?.trackingState,
+      confidence: gazeInfo?.confidence,
     });
-    logI("sdk", "addGazeCallback bound");
   } else {
-    logW("sdk", "addGazeCallback not found on seeso instance");
-  }
-
-  // Debug (optional)
-  if (typeof seeso.addDebugCallback === "function") {
-    seeso.addDebugCallback((info) => logD("sdkdbg", "debug", info));
-    logI("sdk", "addDebugCallback bound");
-  }
-
-  // Calibration: next point -> render dot -> startCollectSamples()
-  if (typeof seeso.addCalibrationNextPointCallback === "function") {
-    seeso.addCalibrationNextPointCallback((x, y) => {
-      lastNextPointAt = performance.now();
-      overlay.calPoint = { x, y };
-      overlay.calRunning = true;
-
-      logI("cal", "onCalibrationNextPoint", { x, y });
-      renderOverlay();
-
-      // CRITICAL: this is what moves progress from 0%.
-      // Delay slightly to ensure the dot has been rendered.
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          try {
-            lastCollectAt = performance.now();
-            seeso.startCollectSamples();
-            logI("cal", "startCollectSamples called");
-          } catch (e) {
-            logE("cal", "startCollectSamples threw", e);
-          }
-        }, 80);
-      });
+    // x,y가 undefined면 어떤 키로 오는지 파악 가능하게 로그
+    logW("gaze", "xy not found in gazeInfo", {
+      hasX: "x" in (gazeInfo || {}),
+      hasY: "y" in (gazeInfo || {}),
+      altX,
+      altY,
+      keys: gazeInfo ? Object.keys(gazeInfo) : null,
     });
-    logI("sdk", "addCalibrationNextPointCallback bound");
-  } else {
-    logW("sdk", "addCalibrationNextPointCallback not found");
   }
+}, 200);
 
-  if (typeof seeso.addCalibrationProgressCallback === "function") {
-    seeso.addCalibrationProgressCallback((progress) => {
-      lastProgressAt = performance.now();
-      overlay.calProgress = progress;
+if (typeof seeso.addGazeCallback === "function") {
+  seeso.addGazeCallback((gazeInfo) => {
+    lastGazeAt = performance.now();
 
-      const pct = (typeof progress === "number") ? Math.round(progress * 100) : NaN;
-      if (Number.isFinite(pct)) {
-        setStatus(`Calibrating... ${pct}% (keep your head steady, look at the green dot)`);
-        if (els.pillCal) setPill(els.pillCal, `cal: running (${pct}%)`);
-      } else {
-        setStatus(`Calibrating... (progress: ${String(progress)})`);
-      }
+    // overlay 갱신은 기존대로
+    overlay.gaze = {
+      x: gazeInfo?.x,
+      y: gazeInfo?.y,
+      trackingState: gazeInfo?.trackingState,
+      confidence: gazeInfo?.confidence,
+    };
 
-      if (DEBUG_LEVEL >= 2) logD("cal", "progress", { progress, pct });
-    });
-    logI("sdk", "addCalibrationProgressCallback bound");
-  } else {
-    logW("sdk", "addCalibrationProgressCallback not found");
-  }
+    // ★ 여기서 x,y 로그가 찍힘
+    logGazeXY(gazeInfo);
 
-  if (typeof seeso.addCalibrationFinishCallback === "function") {
-    seeso.addCalibrationFinishCallback((calibrationData) => {
-      overlay.calRunning = false;
-      overlay.calPoint = null;
-      renderOverlay();
+    renderOverlay();
+  });
 
-      setState("cal", "finished");
-      setStatus("Calibration finished.");
-      logI("cal", "onCalibrationFinished", {
-        type: typeof calibrationData,
-        length: calibrationData?.length,
-        preview: (typeof calibrationData === "string") ? calibrationData.slice(0, 80) + "..." : null,
-      });
-    });
-    logI("sdk", "addCalibrationFinishCallback bound");
-  } else {
-    logW("sdk", "addCalibrationFinishCallback not found");
-  }
+  logI("sdk", "addGazeCallback bound");
+} else {
+  logW("sdk", "addGazeCallback not found on seeso instance");
+}
+
 }
 
 async function initSeeso() {
