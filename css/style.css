@@ -52,6 +52,15 @@ body {
   /* Bring to front for calibration */
 }
 
+#preview,
+#output {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
 #stage.debug {
   opacity: 0.3;
 }
