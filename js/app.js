@@ -397,14 +397,7 @@ function renderOverlay() {
     ctx.arc(cx, cy, scale * 0.4, 0, Math.PI * 2);
     ctx.fill();
 
-    // --- Draw: Charging Ring (Progress Arc) ---
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-    ctx.lineWidth = 4;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    // Start from -90deg (12 o'clock)
-    ctx.arc(cx, cy, scale + 8, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * progress));
-    ctx.stroke();
+
 
     // --- Draw: Magic Runes/Outer Ring (Rotating) ---
     ctx.save();
