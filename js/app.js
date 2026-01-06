@@ -16,7 +16,7 @@ import { loadWebpackModule } from "./webpack-loader.js";
  *  - ?debug=1 (default): INFO/WARN/ERROR
  *  - ?debug=2          : verbose DEBUG
  */
-const LICENSE_KEY = "dev_1ntzip9admm6g0upynw3gooycnecx0vl93hz8nox";
+const LICENSE_KEY = "prod_srdpyuuaumnsqoyk2pvdci0rg3ahsr923bshp32u";
 
 const DEBUG_LEVEL = (() => {
   const v = new URLSearchParams(location.search).get("debug");
