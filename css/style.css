@@ -48,6 +48,8 @@ body {
 
 #stage.visible {
   opacity: 1;
+  z-index: 9999;
+  /* Bring to front for calibration */
 }
 
 #stage.debug {

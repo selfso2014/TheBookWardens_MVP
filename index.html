@@ -58,12 +58,15 @@
 
     <!-- SCREEN 0.5: CALIBRATION -->
     <section id="screen-calibration" class="screen">
-      <h2 style="color: var(--secondary-accent); text-shadow: var(--rift-glow);">Ritual of Sight</h2>
-      <p style="margin-top: 20px; color: #ddd; max-width: 300px; text-align: center;">
-        Focus on the magic orbs as they appear.<br>
-        Keep your head steady.
-      </p>
-      <div id="calibration-status" style="margin-top:20px; color: #888;">Preparing...</div>
+      <div style="position: relative; z-index: 10000; pointer-events: none;">
+        <h2 style="color: var(--secondary-accent); text-shadow: var(--rift-glow);">Ritual of Sight</h2>
+        <p
+          style="margin-top: 20px; color: #ddd; max-width: 300px; text-align: center; margin-left: auto; margin-right: auto;">
+          Focus on the magic orbs as they appear.<br>
+          Keep your head steady.
+        </p>
+        <div id="calibration-status" style="margin-top:20px; color: #888;">Preparing...</div>
+      </div>
     </section>
 
     <!-- SCREEN 1: WORD FORGE (Vocab) -->
