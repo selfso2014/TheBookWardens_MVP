@@ -389,6 +389,10 @@ window.showGazeDot = function (durationMs = 10000) {
 
   overlay.gazeOpacity = 1.0;
 
+  // Make stage visible for drawing
+  const stage = document.getElementById("stage");
+  if (stage) stage.classList.add("visible");
+
   // Start fade out after duration
   gazeFadeTimer = setTimeout(() => {
     gazeFadeInterval = setInterval(() => {
@@ -397,6 +401,9 @@ window.showGazeDot = function (durationMs = 10000) {
         overlay.gazeOpacity = 0;
         clearInterval(gazeFadeInterval);
         gazeFadeInterval = null;
+
+        // Hide stage again to prevent z-index issues
+        if (stage) stage.classList.remove("visible");
       }
     }, 100); // Fade step every 100ms
   }, durationMs);
