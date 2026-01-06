@@ -142,6 +142,11 @@ const Game = {
         this.state.readProgress = 0;
         this.state.isTracking = true;
         console.log("Reading session started. Waiting for gaze...");
+
+        // Show gaze dot for 10 seconds (10000ms) then fade out
+        if (typeof window.showGazeDot === "function") {
+            window.showGazeDot(10000);
+        }
     },
 
     // Called by app.js (SeeSo overlay)

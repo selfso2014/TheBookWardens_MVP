@@ -363,14 +363,44 @@ function renderOverlay() {
     drawDot(pt.x, pt.y, 20, color); // Increased size
   }
 
-  // Gaze dot REMOVED per user request
-  /*
+  // Gaze dot
   if (overlay.gaze && overlay.gaze.x != null && overlay.gaze.y != null) {
-    const pt = toCanvasLocalPoint(overlay.gaze.x, overlay.gaze.y) || overlay.gaze;
-    drawDot(pt.x, pt.y, 7, "#ffff3b");
+    const opacity = overlay.gazeOpacity !== undefined ? overlay.gazeOpacity : 0; // Default hidden if not requested
+    if (opacity > 0) {
+      const pt = toCanvasLocalPoint(overlay.gaze.x, overlay.gaze.y) || overlay.gaze;
+      // Draw with opacity
+      const r = 3; // radius
+      const ctx = els.canvas.getContext("2d");
+      ctx.globalAlpha = opacity;
+      drawDot(pt.x, pt.y, 7, "#ffff3b");
+      ctx.globalAlpha = 1.0; // Reset
+    }
   }
-  */
 }
+
+// Fade out animation
+let gazeFadeTimer = null;
+let gazeFadeInterval = null;
+
+window.showGazeDot = function (durationMs = 10000) {
+  // Reset
+  if (gazeFadeTimer) clearTimeout(gazeFadeTimer);
+  if (gazeFadeInterval) clearInterval(gazeFadeInterval);
+
+  overlay.gazeOpacity = 1.0;
+
+  // Start fade out after duration
+  gazeFadeTimer = setTimeout(() => {
+    gazeFadeInterval = setInterval(() => {
+      overlay.gazeOpacity -= 0.05;
+      if (overlay.gazeOpacity <= 0) {
+        overlay.gazeOpacity = 0;
+        clearInterval(gazeFadeInterval);
+        gazeFadeInterval = null;
+      }
+    }, 100); // Fade step every 100ms
+  }, durationMs);
+};
 
 window.addEventListener("resize", () => {
   resizeCanvas();
