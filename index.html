@@ -107,39 +107,12 @@
       </div>
     </section>
 
-    <!-- SCREEN 1.5: THE WATCHER (Rune Sealing Mini-Game) -->
+    <!-- SCREEN 1.5: THE WATCHER (Owl Eye Tracking Demo) -->
     <section id="screen-owl" class="screen">
-      <div class="game-header-mini">
-        <h2 style="color: #f0c420; text-shadow: 0 0 10px #f0c420; font-family: 'Cinzel', serif; margin: 0;">
-          Seal the Rift
-        </h2>
-        <div class="game-stats">
-          <div class="stat-item">
-            <span class="stat-label">Score:</span>
-            <span id="rune-score" class="stat-value">0</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Time:</span>
-            <span id="rune-timer" class="stat-value">30</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Combo:</span>
-            <span id="rune-combo" class="stat-value">0/4</span>
-          </div>
-        </div>
-      </div>
+      <h2 style="color: #f0c420; text-shadow: 0 0 10px #f0c420; font-family: 'Cinzel', serif;">The Watcher</h2>
+      <p style="color: #aaa; margin-bottom: 40px;">Look around... The owl follows your gaze.</p>
 
-      <p id="rune-instruction" style="color: #aaa; margin: 20px 0; text-align: center;">
-        Gaze at the glowing runes in the correct sequence to seal the Rift!
-      </p>
-
-      <!-- Rune Container -->
-      <div id="rune-container" class="rune-container">
-        <!-- Runes will be dynamically generated here -->
-      </div>
-
-      <!-- Owl (smaller, in corner as guide) -->
-      <div class="owl-container-mini">
+      <div class="owl-container">
         <div class="owl-head">
           <div class="owl-face">
             <div class="owl-eye" id="eye-left">
@@ -153,22 +126,8 @@
         </div>
       </div>
 
-      <!-- Progress Bar -->
-      <div class="rune-progress-container">
-        <div id="rune-progress-bar" class="rune-progress-bar"></div>
-      </div>
-
-      <!-- Game State Messages -->
-      <div id="game-message" class="game-message hidden">
-        <div class="message-content">
-          <h3 id="message-title">Success!</h3>
-          <p id="message-text">You sealed the Rift!</p>
-        </div>
-      </div>
-
-      <!-- Start/Continue Button -->
-      <button id="btn-rune-game" class="btn-primary" onclick="Game.startRuneGame()" style="margin-top: 20px;">
-        Start Sealing
+      <button class="btn-primary" onclick="Game.startReadingFromOwl()" style="margin-top: 60px;">
+        Open the Book
       </button>
     </section>
 

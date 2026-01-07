@@ -501,11 +501,21 @@ const Game = {
     },
 
     // Called from Owl screen button to begin reading
+    startOwlScene() {
+        // Show owl with eye tracking (no rune game)
+        this.state.isTracking = true;
+        this.state.isOwlTracker = true;
+        this.state.isRuneGame = false;
+        this.switchScreen("screen-owl");
+        if (typeof window.showGazeDot === "function") {
+            window.showGazeDot(999999);
+        }
+    },
+
     startReadingFromOwl() {
-        // Stop owl tracking visuals
+        // Stop owl tracking and start reading
         this.state.isOwlTracker = false;
         this.state.isRuneGame = false;
-        // Switch to reading screen and initialize reading session
         this.switchScreen("screen-read");
         this.startReadingSession();
     },
