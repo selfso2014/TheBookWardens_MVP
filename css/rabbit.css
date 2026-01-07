@@ -2,9 +2,11 @@
 
 .rabbit-container {
     position: relative;
-    width: 840px;
-    height: 840px;
-    margin: 0 auto;
+    width: 400px;
+    height: 400px;
+    margin: 50px auto;
+    transform: scale(1.5);
+    transform-origin: center center;
 }
 
 .rabbit-image {
@@ -84,8 +86,9 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .rabbit-container {
-        width: 630px;
-        height: 630px;
+        width: 300px;
+        height: 300px;
+        transform: scale(1.5);
     }
 
     .rabbit-eye-overlay {
