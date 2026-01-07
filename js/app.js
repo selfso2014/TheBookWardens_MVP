@@ -221,6 +221,7 @@ if (btnCalStart) {
       try {
         lastCollectAt = performance.now();
         seeso.startCollectSamples();
+        calManager.startCollection();
         logI("cal", "startCollectSamples called manually");
       } catch (e) {
         logE("cal", "startCollectSamples threw", e);

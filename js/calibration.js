@@ -25,6 +25,72 @@ export class CalibrationManager {
         this.state.running = false;
         if (this.state.watchdogTimer) clearTimeout(this.state.watchdogTimer);
         if (this.state.safetyTimer) clearTimeout(this.state.safetyTimer);
+        if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
+    }
+
+    /**
+     * Called when the user clicks "Start Point" button.
+     * We start a strict timer here. If calibration doesn't finish in 8-10s, we force finish.
+     */
+    startCollection() {
+        this.ctx.logI("cal", "startCollection: Starting strict watchdog (10s)");
+
+        // Clear old
+        if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
+
+        // 10 seconds max wait for 1 point
+        this.state.maxWaitTimer = setTimeout(() => {
+            if (this.state.running) {
+                this.ctx.logW("cal", "Calibration timed out (10s limit). Showing fail popup.");
+                this.showFailPopup();
+            }
+        }, 10000);
+    }
+
+    showFailPopup() {
+        // Stop visual updates but keep session alive?
+        // Ideally we want to let user choose.
+        const popup = document.getElementById("cal-fail-popup");
+        if (popup) {
+            popup.style.display = "flex";
+
+            // Bind buttons if not already (simple way: onclick property)
+            const btnRetry = document.getElementById("btn-cal-retry");
+            const btnSkip = document.getElementById("btn-cal-skip");
+
+            if (btnRetry) {
+                btnRetry.onclick = () => {
+                    popup.style.display = "none";
+                    this.retryPoint();
+                };
+            }
+            if (btnSkip) {
+                btnSkip.onclick = () => {
+                    popup.style.display = "none";
+                    this.finishSequence();
+                };
+            }
+        }
+    }
+
+    retryPoint() {
+        this.ctx.logI("cal", "Retrying calibration point...");
+        // Reset local state for this point
+        this.state.running = true; // Keep running or wait for button?
+        this.state.progress = 0;
+        this.state.displayProgress = 0;
+
+        // Strategy: Show the "Start Point" button again so user can position themselves and click.
+        const btn = document.getElementById("btn-calibration-start");
+        if (btn) {
+            btn.style.display = "inline-block";
+            btn.textContent = "Retry Point";
+            btn.style.pointerEvents = "auto";
+        }
+
+        // We technically interrupt the current "collection" (visual only). 
+        // SDK might still be thinking it's collecting. 
+        // When user clicks "Start", we call `seeso.startCollectSamples()` again. This usually resets collection for the point.
     }
 
     /**
@@ -86,21 +152,11 @@ export class CalibrationManager {
                 setStatus(`Calibrating... ${pct}% (Point ${this.state.pointCount}/1)`);
                 setState("cal", `running (${pct}%)`);
 
-                // Watchdog & Safety
-                // If progress > 70% and stalls for 5s, force finish.
-                if (progress > 0.7 && !this.state.safetyTimer) {
-                    this.state.safetyTimer = setTimeout(() => {
-                        logW("cal", `Safety timeout (5s) triggered at >70%`);
-
-                        // Force finish if still running
-                        if (this.state.running) {
-                            logW("cal", "Force finishing calibration (stalled)");
-                            this.finishSequence();
-                        }
-                    }, 5000);
-                }
+                // (Old safety timer logic removed - we now strictly use startCollection timer)
 
                 if (progress >= 1.0) {
+                    // If progress reaches 1.0, clear the maxWaitTimer as we're proceeding to finish
+                    if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
                     if (this.state.watchdogTimer) clearTimeout(this.state.watchdogTimer);
 
                     this.state.watchdogTimer = setTimeout(() => {
@@ -154,6 +210,7 @@ export class CalibrationManager {
         // Clear all timers
         if (this.state.watchdogTimer) { clearTimeout(this.state.watchdogTimer); this.state.watchdogTimer = null; }
         if (this.state.safetyTimer) { clearTimeout(this.state.safetyTimer); this.state.safetyTimer = null; }
+        if (this.state.maxWaitTimer) { clearTimeout(this.state.maxWaitTimer); this.state.maxWaitTimer = null; }
 
         this.ctx.requestRender();
 
