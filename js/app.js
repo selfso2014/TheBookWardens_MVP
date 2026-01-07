@@ -391,7 +391,11 @@ function renderOverlay() {
       const ctx = els.canvas.getContext("2d");
       ctx.save();
       ctx.globalAlpha = opacity;
-      drawDot(pt.x, pt.y, 7, "#ffff3b");
+      ctx.beginPath();
+      // Remove stroke for softer look
+      ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffff3b";
+      ctx.fill();
       ctx.restore();
     }
   }
