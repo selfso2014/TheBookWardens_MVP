@@ -231,15 +231,24 @@ const Game = {
             this.updatePageUI();
         }
     },
-
     updatePageUI() {
         const ind = document.getElementById("page-indicator");
         const btnPrev = document.getElementById("btn-page-prev");
         const btnNext = document.getElementById("btn-page-next");
+        const btnConfront = document.getElementById("btn-confront-villain");
 
-        if (ind) ind.textContent = `Page ${this.state.currentPage} / ${this.state.totalPages || 1}`;
-        if (btnPrev) btnPrev.disabled = (this.state.currentPage <= 1);
-        if (btnNext) btnNext.disabled = (this.state.currentPage >= this.state.totalPages);
+        const total = this.state.totalPages || 1;
+        const current = this.state.currentPage;
+        const isLast = current >= total;
+
+        if (ind) ind.textContent = `Page ${current} / ${total}`;
+        if (btnPrev) btnPrev.disabled = (current <= 1);
+        if (btnNext) btnNext.disabled = isLast;
+
+        if (btnConfront) {
+            // Show only on the last page
+            btnConfront.style.display = isLast ? "block" : "none";
+        }
     },
 
     // Called by app.js (SeeSo overlay)
