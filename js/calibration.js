@@ -109,9 +109,11 @@ export class CalibrationManager {
                         this.state.watchdogTimer = null;
                     }
 
-                    // Trigger render update
-                    requestRender();
-                });
+                }
+
+                // Trigger render update
+                requestRender();
+            });
             logI("sdk", "addCalibrationProgressCallback bound (CalibrationManager)");
         }
 
