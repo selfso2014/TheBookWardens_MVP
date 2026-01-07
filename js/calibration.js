@@ -264,7 +264,11 @@ export class CalibrationManager {
         ctx.arc(cx, cy, scale * 0.4, 0, Math.PI * 2);
         ctx.fill();
 
-        // Text (Hidden by user request)
-        // ctx.fillText(`${Math.round(p * 100)}%`, cx, cy - 30);
+        // Text
+        ctx.fillStyle = "white";
+        ctx.font = "bold 14px Arial";
+        ctx.textAlign = "center";
+        // Show % closer to point
+        ctx.fillText(`${Math.round(p * 100)}%`, cx, cy - 20);
     }
 }
