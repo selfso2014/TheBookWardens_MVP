@@ -180,10 +180,21 @@ const Game = {
         }
     },
 
+    // --- 1.5 Owl Scene ---
+    startOwlScene() {
+        this.state.isTracking = true;
+        this.state.isOwlTracker = true;
+        this.switchScreen("screen-owl");
+        if (typeof window.showGazeDot === "function") {
+            window.showGazeDot(999999);
+        }
+    },
+
     // --- 2. Reading Rift ---
     startReadingSession() {
         this.state.readProgress = 0;
         this.state.isTracking = true;
+        this.state.isOwlTracker = false; // Stop owl tracking
         console.log("Reading session started. Waiting for gaze...");
 
         // Initialize Pagination
@@ -269,9 +280,32 @@ const Game = {
 
     // Called by app.js (SeeSo overlay)
     onGaze(x, y) {
+        // Owl Interaction
+        if (this.state.isOwlTracker) {
+            const pupils = document.querySelectorAll('.pupil');
+            const cx = window.innerWidth / 2;
+            // Owl is vertically roughly center-ish? Let's assume center for simplicity
+            const cy = window.innerHeight / 2;
+
+            const maxMove = 20; // range of motion
+
+            // Simple mapping: Gaze pos -> pupil offset
+            let dx = (x - cx) / (window.innerWidth / 2) * maxMove;
+            let dy = (y - cy) / (window.innerHeight / 2) * maxMove;
+
+            // Clamp
+            dx = Math.max(-maxMove, Math.min(maxMove, dx));
+            dy = Math.max(-maxMove, Math.min(maxMove, dy));
+
+            pupils.forEach(p => {
+                p.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            });
+            return;
+        }
+
         // Only active in reading screen
         const readScreen = document.getElementById("screen-read");
-        if (!readScreen.classList.contains("active")) return;
+        if (!readScreen || !readScreen.classList.contains("active")) return;
 
         // Hit test: is the user looking at the text?
         const el = document.elementFromPoint(x, y);
@@ -281,6 +315,11 @@ const Game = {
             this.state.readProgress += 0.2; // fill speed
             this.updateProgressBar();
         }
+    },
+
+    onCalibrationFinish() {
+        console.log("Calibration finished. Starting Owl Scene.");
+        this.startOwlScene();
     },
 
     updateProgressBar() {

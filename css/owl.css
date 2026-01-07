@@ -1,0 +1,100 @@
+/* --- 1.5 Owl Screen --- */
+.owl-container {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+}
+
+.owl-head {
+    width: 100%;
+    height: 100%;
+    background: #4a3b2a;
+    border-radius: 50%;
+    position: relative;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+}
+
+.owl-face {
+    position: absolute;
+    top: 25%;
+    left: 10%;
+    width: 80%;
+    height: 60%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.owl-eye {
+    width: 70px;
+    height: 70px;
+    background: #ffeb3b;
+    border-radius: 50%;
+    position: relative;
+    box-shadow: inset 0 0 10px #f57f17;
+    overflow: hidden;
+    border: 3px solid #3e2723;
+}
+
+.pupil {
+    width: 30px;
+    height: 30px;
+    background: #000;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* Start Center */
+    /* Transition for subtle movement lag? User might want instant. */
+    transition: transform 0.05s ease-out;
+}
+
+/* Reflection in pupil */
+.pupil::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    top: 5px;
+    right: 5px;
+}
+
+.owl-beak {
+    position: absolute;
+    top: 60%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-top: 30px solid #f9a825;
+    filter: drop-shadow(0 4px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* Ears/Tufts - Simple */
+.owl-head::before,
+.owl-head::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 0;
+    height: 0;
+    border-left: 20px solid transparent;
+    border-right: 20px solid transparent;
+    border-bottom: 40px solid #4a3b2a;
+}
+
+.owl-head::before {
+    left: 0;
+    transform: rotate(-20deg);
+}
+
+.owl-head::after {
+    right: 0;
+    transform: rotate(20deg);
+}

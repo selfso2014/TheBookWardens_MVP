@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SeeSo Eye Tracking Web Demo</title>
   <link rel="stylesheet" href="./css/style.css" />
+  <link rel="stylesheet" href="./css/owl.css" />
   <script src="./coi-serviceworker.js"></script>
 </head>
 
@@ -104,6 +105,30 @@
           <button class="option-btn" onclick="Game.checkVocab(2)">C. Related to the moon</button>
         </div>
       </div>
+    </section>
+
+    <!-- SCREEN 1.5: THE WATCHER (Owl) -->
+    <section id="screen-owl" class="screen">
+      <h2 style="color: #f0c420; text-shadow: 0 0 10px #f0c420; font-family: 'Cinzel', serif;">The Watcher</h2>
+      <p style="color: #aaa; margin-bottom: 40px;">Look around... The owl follows your gaze.</p>
+
+      <div class="owl-container">
+        <div class="owl-head">
+          <div class="owl-face">
+            <div class="owl-eye" id="eye-left">
+              <div class="pupil"></div>
+            </div>
+            <div class="owl-beak"></div>
+            <div class="owl-eye" id="eye-right">
+              <div class="pupil"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="Game.startReadingSession()" style="margin-top: 60px;">
+        Open the Book
+      </button>
     </section>
 
     <!-- SCREEN 2: READING RIFT (Eye Tracking Gameplay) -->
