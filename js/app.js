@@ -393,7 +393,7 @@ function renderOverlay() {
       ctx.globalAlpha = opacity;
       ctx.beginPath();
       // Remove stroke for softer look
-      ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
       ctx.fillStyle = "#ffff3b";
       ctx.fill();
       ctx.restore();
@@ -417,7 +417,7 @@ window.showGazeDot = function (durationMs = 15000) {
 
   // "Infinite" mode (e.g. > 1000s) -> Static opacity, no fade
   if (durationMs > 100000) { // arbitrary large number check
-    overlay.gazeOpacity = 0.1; // User requested 0.1 (very transparent)
+    overlay.gazeOpacity = 0.3; // User requested 0.3
     return;
   }
 
