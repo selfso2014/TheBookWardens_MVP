@@ -17,6 +17,16 @@ export class CalibrationManager {
         };
     }
 
+    reset() {
+        this.state.pointCount = 0;
+        this.state.point = null;
+        this.state.progress = 0;
+        this.state.isFinishing = false;
+        this.state.running = false;
+        if (this.state.watchdogTimer) clearTimeout(this.state.watchdogTimer);
+        if (this.state.safetyTimer) clearTimeout(this.state.safetyTimer);
+    }
+
     /**
      * Binds to the SeeSo instance.
      */
