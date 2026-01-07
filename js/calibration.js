@@ -172,8 +172,13 @@ export class CalibrationManager {
         const pt = toCanvasLocalPoint(this.state.point.x, this.state.point.y) || this.state.point;
 
         // Smooth lerp
+        // Smooth lerp, but snap to 0 if target is 0 to avoid artifacts
         const target = this.state.progress || 0;
-        this.state.displayProgress += (target - this.state.displayProgress) * 0.1;
+        if (target === 0) {
+            this.state.displayProgress = 0;
+        } else {
+            this.state.displayProgress += (target - this.state.displayProgress) * 0.1;
+        }
 
         const p = this.state.displayProgress;
 
@@ -206,6 +211,9 @@ export class CalibrationManager {
         ctx.fillStyle = "white";
         ctx.font = "bold 14px Arial";
         ctx.textAlign = "center";
+
+        // Only show % if > 0 to maintain clean look? Or user wants 0%?
+        // User said "Start from 0%". So always show.
         ctx.fillText(`${Math.round(p * 100)}%`, cx, cy - 30);
     }
 }
