@@ -35,6 +35,11 @@ export class CalibrationManager {
                     clearTimeout(this.state.watchdogTimer);
                     this.state.watchdogTimer = null;
                 }
+                // Clear safety timer
+                if (this.state.safetyTimer) {
+                    clearTimeout(this.state.safetyTimer);
+                    this.state.safetyTimer = null;
+                }
 
                 this.state.point = { x, y };
                 this.state.running = true;
@@ -72,20 +77,33 @@ export class CalibrationManager {
                 setState("cal", `running (${pct}%)`);
 
                 // Watchdog: If stuck at 100% on last point
-                if (progress >= 1.0 && this.state.pointCount >= 5) {
-                    if (this.state.watchdogTimer) clearTimeout(this.state.watchdogTimer);
+                if (this.state.pointCount >= 5) {
+                    // Safety Timeout: If we have > 70% progress, start a 6s timer to force finish
+                    // This handles cases where user looks away and progress stalls at e.g. 85%
+                    if (progress > 0.7 && !this.state.safetyTimer) {
+                        this.state.safetyTimer = setTimeout(() => {
+                            if (this.state.running && this.state.pointCount >= 5) {
+                                logW("cal", "Safety timeout triggering finish (stalled?)");
+                                this.finishSequence();
+                            }
+                        }, 6000);
+                    }
 
-                    this.state.watchdogTimer = setTimeout(() => {
-                        this.state.watchdogTimer = null;
-                        if (this.state.running && this.state.pointCount >= 5) {
-                            logW("cal", "Force finishing calibration (watchdog)");
-                            this.finishSequence();
+                    if (progress >= 1.0) {
+                        if (this.state.watchdogTimer) clearTimeout(this.state.watchdogTimer);
+
+                        this.state.watchdogTimer = setTimeout(() => {
+                            this.state.watchdogTimer = null;
+                            if (this.state.running && this.state.pointCount >= 5) {
+                                logW("cal", "Force finishing calibration (watchdog 100%)");
+                                this.finishSequence();
+                            }
+                        }, 700);
+                    } else {
+                        if (this.state.watchdogTimer) {
+                            clearTimeout(this.state.watchdogTimer);
+                            this.state.watchdogTimer = null;
                         }
-                    }, 700);
-                } else {
-                    if (this.state.watchdogTimer) {
-                        clearTimeout(this.state.watchdogTimer);
-                        this.state.watchdogTimer = null;
                     }
                 }
 
