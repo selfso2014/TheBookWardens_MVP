@@ -86,18 +86,14 @@ export class CalibrationManager {
                 setStatus(`Calibrating... ${pct}% (Point ${this.state.pointCount}/1)`);
                 setState("cal", `running (${pct}%)`);
 
-                // Watchdog & Safety for ALL points
-                // Safety Timeout: If we have > 70% progress for 5s, we consider it "done enough"
-                // Note: For points 1-4, SDK doesn't allow forcing "next", so this mostly helps the final point.
+                // Watchdog & Safety
+                // If progress > 70% and stalls for 5s, force finish.
                 if (progress > 0.7 && !this.state.safetyTimer) {
                     this.state.safetyTimer = setTimeout(() => {
-                        // Ideally we want to "go to next point", but SDK only allows finishing the whole process manually.
-                        // So if this happens on the last point, we finish.
-                        // If it happens on points 1-4, we essentially just have to wait, but we'll log it.
-                        logW("cal", `Safety timeout (5s) at >70% for Point ${this.state.pointCount}`);
+                        logW("cal", `Safety timeout (5s) triggered at >70%`);
 
-                        // For 1-point calibration, point 1 is the last point.
-                        if (this.state.running && this.state.pointCount >= 1) {
+                        // Force finish if still running
+                        if (this.state.running) {
                             logW("cal", "Force finishing calibration (stalled)");
                             this.finishSequence();
                         }
@@ -154,6 +150,11 @@ export class CalibrationManager {
     finishSequence() {
         this.state.running = false;
         this.state.point = null;
+
+        // Clear all timers
+        if (this.state.watchdogTimer) { clearTimeout(this.state.watchdogTimer); this.state.watchdogTimer = null; }
+        if (this.state.safetyTimer) { clearTimeout(this.state.safetyTimer); this.state.safetyTimer = null; }
+
         this.ctx.requestRender();
 
         const stage = document.getElementById("stage");
