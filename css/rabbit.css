@@ -1,0 +1,250 @@
+/* === White Rabbit Character (Alice in Wonderland themed for The Book Wardens) === */
+
+.rabbit-container {
+    position: relative;
+    width: 240px;
+    height: 280px;
+    margin: 0 auto;
+}
+
+.rabbit-head {
+    position: relative;
+    width: 180px;
+    height: 200px;
+    background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+    border-radius: 50% 50% 45% 45%;
+    margin: 40px auto 0;
+    box-shadow: 0 10px 40px rgba(139, 47, 201, 0.4),
+        inset 0 -20px 30px rgba(0, 0, 0, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+/* Rabbit Ears */
+.rabbit-ear {
+    position: absolute;
+    width: 40px;
+    height: 120px;
+    background: linear-gradient(180deg, #f5f5f5 0%, #e0e0e0 70%, #d0d0d0 100%);
+    border-radius: 20px 20px 10px 10px;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 5px 20px rgba(139, 47, 201, 0.3),
+        inset 0 10px 20px rgba(255, 192, 203, 0.3);
+}
+
+.rabbit-ear::after {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 80px;
+    background: linear-gradient(180deg, rgba(255, 192, 203, 0.6) 0%, rgba(255, 192, 203, 0.3) 100%);
+    border-radius: 12px 12px 6px 6px;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.left-ear {
+    top: -80px;
+    left: 20px;
+    transform: rotate(-15deg);
+}
+
+.right-ear {
+    top: -80px;
+    right: 20px;
+    transform: rotate(15deg);
+}
+
+/* Rabbit Face */
+.rabbit-face {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 85%;
+    height: 60%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Rabbit Eyes - larger and more expressive */
+.rabbit-eye {
+    width: 50px;
+    height: 55px;
+    background: radial-gradient(circle at 30% 30%, #fff 0%, #f0f0f0 100%);
+    border-radius: 50% 50% 48% 52%;
+    position: relative;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.15),
+        0 0 15px rgba(139, 47, 201, 0.4);
+    border: 2px solid rgba(139, 47, 201, 0.3);
+    margin: 0 10px;
+}
+
+.rabbit-eye .pupil {
+    width: 20px;
+    height: 20px;
+    background: radial-gradient(circle at 30% 30%, #4a148c 0%, #1a0033 100%);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transition: transform 0.05s ease-out;
+    box-shadow: 0 0 8px rgba(139, 47, 201, 0.8);
+}
+
+/* Magical glint in pupil */
+.rabbit-eye .pupil::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: rgba(240, 196, 32, 0.9);
+    border-radius: 50%;
+    top: 4px;
+    right: 4px;
+    box-shadow: 0 0 4px rgba(240, 196, 32, 0.8);
+}
+
+/* Rabbit Nose */
+.rabbit-nose {
+    position: absolute;
+    width: 20px;
+    height: 15px;
+    background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    top: 55%;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 2px 8px rgba(255, 20, 147, 0.5),
+        0 0 10px rgba(139, 47, 201, 0.3);
+}
+
+/* Nose highlight */
+.rabbit-nose::before {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 50%;
+    top: 3px;
+    left: 4px;
+}
+
+/* Whiskers */
+.whiskers {
+    position: absolute;
+    top: 58%;
+    width: 80px;
+    height: 2px;
+}
+
+.whiskers::before,
+.whiskers::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(139, 47, 201, 0.6) 50%, transparent 100%);
+    box-shadow: 0 0 3px rgba(139, 47, 201, 0.4);
+}
+
+.whiskers::before {
+    top: -8px;
+    transform: rotate(-5deg);
+}
+
+.whiskers::after {
+    top: 8px;
+    transform: rotate(5deg);
+}
+
+.left-whiskers {
+    left: -70px;
+    transform: scaleX(-1);
+}
+
+.right-whiskers {
+    right: -70px;
+}
+
+/* Bow Tie (iconic White Rabbit accessory) */
+.rabbit-bowtie {
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 30px;
+    background: linear-gradient(135deg, #8b2fc9 0%, #6a1b9a 100%);
+    clip-path: polygon(0% 50%, 15% 0%, 35% 20%, 50% 0%, 65% 20%, 85% 0%, 100% 50%,
+            85% 100%, 65% 80%, 50% 100%, 35% 80%, 15% 100%);
+    box-shadow: 0 4px 15px rgba(139, 47, 201, 0.6),
+        inset 0 2px 8px rgba(255, 255, 255, 0.2);
+}
+
+/* Center knot of bow tie */
+.rabbit-bowtie::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 20px;
+    background: linear-gradient(135deg, #6a1b9a 0%, #4a148c 100%);
+    border-radius: 3px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Magical aura around rabbit */
+.rabbit-container::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(139, 47, 201, 0.1) 0%, transparent 70%);
+    animation: rabbitGlow 3s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes rabbitGlow {
+
+    0%,
+    100% {
+        opacity: 0.5;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .rabbit-container {
+        width: 200px;
+        height: 240px;
+    }
+
+    .rabbit-head {
+        width: 150px;
+        height: 170px;
+    }
+
+    .rabbit-ear {
+        width: 35px;
+        height: 100px;
+    }
+
+    .rabbit-eye {
+        width: 40px;
+        height: 45px;
+    }
+}

@@ -7,6 +7,7 @@
   <title>SeeSo Eye Tracking Web Demo</title>
   <link rel="stylesheet" href="./css/style.css" />
   <link rel="stylesheet" href="./css/rune-game.css" />
+  <link rel="stylesheet" href="./css/rabbit.css" />
   <script src="./coi-serviceworker.js"></script>
 </head>
 
@@ -107,27 +108,43 @@
       </div>
     </section>
 
-    <!-- SCREEN 1.5: THE WATCHER (Owl Eye Tracking Demo) -->
+    <!-- SCREEN 1.5: THE WHITE RABBIT (Eye Tracking Demo) -->
     <section id="screen-owl" class="screen">
-      <h2 style="color: #f0c420; text-shadow: 0 0 10px #f0c420; font-family: 'Cinzel', serif;">The Watcher</h2>
-      <p style="color: #aaa; margin-bottom: 40px;">Look around... The owl follows your gaze.</p>
+      <h2 style="color: #f0c420; text-shadow: 0 0 10px #f0c420; font-family: 'Cinzel', serif;">The White Rabbit</h2>
+      <p style="color: #aaa; margin-bottom: 40px;">"Oh dear! Oh dear! I shall be too late!" - Follow the Rabbit's
+        gaze...</p>
 
-      <div class="owl-container">
-        <div class="owl-head">
-          <div class="owl-face">
-            <div class="owl-eye" id="eye-left">
+      <div class="rabbit-container">
+        <div class="rabbit-head">
+          <!-- Ears -->
+          <div class="rabbit-ear left-ear"></div>
+          <div class="rabbit-ear right-ear"></div>
+
+          <!-- Face -->
+          <div class="rabbit-face">
+            <!-- Eyes -->
+            <div class="rabbit-eye" id="eye-left">
               <div class="pupil"></div>
             </div>
-            <div class="owl-beak"></div>
-            <div class="owl-eye" id="eye-right">
+            <div class="rabbit-eye" id="eye-right">
               <div class="pupil"></div>
             </div>
+
+            <!-- Nose -->
+            <div class="rabbit-nose"></div>
+
+            <!-- Whiskers -->
+            <div class="whiskers left-whiskers"></div>
+            <div class="whiskers right-whiskers"></div>
           </div>
+
+          <!-- Bow tie (like the White Rabbit) -->
+          <div class="rabbit-bowtie"></div>
         </div>
       </div>
 
       <button class="btn-primary" onclick="Game.startReadingFromOwl()" style="margin-top: 60px;">
-        Open the Book
+        Follow the Rabbit
       </button>
     </section>
 
