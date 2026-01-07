@@ -628,6 +628,12 @@ function attachSeesoCallbacks() {
       // Increment point counter (1-based)
       overlay.calPointCount = (overlay.calPointCount || 0) + 1;
 
+      // Clear any pending watchdog timer from previous point
+      if (overlay.watchdogTimer) {
+        clearTimeout(overlay.watchdogTimer);
+        overlay.watchdogTimer = null;
+      }
+
       overlay.calPoint = { x, y };
       overlay.calRunning = true;
       overlay.calProgress = 0;
@@ -678,7 +684,10 @@ function attachSeesoCallbacks() {
 
       // FORCE FINISH WATCHDOG: If stuck at 100% for > 0.7s AND it's the 5th point, force finish
       if (progress >= 1.0 && overlay.calPointCount >= 5) {
-        setTimeout(() => {
+        if (overlay.watchdogTimer) clearTimeout(overlay.watchdogTimer);
+
+        overlay.watchdogTimer = setTimeout(() => {
+          overlay.watchdogTimer = null;
           if (overlay.calRunning && overlay.calPointCount >= 5) {
             logW("cal", "Force finishing calibration (stuck at 100% on last point)");
 
@@ -697,6 +706,12 @@ function attachSeesoCallbacks() {
             }
           }
         }, 700);
+      } else {
+        // If not 100% or not last point, ensure no pending watchdog
+        if (overlay.watchdogTimer) {
+          clearTimeout(overlay.watchdogTimer);
+          overlay.watchdogTimer = null;
+        }
       }
     });
 
