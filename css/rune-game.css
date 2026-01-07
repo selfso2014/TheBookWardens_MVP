@@ -67,6 +67,22 @@
     filter: blur(1px);
 }
 
+/* Detection radius indicator */
+.rune::after {
+    content: '';
+    position: absolute;
+    width: 800px;
+    /* 400px radius * 2 */
+    height: 800px;
+    border: 2px solid rgba(0, 255, 0, 0.3);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: -1;
+}
+
 .rune.active {
     opacity: 1;
     filter: blur(0);
