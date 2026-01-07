@@ -186,10 +186,15 @@ const Game = {
         this.state.isTracking = true;
         console.log("Reading session started. Waiting for gaze...");
 
-        // Show gaze dot for 15 seconds (15000ms) then fade out
+        // Show gaze dot indefinitely (user request)
         if (typeof window.showGazeDot === "function") {
-            window.showGazeDot(15000);
+            window.showGazeDot(999999);
         }
+    },
+
+    confrontVillain() {
+        this.state.isTracking = false;
+        this.switchScreen("screen-boss");
     },
 
     // Called by app.js (SeeSo overlay)
@@ -215,12 +220,7 @@ const Game = {
             let p = Math.min(100, this.state.readProgress);
             bar.style.width = p + "%";
 
-            // Win condition for reading
-            if (p >= 100) {
-                this.state.isTracking = false;
-                // Delay slightly then move to boss
-                setTimeout(() => this.switchScreen("screen-boss"), 1000);
-            }
+            // Note: Auto-redirection removed. User clicks "Confront Villain" manually.
         }
     },
 

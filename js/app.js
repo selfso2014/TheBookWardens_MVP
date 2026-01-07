@@ -407,15 +407,21 @@ window.showGazeDot = function (durationMs = 15000) {
   if (gazeFadeInterval) clearInterval(gazeFadeInterval);
   gazeFadeTimer = null;
 
-  overlay.gazeOpacity = 1.0;
-
   // Make stage visible for drawing
   const stage = document.getElementById("stage");
   if (stage) stage.classList.add("visible");
 
+  // "Infinite" mode (e.g. > 1000s) -> Static opacity, no fade
+  if (durationMs > 1000000) { // arbitrary large number check
+    overlay.gazeOpacity = 0.3; // More transparent (0.3) so it doesn't block text
+    return;
+  }
+
+  // Normal mode: Fade out
+  overlay.gazeOpacity = 1.0;
   const startTime = performance.now();
 
-  // Fade out linearly over the entire duration (15s)
+  // Fade out linearly over the entire duration
   gazeFadeInterval = setInterval(() => {
     const elapsed = performance.now() - startTime;
     const progress = elapsed / durationMs; // 0.0 -> 1.0
