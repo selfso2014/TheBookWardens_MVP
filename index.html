@@ -110,36 +110,20 @@
 
     <!-- SCREEN 1.5: THE WHITE RABBIT (Eye Tracking Demo) -->
     <section id="screen-owl" class="screen">
-      <h2 style="color: #f0c420; text-shadow: 0 0 10px #f0c420; font-family: 'Cinzel', serif;">The White Rabbit</h2>
+      <h2 style="color: #f0c420; text-shadow: 0 0 10px #f0c420; font-family: 'Cinzel', serif;">Misty the Chronicler</h2>
       <p style="color: #aaa; margin-bottom: 40px;">"Oh dear! Oh dear! I shall be too late!" - Follow the Rabbit's
         gaze...</p>
 
       <div class="rabbit-container">
-        <div class="rabbit-head">
-          <!-- Ears -->
-          <div class="rabbit-ear left-ear"></div>
-          <div class="rabbit-ear right-ear"></div>
+        <!-- Rabbit character image -->
+        <div class="rabbit-image"></div>
 
-          <!-- Face -->
-          <div class="rabbit-face">
-            <!-- Eyes -->
-            <div class="rabbit-eye" id="eye-left">
-              <div class="pupil"></div>
-            </div>
-            <div class="rabbit-eye" id="eye-right">
-              <div class="pupil"></div>
-            </div>
-
-            <!-- Nose -->
-            <div class="rabbit-nose"></div>
-
-            <!-- Whiskers -->
-            <div class="whiskers left-whiskers"></div>
-            <div class="whiskers right-whiskers"></div>
-          </div>
-
-          <!-- Bow tie (like the White Rabbit) -->
-          <div class="rabbit-bowtie"></div>
+        <!-- Eye tracking overlays -->
+        <div class="rabbit-eye-overlay left-eye-overlay">
+          <div class="pupil" id="eye-left-pupil"></div>
+        </div>
+        <div class="rabbit-eye-overlay right-eye-overlay">
+          <div class="pupil" id="eye-right-pupil"></div>
         </div>
       </div>
 
