@@ -452,7 +452,11 @@
             white-space: pre-wrap;">
         <!-- Full text injected here -->
       </div>
-      <button class="btn-primary" onclick="Game.typewriter.showSummaryShare()">Next</button>
+      <div style="display:flex; gap:10px; margin-top: 10px;">
+        <button class="btn-primary" onclick="Game.typewriter.showSummaryShare()">Next</button>
+        <button class="btn-primary" style="background:#444;"
+          onclick="if(window.gazeDataManager) window.gazeDataManager.exportCSV()">Gaze Data Output</button>
+      </div>
     </section>
 
     <!-- SCREEN 6: SUMMARY & SHARE -->

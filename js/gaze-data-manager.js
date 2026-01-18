@@ -103,4 +103,39 @@ export class GazeDataManager {
         this.data = [];
         this.buffer = [];
     }
+
+    exportCSV() {
+        if (!this.data || this.data.length === 0) {
+            alert("No gaze data to export.");
+            return;
+        }
+
+        // CSV Header
+        let csv = "Timestamp,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type\n";
+
+        // Rows
+        this.data.forEach(d => {
+            const row = [
+                d.t,
+                d.x, d.y,
+                d.gx !== undefined ? d.gx.toFixed(2) : "",
+                d.gy !== undefined ? d.gy.toFixed(2) : "",
+                d.vx !== undefined ? d.vx.toFixed(4) : "",
+                d.vy !== undefined ? d.vy.toFixed(4) : "",
+                d.type
+            ];
+            csv += row.join(",") + "\n";
+        });
+
+        // Download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `gaze_session_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 }
