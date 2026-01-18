@@ -211,6 +211,12 @@ const Game = {
             });
             return;
         }
+
+        // Typewriter Gaze Feedback
+        if (this.typewriter && typeof this.typewriter.checkGazeDistance === "function") {
+            // Pass Gaze Data
+            this.typewriter.checkGazeDistance(x, y);
+        }
     },
 
     onCalibrationFinish() {
@@ -260,6 +266,12 @@ Game.typewriter = {
     charIndex: 0,
     timer: null,
     isPaused: false,
+
+    // Debug & Feedback Visuals
+    debugEl100: null,
+    debugEl300: null,
+    labelEl: null,
+    cursorBlob: null,
 
     // Speed and WPM
     baseSpeed: 30, // ms delay
@@ -324,6 +336,7 @@ Game.typewriter = {
         if (this.currentParaIndex >= this.paragraphs.length) {
             Game.switchScreen("screen-win");
             if (this.wpmInterval) clearInterval(this.wpmInterval);
+            this.hideDebugVisuals();
             return;
         }
 
@@ -476,7 +489,81 @@ Game.typewriter = {
 
     onQuizCorrect() {
         this.currentParaIndex++;
+        this.hideDebugVisuals();
         this.playNextParagraph();
+    },
+
+    // --- Gaze Feedback Logic ---
+    hideDebugVisuals() {
+        if (this.debugEl100) this.debugEl100.style.display = "none";
+        if (this.debugEl300) this.debugEl300.style.display = "none";
+        if (this.labelEl) this.labelEl.style.display = "none";
+    },
+
+    checkGazeDistance(gazeX, gazeY) {
+        if (!this.cursorBlob) return;
+        // If cursor is removed (end of paragraph), hide debug
+        if (!this.cursorBlob.isConnected) {
+            this.hideDebugVisuals();
+            return;
+        }
+
+        const rect = this.cursorBlob.getBoundingClientRect();
+        // Center of cursor
+        const cursorX = rect.left + rect.width / 2;
+        const cursorY = rect.top + rect.height / 2;
+
+        // Safety check if cursor is off-screen or hidden
+        if (cursorX === 0 && cursorY === 0) return;
+
+        const dist = Math.hypot(gazeX - cursorX, gazeY - cursorY);
+
+        this.updateDebugVisuals(cursorX, cursorY, dist);
+    },
+
+    updateDebugVisuals(cx, cy, dist) {
+        // Create elements if not exist
+        if (!this.debugEl100) {
+            this.debugEl100 = document.createElement("div");
+            this.debugEl100.className = "debug-circle debug-circle-100";
+            document.body.appendChild(this.debugEl100);
+
+            this.debugEl300 = document.createElement("div");
+            this.debugEl300.className = "debug-circle debug-circle-300";
+            document.body.appendChild(this.debugEl300);
+
+            this.labelEl = document.createElement("div");
+            this.labelEl.className = "cursor-label";
+            document.body.appendChild(this.labelEl);
+        }
+
+        // Update Position (Circles centered on cursor)
+        this.debugEl100.style.left = cx + "px";
+        this.debugEl100.style.top = cy + "px";
+        this.debugEl100.style.display = "block";
+
+        this.debugEl300.style.left = cx + "px";
+        this.debugEl300.style.top = cy + "px";
+        this.debugEl300.style.display = "block";
+
+        // Update Label
+        // Place label to the right of the cursor (approx 30px offset)
+        this.labelEl.style.left = (cx + 30) + "px";
+        this.labelEl.style.top = cy + "px";
+        this.labelEl.style.transform = "translateY(-50%)";
+
+        if (dist <= 100) {
+            this.labelEl.textContent = "Perfect";
+            this.labelEl.className = "cursor-label label-perfect";
+            this.labelEl.style.display = "block";
+        } else if (dist <= 300) {
+            this.labelEl.textContent = "Good";
+            this.labelEl.className = "cursor-label label-good";
+            this.labelEl.style.display = "block";
+        } else {
+            // > 300: No label
+            this.labelEl.style.display = "none";
+        }
     }
 };
 
