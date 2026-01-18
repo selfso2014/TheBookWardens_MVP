@@ -784,16 +784,16 @@ Game.typewriter = {
 
         // Create P
         this.currentP = document.createElement("p");
-        // Add style for visibility
-        this.currentP.style.fontSize = "1.8rem";
+        // Add style for visibility (Font size 30% of original 1.8rem -> 0.6rem)
+        this.currentP.style.fontSize = "0.6rem";
         this.currentP.style.lineHeight = "1.8";
         this.currentP.style.fontFamily = "'Crimson Text', serif";
         this.currentP.style.margin = "20px";
         el.appendChild(this.currentP);
 
-        // Start typing
-        if (this.timer) clearInterval(this.timer);
-        this.timer = setInterval(() => this.tick(), 50); // Speed 50ms
+        // Start typing (use timeout logic in tick)
+        if (this.timer) clearTimeout(this.timer);
+        this.tick();
     },
 
     tick() {
