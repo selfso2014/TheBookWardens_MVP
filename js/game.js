@@ -192,8 +192,6 @@ const Game = {
         this.switchScreen("screen-boss");
     },
 
-    // ... pagination methods omitted for brevity as they are overridden or unused in Typewriter mode usually ...
-
     // Called by app.js (SeeSo overlay)
     onGaze(x, y) {
         // Owl Interaction
@@ -236,13 +234,6 @@ const Game = {
 
 // --- Typewriter Mode Logic (New) ---
 Game.typewriter = {
-    // Data with chunk markers
-    // User provided text with '/' for chunks.
-    // I will replace '/' with a special marker or handle it logic.
-    // Actually, I will pre-process the raw text here into an array of chunks for each paragraph.
-    // But since `paragraphs` is expected to be an array of strings (chunks) or paragraphs?
-    // User requests "chunks". 
-    // Implementation: I will split paragraphs by newline first, then keep the `/` logic for pausing.
     paragraphs: [
         "Alice was beginning to get very tired / of sitting by her sister / on the bank, / and of having nothing to do: / once or twice / she had peeped into the book / her sister was reading, / but it had no pictures / or conversations / in it, / “and what is the use of a book,” / thought Alice / “without pictures / or conversations?”",
 
@@ -289,12 +280,9 @@ Game.typewriter = {
         const el = document.getElementById("book-content");
         if (el) {
             el.innerHTML = "";
-            // Fix layout: Remove column properties causing "center expansion" effect
             el.style.columnCount = "auto";
             el.style.columnWidth = "auto";
             el.style.columnGap = "normal";
-
-            // Enforce fixed box layout
             el.style.display = "block";
             el.style.textAlign = "left";
             el.style.height = "60vh";
@@ -310,19 +298,9 @@ Game.typewriter = {
     },
 
     changeSpeed(delta) {
-        // Decrease delay = Increase speed
-        // Button + -> Increase Speed -> Decrease Delay
-        // Button - -> Decrease Speed -> Increase Delay
-        // Oops, user said: "(+)버튼 누르면 글자 보이는 속도 증가" -> Delay must decrease.
-        // changeSpeed(10) called by (+) -> should decrease delay.
-
-        // Let's interpret delta as "Speed Up factor"
-        // If delta is positive (+10), we subtract from delay to make it faster.
-        // If delta is negative (-10), we add to delay to make it slower.
-
         this.baseSpeed -= delta;
-        if (this.baseSpeed < 5) this.baseSpeed = 5; // Max speed
-        if (this.baseSpeed > 200) this.baseSpeed = 200; // Min speed
+        if (this.baseSpeed < 5) this.baseSpeed = 5;
+        if (this.baseSpeed > 200) this.baseSpeed = 200;
     },
 
     updateWPM() {
@@ -364,12 +342,25 @@ Game.typewriter = {
         }
 
         this.currentP = document.createElement("p");
-        // Font size 50% decrease -> 1.2rem
-        this.currentP.style.fontSize = "1.2rem";
+
+        // Font size ~10% smaller than 1.2rem -> ~1.1rem
+        // Mobile layout adjustment
+        const isMobile = window.innerWidth <= 768;
+        this.currentP.style.fontSize = isMobile ? "1.0rem" : "1.1rem";
         this.currentP.style.textAlign = "left";
         this.currentP.style.lineHeight = "1.5";
         this.currentP.style.fontFamily = "'Crimson Text', serif";
-        this.currentP.style.margin = "20px";
+
+        // Mobile Layout: Wider box, smaller margins
+        if (isMobile) {
+            this.currentP.style.margin = "10px 5px";
+            el.style.padding = "10px";
+            el.style.width = "98%";
+        } else {
+            this.currentP.style.margin = "20px";
+            el.style.padding = "20px";
+            el.style.width = "100%";
+        }
 
         // Create Cursor
         this.cursorBlob = document.createElement("span");
@@ -379,14 +370,15 @@ Game.typewriter = {
         el.appendChild(this.currentP);
 
         if (this.timer) clearTimeout(this.timer);
-        this.tick();
+
+        // Wait for 3 cursor blinks (0.8s * 3 = 2400ms) before starting
+        setTimeout(() => {
+            this.tick();
+        }, 2400);
     },
 
     tick() {
         if (this.isPaused) {
-            // Track pause time if not already handled? 
-            // Logic handles pause via explicit flags, but we need time tracking.
-            // Usually pause happens at end of paragraph.
             return;
         }
 
@@ -410,8 +402,6 @@ Game.typewriter = {
             const charNode = document.createTextNode(char);
             this.currentP.insertBefore(charNode, this.cursorBlob);
 
-            // Count Words (Space or Chunk Split)
-            // Simple naive count: if char is space, count++
             if (char === ' ') this.wordCount++;
 
             this.charIndex++;
@@ -423,8 +413,7 @@ Game.typewriter = {
 
         // Check if finished
         if (this.charIndex >= this.currentText.length) {
-            this.isPaused = true;
-            this.pauseStartTimestamp = Date.now(); // Start Pause Tracking
+            this.pauseStartTimestamp = Date.now();
 
             if (this.currentP.contains(this.cursorBlob)) {
                 this.currentP.removeChild(this.cursorBlob);
@@ -435,10 +424,10 @@ Game.typewriter = {
             }, 1000);
         } else {
             // Speed Logic
-            let nextDelay = this.baseSpeed; // Use variable base speed
+            let nextDelay = this.baseSpeed;
 
             if (isChunkEnd) {
-                nextDelay = 800; // Explicit chunk pause (Fixed)
+                nextDelay = 800; // Explicit chunk pause
             } else {
                 const lastChar = char;
                 if (lastChar === '.' || lastChar === '!' || lastChar === '?') {
