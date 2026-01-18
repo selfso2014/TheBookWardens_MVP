@@ -299,13 +299,18 @@ Game.typewriter = {
         this.isPaused = false;
 
         this.currentP = document.createElement("p");
-        // Font size 2x of previous 0.6rem -> 1.2rem
-        // Force Left Alignment
-        this.currentP.style.fontSize = "1.2rem";
+        // Font size 2x of previous 1.2rem -> 2.4rem
+        this.currentP.style.fontSize = "2.4rem";
         this.currentP.style.textAlign = "left";
-        this.currentP.style.lineHeight = "1.8";
+        this.currentP.style.lineHeight = "1.5";
         this.currentP.style.fontFamily = "'Crimson Text', serif";
         this.currentP.style.margin = "20px";
+
+        // Create Cursor
+        this.cursorBlob = document.createElement("span");
+        this.cursorBlob.className = "cursor";
+        this.currentP.appendChild(this.cursorBlob);
+
         el.appendChild(this.currentP);
 
         if (this.timer) clearTimeout(this.timer);
@@ -330,9 +335,10 @@ Game.typewriter = {
             }
         }
 
-        // Add char to P (unless we just ended)
+        // Add char to P (insert before cursor)
         if (this.charIndex < this.currentText.length) {
-            this.currentP.textContent += char;
+            const charNode = document.createTextNode(char);
+            this.currentP.insertBefore(charNode, this.cursorBlob);
             this.charIndex++;
         }
 
@@ -343,20 +349,22 @@ Game.typewriter = {
         // Check if finished
         if (this.charIndex >= this.currentText.length) {
             this.isPaused = true;
+            // Remove cursor after done? Or keep blinking? User didn't specify, but nice to remove or stop.
+            // Reference code keeps removing it per paragraph.
+            if (this.currentP.contains(this.cursorBlob)) {
+                this.currentP.removeChild(this.cursorBlob);
+            }
+
             setTimeout(() => {
                 this.showVillainQuiz();
             }, 1000);
         } else {
             // Speed Logic
-            // Default fast: 20ms
-            // Chunk end ('/' or punctuation): 600ms
-            let nextDelay = 30;
+            let nextDelay = 30; // Fast base speed
 
             if (isChunkEnd) {
-                nextDelay = 800; // Explicit chunk pause
+                nextDelay = 800; // Chunk End
             } else {
-                // Keep some punctuation pauses too if not slashed?
-                // User provided slash logic, so rely mainly on that, but maybe keep sentence end too.
                 const lastChar = char;
                 if (lastChar === '.' || lastChar === '!' || lastChar === '?') {
                     nextDelay = 600;

@@ -97,6 +97,30 @@
       white-space: pre-wrap;
       /* Preserve formatting */
     }
+
+    .cursor {
+      display: inline-block;
+      width: 3px;
+      min-height: 1.2em;
+      /*폰트 크기에 비례 */
+      background-color: #f0c420;
+      /* Gold Cursor */
+      vertical-align: text-bottom;
+      animation: blink 0.8s infinite;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 
