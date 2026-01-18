@@ -491,9 +491,7 @@ Game.typewriter = {
             Game.updateUI();
 
             // Invoke Villain
-            const qIndex = (Game.state.level - 1) % this.quizzes.length;
-            const qData = this.quizzes[qIndex];
-            Game.invokeVillain(qData);
+            this.openQuizModal();
         }, 4000);
     },
 
