@@ -761,6 +761,163 @@ const Game = {
     }
 };
 
+// --- Typewriter Mode Logic (New) ---
+typewriter: {
+    paragraphs: [
+        "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, “and what is the use of a book,” thought Alice “without pictures or conversations?”",
+
+        "So she was considering in her own mind (as well as she could, for the hot day made her feel very sleepy and stupid), whether the pleasure of making a daisy-chain would be worth the trouble of getting up and picking the daisies, when suddenly a White Rabbit with pink eyes ran close by her.",
+
+        "There was nothing so VERY remarkable in that; nor did Alice think it so VERY much out of the way to hear the Rabbit say to itself, “Oh dear! Oh dear! I shall be late!” (when she thought it over afterwards, it occurred to her that she ought to have wondered at this, but at the time it all seemed quite natural);",
+
+        "But when the Rabbit actually TOOK A WATCH OUT OF ITS WAISTCOAT-POCKET, and looked at it, and then hurried on, Alice started to her feet, for it flashed across her mind that she had never before seen a rabbit with either a waistcoat-pocket, or a watch to take out of it, and burning with curiosity, she ran across the field after it.",
+
+        "In another moment down went Alice after it, never once considering how in the world she was to get out again. The rabbit-hole went straight on like a tunnel for some way, and then dipped suddenly down, so suddenly that Alice had not a moment to think about stopping herself before she found herself falling down a very deep well."
+    ],
+        quizzes: [
+            { q: "Why was Alice bored?", o: ["It was raining.", "The book had no pictures.", "She was hungry."], a: 1 },
+            { q: "What did Alice see?", o: ["A White Rabbit.", "A Cheshire Cat.", "A Mad Hatter."], a: 0 },
+            { q: "What did the Rabbit say?", o: ["I'm hungry!", "Oh dear! I shall be late!", "Hello Alice!"], a: 1 },
+            { q: "What did the Rabbit pull out?", o: ["A carrot.", "A watch.", "A map."], a: 1 },
+            { q: "Where did Alice fall?", o: ["Up a tree.", "Into a deep well.", "Into a river."], a: 1 }
+        ],
+            currentParaIndex: 0,
+                currentText: "",
+                    charIndex: 0,
+                        timer: null,
+                            isPaused: false,
+
+                                start() {
+        // Reset
+        this.currentParaIndex = 0;
+        const el = document.getElementById("book-content");
+        if (el) {
+            el.innerHTML = "";
+            el.style.columnCount = "1"; // Reset column layout if any
+            el.style.height = "auto";
+            el.style.overflowY = "auto";
+        }
+        this.playNextParagraph();
+    },
+
+    playNextParagraph() {
+        const el = document.getElementById("book-content");
+        if (!el) return;
+
+        // Clear screen for new paragraph (User Req: 1. Empty screen ... 4. Like this repeatedly)
+        // Wait, User said: "1. Empty screen... 4. Like this repeatedly (implying sequence)... 5. After paragraph ends... 6. If all done..."
+        // "1번으로 돌아간다" means after quiz, screen clears again.
+        el.innerHTML = "";
+
+        if (this.currentParaIndex >= this.paragraphs.length) {
+            Game.switchScreen("screen-win");
+            return;
+        }
+
+        this.currentText = this.paragraphs[this.currentParaIndex];
+        this.charIndex = 0;
+        this.isPaused = false;
+
+        // Create P
+        this.currentP = document.createElement("p");
+        // Add style for visibility
+        this.currentP.style.fontSize = "1.8rem";
+        this.currentP.style.lineHeight = "1.8";
+        this.currentP.style.fontFamily = "'Crimson Text', serif";
+        this.currentP.style.margin = "20px";
+        el.appendChild(this.currentP);
+
+        // Start typing
+        if (this.timer) clearInterval(this.timer);
+        this.timer = setInterval(() => this.tick(), 50); // Speed 50ms
+    },
+
+    tick() {
+        if (this.isPaused) return;
+
+        this.charIndex++;
+        this.currentP.textContent = this.currentText.substring(0, this.charIndex);
+
+        // Auto-scroll to bottom if needed (User mentioned 'scroll up' code, assuming we just follow bottom)
+        const el = document.getElementById("book-content");
+        if (el) el.scrollTop = el.scrollHeight;
+
+        if (this.charIndex >= this.currentText.length) {
+            clearInterval(this.timer);
+            this.isPaused = true;
+
+            // 1 sec delay then Quiz
+            setTimeout(() => {
+                this.showVillainQuiz();
+            }, 1000);
+        }
+    },
+
+    showVillainQuiz() {
+        const modal = document.getElementById("villain-modal");
+        const qEl = document.getElementById("quiz-text");
+        const oEl = document.getElementById("quiz-options");
+
+        if (!modal || !qEl || !oEl) return;
+
+        // Get quiz
+        const qData = this.quizzes[this.currentParaIndex] || { q: "Continue?", o: ["Yes", "No", "Maybe"], a: 0 };
+
+        qEl.textContent = qData.q;
+        oEl.innerHTML = "";
+
+        qData.o.forEach((optText, idx) => {
+            const btn = document.createElement("button");
+            btn.className = "quiz-btn";
+            btn.textContent = optText;
+            btn.onclick = () => {
+                if (idx === qData.a) {
+                    btn.classList.add("correct");
+                    setTimeout(() => {
+                        modal.style.display = "none";
+                        this.onQuizCorrect();
+                    }, 500);
+                } else {
+                    btn.classList.add("wrong");
+                    setTimeout(() => btn.classList.remove("wrong"), 500);
+                }
+            };
+            oEl.appendChild(btn);
+        });
+
+        modal.style.display = "flex";
+    },
+
+    onQuizCorrect() {
+        this.currentParaIndex++;
+        this.playNextParagraph();
+    }
+},
+
+// Override startReadingSession
+startReadingSession() {
+    console.log("Starting Typewriter Logic...");
+
+    // Show gaze dot?
+    if (typeof window.showGazeDot === "function") window.showGazeDot(999999);
+
+    // Setup UI
+    const el = document.getElementById("book-content");
+    if (el) {
+        // Reset styles specific to Rift mode if any
+        el.style.columnWidth = "auto";
+        el.style.columnGap = "normal";
+    }
+
+    // Hide rift specific UI
+    const bar = document.querySelector(".rift-seal-bar");
+    if (bar) bar.style.display = "none";
+
+    // Start Typewriter
+    this.typewriter.start();
+}
+};
+
 // Expose to window for HTML onclicks
 window.Game = Game;
 
