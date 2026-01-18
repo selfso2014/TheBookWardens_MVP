@@ -598,17 +598,22 @@ Game.typewriter = {
             btn.onclick = () => {
                 if (idx === answerIdx) {
                     // Boss Defeated
-                    alert(`Boss Defeated! You sealed the rift with ${Game.state.ink} Ink and ${Game.state.gems} Gems!`);
-                    Game.switchScreen("screen-home");
+                    // alert(`Boss Defeated! You sealed the rift with ${Game.state.ink} Ink and ${Game.state.gems} Gems!`);
+                    Game.updateUI(); // Update UI before switching to win screen
+                    Game.switchScreen("screen-win");
                 } else {
-                    // Wrong -> Lose ALL Gems? Or just one? User said "Gem이 날라간다. Gem이 모두 소진하면 처음부터 다시"
-                    Game.state.gems = (Game.state.gems || 0) - 10; // Big penalty
-                    if (Game.state.gems < 0) {
+                    // Boss Damage
+                    Game.state.gems = Math.max(0, (Game.state.gems || 0) - 10); // Big penalty
+                    Game.updateUI();
+
+                    if (Game.state.gems <= 0) {
                         alert("Game Over! Your Gems have been depleted.");
                         location.reload();
                     } else {
-                        alert("The Shadow attacks! You lost 10 Gems. Try again!");
-                        Game.updateUI();
+                        // Visual feedback for wrong answer instead of alert
+                        btn.classList.add("wrong");
+                        setTimeout(() => btn.classList.remove("wrong"), 500);
+                        // Optional: Shake effect on screen
                     }
                 }
             };
