@@ -558,7 +558,7 @@ Game.typewriter = {
                 oEl.appendChild(btn);
             });
 
-        }, 2000);
+        }, 3000);
     },
 
     onQuizCorrect() {
