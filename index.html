@@ -158,6 +158,13 @@
         opacity: 1;
       }
     }
+
+    .villain-img {
+      width: 150px;
+      height: auto;
+      margin-bottom: 15px;
+      filter: drop-shadow(0 0 10px rgba(138, 43, 226, 0.6));
+    }
   </style>
 </head>
 
@@ -406,7 +413,8 @@
 
     <!-- SCREEN 3: BOSS BATTLE (Comprehension) -->
     <section id="screen-boss" class="screen">
-      <div class="boss-avatar"></div>
+      <img src="./ink_shadow_boss.png" class="villain-img" alt="The Ink Shadow"
+        style="width: 200px; margin-bottom: 20px;">
       <div class="boss-dialogue">
         <h3 style="margin: 0 0 10px 0; color: #f00;">The Ink Shadow asks:</h3>
         <p id="boss-question">"Why did Alice follow the Rabbit?"</p>
@@ -446,7 +454,7 @@
 
       <!-- Quiz Container -->
       <div id="quiz-container">
-        <div class="villain-avatar">🎩</div>
+        <img src="./ink_shadow_boss.png" class="villain-img" alt="The Timekeeper">
         <h2 class="villain-title">The Timekeeper</h2>
         <p id="quiz-text" class="quiz-question">...</p>
         <div id="quiz-options" class="quiz-options"></div>
