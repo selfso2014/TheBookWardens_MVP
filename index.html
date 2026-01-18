@@ -340,37 +340,54 @@
         </p>
       </div>
 
-      <div id="read-progress" class="rift-seal-fill"></div>
-  </div>
-  <p style="margin-top: 10px; font-size: 0.8rem; color: #777;">Read to seal the rift...</p>
+      <!-- Speed Controls -->
+      <div id="read-controls"
+        style="display: flex; justify-content: center; align-items: center; margin-top: 20px; width: 100%; gap: 20px;">
+        <button class="btn-secondary" onclick="Game.typewriter.changeSpeed(-10)"
+          style="font-size: 1.5rem; width: 50px;">-</button>
+        <div style="text-align: center; position: relative;">
+          <div id="gaze-feedback-label" style="font-size: 1rem; font-weight: bold; height: 1.5em; margin-bottom: 2px;">
+          </div>
+          <span id="wpm-display" style="color: #f0c420; font-size: 1.5rem; font-weight: bold; display: block;">0
+            WPM</span>
+          <span style="color: #888; font-size: 0.8rem;">Reading Speed</span>
+        </div>
+        <button class="btn-secondary" onclick="Game.typewriter.changeSpeed(10)"
+          style="font-size: 1.5rem; width: 50px;">+</button>
+      </div>
 
-  <button id="btn-confront-villain" class="btn-primary"
-    style="display: none; margin-top: 30px; background: #ff4444; width: 100%;" onclick="Game.confrontVillain()">
-    Confront the Ink Shadow
-  </button>
-  </section>
+      <div class="rift-seal-bar" style="display:none;">
+        <div id="read-progress" class="rift-seal-fill"></div>
+      </div>
+      <p style="margin-top: 10px; font-size: 0.8rem; color: #777;">Read to seal the rift...</p>
 
-  <!-- SCREEN 3: BOSS BATTLE (Comprehension) -->
-  <section id="screen-boss" class="screen">
-    <div class="boss-avatar"></div>
-    <div class="boss-dialogue">
-      <h3 style="margin: 0 0 10px 0; color: #f00;">The Ink Shadow asks:</h3>
-      <p id="boss-question">"Why did Alice follow the Rabbit?"</p>
-    </div>
+      <button id="btn-confront-villain" class="btn-primary"
+        style="display: none; margin-top: 30px; background: #ff4444; width: 100%;" onclick="Game.confrontVillain()">
+        Confront the Ink Shadow
+      </button>
+    </section>
 
-    <div id="boss-options" style="width: 100%; max-width: 500px;">
-      <button class="option-btn" onclick="Game.checkBoss(0)">A. Because it was late for a party.</button>
-      <button class="option-btn" onclick="Game.checkBoss(1)">B. Because she was bored.</button>
-    </div>
-  </section>
+    <!-- SCREEN 3: BOSS BATTLE (Comprehension) -->
+    <section id="screen-boss" class="screen">
+      <div class="boss-avatar"></div>
+      <div class="boss-dialogue">
+        <h3 style="margin: 0 0 10px 0; color: #f00;">The Ink Shadow asks:</h3>
+        <p id="boss-question">"Why did Alice follow the Rabbit?"</p>
+      </div>
 
-  <!-- SCREEN 4: VICTORY -->
-  <section id="screen-win" class="screen">
-    <h1 style="color: gold;">Rift Sealed!</h1>
-    <p>You have restored the meaning of this page.</p>
-    <div style="font-size: 3rem; margin: 20px;">💎 +50</div>
-    <button class="btn-primary" onclick="location.reload()">Next Day</button>
-  </section>
+      <div id="boss-options" style="width: 100%; max-width: 500px;">
+        <button class="option-btn" onclick="Game.checkBoss(0)">A. Because it was late for a party.</button>
+        <button class="option-btn" onclick="Game.checkBoss(1)">B. Because she was bored.</button>
+      </div>
+    </section>
+
+    <!-- SCREEN 4: VICTORY -->
+    <section id="screen-win" class="screen">
+      <h1 style="color: gold;">Rift Sealed!</h1>
+      <p>You have restored the meaning of this page.</p>
+      <div style="font-size: 3rem; margin: 20px;">💎 +50</div>
+      <button class="btn-primary" onclick="location.reload()">Next Day</button>
+    </section>
 
   </div>
 
