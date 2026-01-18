@@ -108,6 +108,17 @@
       vertical-align: text-bottom;
       animation: blink 0.8s infinite;
       margin-left: 2px;
+      transition: box-shadow 0.2s;
+    }
+
+    .cursor.glow-good {
+      box-shadow: 0 0 10px 2px rgba(255, 215, 0, 0.6);
+      /* Gold glow */
+    }
+
+    .cursor.glow-perfect {
+      box-shadow: 0 0 20px 5px rgba(0, 255, 0, 0.8), 0 0 40px 10px rgba(0, 255, 0, 0.4);
+      /* Strong Green glow */
     }
 
     @keyframes blink {

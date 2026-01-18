@@ -554,14 +554,25 @@ Game.typewriter = {
             labelEl.style.color = "#00ff00";
             labelEl.style.textShadow = "0 0 5px #00ff00";
             labelEl.style.display = "block";
+
+            if (this.cursorBlob) {
+                this.cursorBlob.className = "cursor glow-perfect";
+            }
         } else if (dist <= 300) {
             labelEl.textContent = "Good";
             labelEl.style.color = "#ffd700";
             labelEl.style.textShadow = "none";
             labelEl.style.display = "block";
+
+            if (this.cursorBlob) {
+                this.cursorBlob.className = "cursor glow-good";
+            }
         } else {
             // > 300: Clear or show nothing
             labelEl.textContent = "";
+            if (this.cursorBlob) {
+                this.cursorBlob.className = "cursor"; // Normal
+            }
         }
     }
 };
