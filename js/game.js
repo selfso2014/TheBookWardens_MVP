@@ -408,8 +408,16 @@ Game.typewriter = {
 
             this.charIndex++; // Skip the slash
 
+            // Skip any immediate space after slash so the pause is felt BEFORE the next word starts
+            while (this.charIndex < this.currentText.length && this.currentText[this.charIndex] === ' ') {
+                this.charIndex++;
+                // Manually add space to DOM so spacing is preserved, but we won't spend a tick printing it
+                const space = document.createTextNode(" ");
+                this.currentP.insertBefore(space, this.cursorBlob);
+            }
+
             // Schedule the pause and RETURN. 
-            // The next character will be printed in the *next* tick call.
+            // The next character (the start of the real word) will be printed in the *next* tick call.
             this.timer = setTimeout(() => this.tick(), this.chunkDelay);
             return;
         }
