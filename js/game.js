@@ -397,10 +397,14 @@ Game.typewriter = {
         // Advance character
         let char = this.currentText[this.charIndex];
 
-        let isChunkEnd = false;
         if (char === '/') {
             isChunkEnd = true;
             this.currentLineIndex = (this.currentLineIndex || 0) + 1;
+
+            // Insert line break to match LineIndex visually
+            const br = document.createElement("br");
+            this.currentP.insertBefore(br, this.cursorBlob);
+
             this.charIndex++;
             if (this.charIndex < this.currentText.length) {
                 char = this.currentText[this.charIndex];
