@@ -418,7 +418,9 @@ Game.typewriter = {
 
             // Schedule the pause and RETURN. 
             // The next character (the start of the real word) will be printed in the *next* tick call.
-            this.timer = setTimeout(() => this.tick(), this.chunkDelay);
+            const delay = this.chunkDelay || 2000;
+            console.log(`[Game] Chunk Pause: ${delay}ms`);
+            this.timer = setTimeout(() => this.tick(), delay);
             return;
         }
 
