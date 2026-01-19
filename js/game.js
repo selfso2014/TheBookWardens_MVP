@@ -387,6 +387,11 @@ Game.typewriter = {
         if (this.timer) clearTimeout(this.timer);
 
         // Wait for 3 cursor blinks (0.8s * 3 = 2400ms) before starting
+        if (window.gazeDataManager) {
+            console.log("[Game] Resetting Gaze Data for new session (Start from blink 1)");
+            window.gazeDataManager.reset();
+        }
+
         setTimeout(() => {
             this.tick();
         }, 2400);
@@ -458,9 +463,19 @@ Game.typewriter = {
                 this.currentP.removeChild(this.cursorBlob);
             }
 
+            // User Requirement: End recording 3 seconds after last character
+            console.log("[Game] Text finished. Waiting 3s for final gaze data...");
             setTimeout(() => {
+                // 1. Export CSV (End of Recording)
+                if (window.gazeDataManager && !Game.hasExported) {
+                    console.log("[Game] 3s elapsed. Exporting CSV.");
+                    window.gazeDataManager.exportCSV();
+                    Game.hasExported = true;
+                }
+
+                // 2. Proceed to Visuals
                 this.showVillainQuiz();
-            }, 1000);
+            }, 3000);
         } else {
             // Speed Logic
             let nextDelay = this.baseSpeed;
