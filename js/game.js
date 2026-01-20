@@ -976,6 +976,9 @@ Game.typewriter = {
 
         const visualLines = this.getVisualLines(this.currentP);
         const lineGroups = {};
+        // Get content container position for absolute alignment
+        const contentEl = document.getElementById("book-content");
+        const contentRect = contentEl ? contentEl.getBoundingClientRect() : { top: 0 };
 
         // 2. Pre-calculation: Min/Max X per line
         // Revert to using 'gx' for simple trace
@@ -1027,8 +1030,14 @@ Game.typewriter = {
                 }
                 normX = Math.max(0, Math.min(1, normX));
                 Dx = vLine.left + normX * (vLine.right - vLine.left);
-                // USER REQUEST: Center Y-axis (0.5)
-                Dy = vLine.top + (vLine.bottom - vLine.top) * 0.5;
+
+                // USER FIX: Use lineYData for Y-axis accuracy to prevent drift vs Red Lines
+                if (this.lineYData && this.lineYData[visualIdx]) {
+                    // y is offsetTop (Top of line). Add ~16px to center (assuming ~30px line height)
+                    Dy = contentRect.top + this.lineYData[visualIdx].y + 16;
+                } else {
+                    Dy = vLine.top + (vLine.bottom - vLine.top) * 0.5;
+                }
             } else {
                 return;
             }
