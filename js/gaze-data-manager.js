@@ -612,6 +612,27 @@ export class GazeDataManager {
 
         const count = validLines.length;
         console.log(`[GazeDataManager] V3 Line Detection: Found ${count} lines.`, validLines);
+
+        // USER REQUEST: Display Text Extrema in Console
+        const extremaPoints = [];
+        this.data.forEach((d, i) => {
+            if (d.extrema) {
+                extremaPoints.push({
+                    index: i,
+                    t: d.t,
+                    gx: d.gx !== null ? parseFloat(d.gx.toFixed(2)) : null,
+                    extremaType: d.extrema
+                });
+            }
+        });
+        console.log("========== TEXT EXTREMA POINTS ==========");
+        if (extremaPoints.length > 0) {
+            console.table(extremaPoints);
+        } else {
+            console.log("No extrema points detected.");
+        }
+        console.log("=========================================");
+
         return count;
     }
 }
