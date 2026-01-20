@@ -997,7 +997,8 @@ Game.typewriter = {
                 if (d.detectedLineIndex !== lastLineIdx) {
                     if (rawDelta > 50) effectiveDelta = 50;
                 }
-                virtualTime += effectiveDelta;
+                // USER REQUEST: Double Speed (delta / 2)
+                virtualTime += effectiveDelta / 2;
             }
             lastRawT = d.t;
             lastLineIdx = d.detectedLineIndex;
@@ -1019,7 +1020,8 @@ Game.typewriter = {
                 }
                 normX = Math.max(0, Math.min(1, normX));
                 Dx = vLine.left + normX * (vLine.right - vLine.left);
-                Dy = vLine.top + (vLine.bottom - vLine.top) * 0.35;
+                // USER REQUEST: Center Y-axis (0.5)
+                Dy = vLine.top + (vLine.bottom - vLine.top) * 0.5;
             } else {
                 return;
             }
