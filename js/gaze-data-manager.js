@@ -143,7 +143,7 @@ export class GazeDataManager {
         }
 
         // CSV Header
-        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,LineIndex,CharIndex\n";
+        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,LineIndex,CharIndex,AlgoLineIndex\n";
 
         // Rows
         this.data.forEach(d => {
@@ -156,7 +156,8 @@ export class GazeDataManager {
                 d.vy !== undefined ? d.vy.toFixed(4) : "",
                 d.type,
                 (d.lineIndex !== undefined && d.lineIndex !== null) ? d.lineIndex : "",
-                (d.charIndex !== undefined && d.charIndex !== null) ? d.charIndex : ""
+                (d.charIndex !== undefined && d.charIndex !== null) ? d.charIndex : "",
+                (d.detectedLineIndex !== undefined) ? d.detectedLineIndex : ""
             ];
             csv += row.join(",") + "\n";
         });
@@ -183,6 +184,132 @@ export class GazeDataManager {
     }
     // --- Line Detection Algorithm (Mobile / Typewriter) ---
     detectLinesMobile() {
+        if (this.data.length < 10) return 0;
+
+        // 1. Gaussian Smoothing (Sigma = 3) for X and Y
+        const sigma = 3;
+        const radius = Math.ceil(3 * sigma);
+        const kernelSize = 2 * radius + 1;
+        const kernel = new Float32Array(kernelSize);
+        let sumK = 0;
+
+        for (let i = 0; i < kernelSize; i++) {
+            const x = i - radius;
+            const val = Math.exp(-(x * x) / (2 * sigma * sigma));
+            kernel[i] = val;
+            sumK += val;
+        }
+        for (let i = 0; i < kernelSize; i++) kernel[i] /= sumK;
+
+        const x1 = new Float32Array(this.data.length);
+        const y1 = new Float32Array(this.data.length);
+
+        for (let i = 0; i < this.data.length; i++) {
+            let sumX = 0, sumY = 0, wSum = 0;
+            for (let k = 0; k < kernelSize; k++) {
+                const idx = i + (k - radius);
+                if (idx >= 0 && idx < this.data.length) {
+                    sumX += this.data[idx].x * kernel[k];
+                    sumY += this.data[idx].y * kernel[k];
+                    wSum += kernel[k];
+                }
+            }
+            x1[i] = sumX / wSum;
+            y1[i] = sumY / wSum;
+        }
+
+        // 2. Find Extremes (Maxima & Minima) on smoothed X
+        const maxima = [];
+        const minima = [];
+        const win = 10;
+
+        for (let i = win; i < x1.length - win; i++) {
+            let isMax = true;
+            let isMin = true;
+            for (let j = 1; j <= win; j++) {
+                if (x1[i] <= x1[i - j] || x1[i] <= x1[i + j]) isMax = false;
+                if (x1[i] >= x1[i - j] || x1[i] >= x1[i + j]) isMin = false;
+            }
+            if (isMax) maxima.push({ index: i, value: x1[i], t: this.data[i].t, y: y1[i] });
+            if (isMin) minima.push({ index: i, value: x1[i], t: this.data[i].t, y: y1[i] });
+        }
+
+        // 3. Advanced Validation (Return Sweep & Reading)
+        const validLines = []; // Stores { startIdx, endIdx, lineNum }
+        const AMP_THRESHOLD = 50; // Min line width (px)
+        const SPEED_THRESHOLD = 0.3; // Min Return Sweep Speed (px/ms)
+        const READING_MIN_DURATION = 200; // Min time to read a line (ms)
+        const Y_TOLERANCE = 50; // Allowed upward drift (px) - generous for mobile
+
+        let lineCounter = 1;
+
+        // Iterate through all Maxima (Potential end of lines)
+        for (let i = 0; i < maxima.length; i++) {
+            const currentPeak = maxima[i];
+
+            // A. Find the immediate next Minima (End of Return Sweep / Start of next line)
+            let nextValley = null;
+            for (let j = 0; j < minima.length; j++) {
+                if (minima[j].index > currentPeak.index) {
+                    nextValley = minima[j];
+                    break;
+                }
+            }
+
+            // B. Find the preceding Minima (Start of THIS line)
+            let prevValley = null;
+            for (let j = minima.length - 1; j >= 0; j--) {
+                if (minima[j].index < currentPeak.index) {
+                    prevValley = minima[j];
+                    break;
+                }
+            }
+
+            if (!prevValley || !nextValley) continue;
+
+            // Check 1: Amplitude (Width of sweep or line width)
+            // Return Sweep Amplitude: Peak(Right) - NextValley(Left) > Threshold
+            const sweepAmp = currentPeak.value - nextValley.value;
+            if (sweepAmp < AMP_THRESHOLD) continue;
+
+            // Check 2: Return Sweep Velocity
+            const sweepDuration = nextValley.t - currentPeak.t;
+            if (sweepDuration <= 0) continue;
+            const sweepSpeed = sweepAmp / sweepDuration;
+            if (sweepSpeed < SPEED_THRESHOLD) continue;
+
+            // Check 3: Y-Trend (Should go down or stay similar)
+            // Next Valley Y should be >= Current Peak Y (allowing tolerance)
+            if (nextValley.y < currentPeak.y - Y_TOLERANCE) continue;
+
+            // Check 4: Reading Duration (PrevValley -> Peak)
+            const readDuration = currentPeak.t - prevValley.t;
+            if (readDuration < READING_MIN_DURATION) continue;
+
+            // Valid Line Detected: From PrevValley to CurrentPeak
+            validLines.push({
+                startIdx: prevValley.index,
+                endIdx: currentPeak.index,
+                lineNum: lineCounter++
+            });
+        }
+
+        // 4. Mark Data for CSV
+        // Reset old markings
+        for (let i = 0; i < this.data.length; i++) delete this.data[i].detectedLineIndex;
+
+        validLines.forEach(line => {
+            for (let k = line.startIdx; k <= line.endIdx; k++) {
+                this.data[k].detectedLineIndex = line.lineNum;
+            }
+        });
+
+        const count = validLines.length;
+        console.log(`[GazeDataManager] Advanced Line Detection: Found ${count} lines.`, validLines);
+        return count;
+    }
+
+    detectLinesMobile_Legacy_Unused() {
         if (this.data.length < 10) return 0;
 
         // 1. Gaussian Smoothing (Sigma = 3)
