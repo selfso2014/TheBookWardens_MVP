@@ -409,8 +409,9 @@ Game.typewriter = {
 
         // 1. Chunk End Handling
         if (char === '/') {
-            // Insert chunk separator (space)
-            const separator = document.createTextNode(" ");
+            // Insert chunk separator (space) as SPAN
+            const separator = document.createElement("span");
+            separator.innerText = " ";
             this.currentP.insertBefore(separator, this.cursorBlob);
             insertedNode = separator;
 
@@ -434,7 +435,8 @@ Game.typewriter = {
 
         // 2. Normal Character Printing
         if (this.charIndex < this.currentText.length) {
-            const charNode = document.createTextNode(char);
+            const charNode = document.createElement("span");
+            charNode.innerText = char;
             this.currentP.insertBefore(charNode, this.cursorBlob);
             insertedNode = charNode;
 
@@ -521,14 +523,13 @@ Game.typewriter = {
 
         if (currentLine >= ERASE_START_LINE) {
             // Erase nodes from line (currentLine - 2) or older
-            // We only erase ONE node per tick to create the "following" effect
             if (this.renderedNodes.length > 0) {
                 const head = this.renderedNodes[0];
                 if (head.line <= currentLine - 2) {
                     const item = this.renderedNodes.shift();
-                    if (item.node.parentNode) {
-                        item.node.parentNode.removeChild(item.node);
-                    }
+                    // Use opacity to hide but keep space
+                    item.node.style.opacity = "0";
+                    item.node.style.transition = "opacity 0.2s"; // Smooth fade
                 }
             }
         }
