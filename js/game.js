@@ -1033,8 +1033,8 @@ Game.typewriter = {
 
                 // USER FIX: Use lineYData for Y-axis accuracy to prevent drift vs Red Lines
                 if (this.lineYData && this.lineYData[visualIdx]) {
-                    // USER REQUEST: Reduce offset to 8px
-                    Dy = contentRect.top + this.lineYData[visualIdx].y + 8;
+                    // USER REQUEST: Set offset to 0px
+                    Dy = contentRect.top + this.lineYData[visualIdx].y + 0;
                 } else {
                     Dy = vLine.top + (vLine.bottom - vLine.top) * 0.5;
                 }
