@@ -409,13 +409,9 @@ Game.typewriter = {
 
         // 1. Chunk End Handling
         if (char === '/') {
-            // Insert chunk separator (space) as SPAN
-            const separator = document.createElement("span");
-            separator.innerText = " ";
+            // Insert chunk separator (space)
+            const separator = document.createTextNode(" ");
             this.currentP.insertBefore(separator, this.cursorBlob);
-            insertedNode = separator;
-
-            this.renderedNodes.push({ node: separator, line: this.visualLineIndex || 0 });
 
             this.charIndex++; // Skip the slash
 
@@ -423,9 +419,6 @@ Game.typewriter = {
             while (this.charIndex < this.currentText.length && this.currentText[this.charIndex] === ' ') {
                 this.charIndex++;
             }
-
-            // Eraser Check (also for separator)
-            this.applyMagicEraser();
 
             const delay = this.chunkDelay || 1000;
             console.log(`[Game] Chunk Pause: ${delay}ms`);
@@ -435,10 +428,8 @@ Game.typewriter = {
 
         // 2. Normal Character Printing
         if (this.charIndex < this.currentText.length) {
-            const charNode = document.createElement("span");
-            charNode.innerText = char;
+            const charNode = document.createTextNode(char);
             this.currentP.insertBefore(charNode, this.cursorBlob);
-            insertedNode = charNode;
 
             if (char === ' ') this.wordCount++;
 
@@ -455,12 +446,6 @@ Game.typewriter = {
                 this.visualLineIndex = (this.visualLineIndex || 0) + 1;
                 this.lastOffsetTop = currentTop;
             }
-        }
-
-        // 4. Track Node & Magic Eraser
-        if (insertedNode) {
-            this.renderedNodes.push({ node: insertedNode, line: this.visualLineIndex || 0 });
-            this.applyMagicEraser();
         }
 
         // Auto-scroll
@@ -518,21 +503,7 @@ Game.typewriter = {
     },
 
     applyMagicEraser() {
-        const ERASE_START_LINE = 2; // When starting (index 2), erase (index 0)
-        const currentLine = this.visualLineIndex || 0;
-
-        if (currentLine >= ERASE_START_LINE) {
-            // Erase nodes from line (currentLine - 2) or older
-            if (this.renderedNodes.length > 0) {
-                const head = this.renderedNodes[0];
-                if (head.line <= currentLine - 2) {
-                    const item = this.renderedNodes.shift();
-                    // Use opacity to hide but keep space
-                    item.node.style.opacity = "0";
-                    item.node.style.transition = "opacity 0.2s"; // Smooth fade
-                }
-            }
-        }
+        // Feature disabled. Reverted to standard typewriter mode.
     },
 
     showVillainQuiz() {
