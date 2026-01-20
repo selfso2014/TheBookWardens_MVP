@@ -952,7 +952,8 @@ Game.typewriter = {
                 normX = Math.max(0, Math.min(1, normX));
 
                 const Dx = vLine.left + normX * (vLine.right - vLine.left);
-                const Dy = vLine.top + (vLine.bottom - vLine.top) / 2;
+                // Visual adjustment: Move up to match text center better (bbox includes descent)
+                const Dy = vLine.top + (vLine.bottom - vLine.top) * 0.35;
 
                 replayData.push({
                     t: d.t - startTime,
