@@ -172,4 +172,89 @@ export class GazeDataManager {
         link.click();
         document.body.removeChild(link);
     }
+    // --- Line Detection Algorithm (Mobile / Typewriter) ---
+    detectLinesMobile() {
+        if (this.data.length < 10) return 0;
+
+        // 1. Gaussian Smoothing (Sigma = 3)
+        // Kernel generation: size = 6*sigma + 1 = 19
+        const sigma = 3;
+        const radius = Math.ceil(3 * sigma);
+        const kernelSize = 2 * radius + 1;
+        const kernel = new Float32Array(kernelSize);
+        let sumK = 0;
+
+        for (let i = 0; i < kernelSize; i++) {
+            const x = i - radius;
+            const val = Math.exp(-(x * x) / (2 * sigma * sigma));
+            kernel[i] = val;
+            sumK += val;
+        }
+        // Normalize
+        for (let i = 0; i < kernelSize; i++) kernel[i] /= sumK;
+
+        // Apply Convolution to X
+        const x1 = new Float32Array(this.data.length);
+        for (let i = 0; i < this.data.length; i++) {
+            let sum = 0;
+            let wSum = 0;
+            for (let k = 0; k < kernelSize; k++) {
+                const idx = i + (k - radius);
+                if (idx >= 0 && idx < this.data.length) {
+                    sum += this.data[idx].x * kernel[k];
+                    wSum += kernel[k];
+                }
+            }
+            x1[i] = sum / wSum;
+        }
+
+        // 2. Find Extremes
+        const maxima = [];
+        const minima = [];
+        const win = 10;
+        for (let i = win; i < x1.length - win; i++) {
+            let isMax = true;
+            let isMin = true;
+            for (let j = 1; j <= win; j++) {
+                if (x1[i] <= x1[i - j] || x1[i] <= x1[i + j]) isMax = false;
+                if (x1[i] >= x1[i - j] || x1[i] >= x1[i + j]) isMin = false;
+            }
+            if (isMax) maxima.push({ index: i, value: x1[i], t: this.data[i].t });
+            if (isMin) minima.push({ index: i, value: x1[i], t: this.data[i].t });
+        }
+
+        // 3. Regularity Assessment
+        const validPeaks = [];
+        const AMP_THRESHOLD = 50;
+        const TIME_THRESHOLD = 500;
+
+        for (let i = 0; i < maxima.length; i++) {
+            const max = maxima[i];
+            let prevMin = null;
+            // Find most recent preceding min
+            for (let j = minima.length - 1; j >= 0; j--) {
+                if (minima[j].t < max.t) {
+                    prevMin = minima[j];
+                    break;
+                }
+            }
+
+            if (prevMin) {
+                const amp = max.value - prevMin.value;
+                const duration = max.t - prevMin.t;
+
+                if (amp > AMP_THRESHOLD && duration > 200) {
+                    const lastValid = validPeaks[validPeaks.length - 1];
+                    // Ensure not duplicate of same line scan (or too close)
+                    if (!lastValid || (max.t - lastValid.t) > TIME_THRESHOLD) {
+                        validPeaks.push(max);
+                    }
+                }
+            }
+        }
+
+        const count = validPeaks.length;
+        console.log(`[GazeDataManager] Line Detection: Found ${count} lines.`, validPeaks);
+        return count;
+    }
 }

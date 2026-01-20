@@ -466,14 +466,25 @@ Game.typewriter = {
             // User Requirement: End recording 3 seconds after last character
             console.log("[Game] Text finished. Waiting 3s for final gaze data...");
             setTimeout(() => {
-                // 1. Export CSV (End of Recording)
-                if (window.gazeDataManager && !Game.hasExported) {
-                    console.log("[Game] 3s elapsed. Exporting CSV.");
-                    window.gazeDataManager.exportCSV();
-                    Game.hasExported = true;
+                let detectedLines = 0;
+                if (window.gazeDataManager) {
+                    // 1. Line Detection Algorithm
+                    detectedLines = window.gazeDataManager.detectLinesMobile();
+                    console.log(`[Game] Line Detection Result: ${detectedLines}`);
+
+                    // 2. Display on UI
+                    const resEl = document.getElementById("line-detect-result");
+                    if (resEl) resEl.innerText = `Line detection: ${detectedLines}`;
+
+                    // 3. Export CSV (End of Recording)
+                    if (!Game.hasExported) {
+                        console.log("[Game] 3s elapsed. Exporting CSV.");
+                        window.gazeDataManager.exportCSV();
+                        Game.hasExported = true;
+                    }
                 }
 
-                // 2. Proceed to Visuals
+                // 4. Proceed to Visuals
                 this.showVillainQuiz();
             }, 3000);
         } else {
