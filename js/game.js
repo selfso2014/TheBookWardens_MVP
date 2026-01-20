@@ -956,7 +956,9 @@ Game.typewriter = {
     // --- Gaze Feedback Logic ---
     // --- Gaze Replay Logic ---
     startGazeReplay() {
-        console.log("[Game] Starting Gaze Replay...");
+        console.log("[Game] Starting Gaze Replay (Direct Stream Mode)...");
+
+        // 1. Data Source (SeeSo SDK)
         const rawData = window.gazeDataManager.getAllData();
         const validData = rawData.filter(d => d.detectedLineIndex !== undefined && d.detectedLineIndex !== null);
 
@@ -969,7 +971,7 @@ Game.typewriter = {
         const visualLines = this.getVisualLines(this.currentP);
         const lineGroups = {};
 
-        // 1. Min/Max X per line
+        // 2. Pre-calculation: Min/Max X per line
         validData.forEach(d => {
             const idx = d.detectedLineIndex;
             if (!lineGroups[idx]) lineGroups[idx] = { minX: 99999, maxX: -99999 };
@@ -977,39 +979,36 @@ Game.typewriter = {
             if (d.gx > lineGroups[idx].maxX) lineGroups[idx].maxX = d.gx;
         });
 
-        // 2. Build Replay Data (Timestamp Compression + Fixation Anchoring)
+        // 3. Build Replay Stream (Frame-by-Frame)
+        // We do NOT merge events. We use the stream directly.
         const replayData = [];
         let virtualTime = 0;
         let lastRawT = validData[0].t;
         let lastLineIdx = validData[0].detectedLineIndex;
 
-        // Fixation Tracking
+        // Visual State for "Growing Circle"
+        // We track this purely for rendering properties, not to merge data.
         let inFixation = false;
-        let fixAnchor = { x: 0, y: 0, startTime: 0 };
+        let fixAnchor = { x: 0, y: 0, startTime: 0, duration: 0 };
 
         validData.forEach((d, i) => {
-            // A. Time Compression
+            // A. Time Compression (Handle Line Jumps)
             if (i > 0) {
                 const rawDelta = d.t - lastRawT;
                 let effectiveDelta = rawDelta;
 
-                // If Line Changed (or Return Sweep), clamp delay
+                // Algorithm: If Line Changed, Force Fast Transition
                 if (d.detectedLineIndex !== lastLineIdx) {
-                    // Force immediate transition (max 50ms)
+                    // If difference > 50ms, clamp to 50ms
                     if (rawDelta > 50) effectiveDelta = 50;
                 }
-                // Optional: Clamp very long pauses within line too?
-                // For now, let's stick to line transition as per request.
-                // But user said "waits a long time... then moves". 
-                // Let's cap any delta at 100ms to speed up overall replay? 
-                // User requirement: "timestamp를 조절해서 개행시점에 바로 넘어가도록" -> Target Line Change.
 
                 virtualTime += effectiveDelta;
             }
             lastRawT = d.t;
             lastLineIdx = d.detectedLineIndex;
 
-            // B. Coordinate Mapping
+            // B. Visual Mapping
             const idx = d.detectedLineIndex;
             const visualIdx = idx - 1;
             let Dx = 0, Dy = 0;
@@ -1024,26 +1023,38 @@ Game.typewriter = {
                 normX = Math.max(0, Math.min(1, normX));
                 Dx = vLine.left + normX * (vLine.right - vLine.left);
                 Dy = vLine.top + (vLine.bottom - vLine.top) * 0.35;
+            } else {
+                return; // Skip mapping failure
             }
 
-            // C. Fixation Logic (Anchor & Type)
-            const isFixation = (d.type === 'Fixation');
+            // C. Fixation Logic (Directly from SDK)
+            // Use d.type directly. 0 or 'Fixation'
+            const isFixation = (d.type === 0 || d.type === 'Fixation');
+
             let renderX = Dx;
             let renderY = Dy;
-            let radiusBonus = 0;
+            let radius = 10;
+            let drawType = isFixation ? 'Fixation' : 'Saccade';
 
             if (isFixation) {
                 if (!inFixation) {
-                    // Start of new fixation
+                    // New Fixation Sequence Start
                     inFixation = true;
+                    // Set Anchor to CURRENT mapped position effectively
                     fixAnchor = { x: Dx, y: Dy, startTime: virtualTime };
                 }
-                // Lock coords to anchor
+
+                // Use Anchor Position
                 renderX = fixAnchor.x;
                 renderY = fixAnchor.y;
 
-                // Radius grows with time (0.05px per ms of fixation)
-                radiusBonus = (virtualTime - fixAnchor.startTime) * 0.05;
+                // Grow Radius: 0.05px per ms from start of this sequence
+                const fixationDuration = virtualTime - fixAnchor.startTime;
+                radius = 10 + (fixationDuration * 0.05);
+
+                // Cap radius? (Optional, e.g. max 50)
+                if (radius > 40) radius = 40;
+
             } else {
                 inFixation = false;
             }
@@ -1052,8 +1063,8 @@ Game.typewriter = {
                 t: virtualTime,
                 x: renderX,
                 y: renderY,
-                r: 10 + radiusBonus, // Base radius 10
-                type: d.type
+                r: radius,
+                type: drawType
             });
         });
 
@@ -1062,7 +1073,7 @@ Game.typewriter = {
             return;
         }
 
-        // 3. Render Loop
+        // 4. Render
         const overlay = document.createElement('canvas');
         overlay.style.position = 'fixed';
         overlay.style.top = '0';
@@ -1086,9 +1097,9 @@ Game.typewriter = {
 
             ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-            // Find current point
+            // Find current point in stream
             let pt = null;
-            // Simple linear search is okay for small N
+            // Linear search
             for (let i = 0; i < replayData.length; i++) {
                 if (replayData[i].t > progress) {
                     pt = replayData[i > 0 ? i - 1 : 0];
@@ -1099,28 +1110,28 @@ Game.typewriter = {
 
             if (pt) {
                 ctx.beginPath();
-                // Draw Circle
                 ctx.arc(pt.x, pt.y, pt.r, 0, 2 * Math.PI);
 
-                // Green for all, maybe darker border?
-                ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-                ctx.fill();
-
-                // Optional: Add stroke for better visibility of expanding circle
                 if (pt.type === 'Fixation') {
+                    ctx.fillStyle = 'rgba(0, 255, 0, 0.4)';
                     ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
                     ctx.lineWidth = 2;
+                    ctx.fill();
                     ctx.stroke();
+                } else {
+                    // Saccade / Move
+                    ctx.fillStyle = 'rgba(100, 255, 100, 0.5)';
+                    ctx.fill();
                 }
             }
 
-            if (progress < totalDuration + 500) { // +500ms buffer at end
+            if (progress < totalDuration + 200) {
                 requestAnimationFrame(animate);
             } else {
                 setTimeout(() => {
                     if (document.body.contains(overlay)) document.body.removeChild(overlay);
                     this.showVillainQuiz();
-                }, 500); // Quick exit after done
+                }, 500);
             }
         };
         requestAnimationFrame(animate);
