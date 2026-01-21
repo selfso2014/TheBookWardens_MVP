@@ -381,7 +381,7 @@ export class GazeDataManager {
         document.body.removeChild(link);
     }
 
-    // --- Line Detection Algorithm V4.2 (Strict Filtering & Merging) ---
+    // --- Line Detection Algorithm V4.6 (Return Sweep First) ---& Merging) ---
     // --- Line Detection Algorithm V4.3 (Corrected Order & Logic) ---
     detectLinesMobile() {
         if (this.data.length < 10) return 0;
@@ -483,32 +483,44 @@ export class GazeDataManager {
         if (trendDistance < 50) return 0;
 
         // ---------------------------------------------------------
-        // Step 7, 8, 9. Validate Pairs
+        // Step 8. Validate Return Sweeps (Peak -> Valley) - PRIORITY
         // ---------------------------------------------------------
-
-        // We iterate specifically looking for Valley -> Peak segments.
-        // If a segment fails, we mark both Valley and Peak as invalid (remove them).
+        // User Request: Verify Peak -> Valley distance FIRST.
+        // Logic: If (Peak - Valley) < distThreshold, it's not a line break. 
+        // Discard both to merge segments.
 
         for (let i = 0; i < candidates.length - 1; i++) {
-            // Find Valley -> Peak
-            if (candidates[i].type === 'Valley' && candidates[i + 1].type === 'Peak') {
-                const cv = candidates[i];
-                const cp = candidates[i + 1];
+            if (candidates[i].type === 'Peak' && candidates[i + 1].type === 'Valley') {
+                const p = candidates[i];
+                const v = candidates[i + 1];
 
-                const dx = cp.val - cv.val; // Distance
-                const dt = cp.t - cv.t;     // Duration
+                const returnDist = p.val - v.val;
 
-                // Step 8: Distance Check (>= 50% Trend)
-                if (dx < distThreshold) {
-                    cv.valid = false;
-                    cp.valid = false;
-                    continue;
+                if (returnDist < distThreshold) {
+                    p.valid = false;
+                    v.valid = false;
                 }
+            }
+        }
 
-                // Step 9: Time Check (>= 500ms)
+        // ---------------------------------------------------------
+        // Step 9. Validate Reading Segments (Valley -> Peak)
+        // ---------------------------------------------------------
+        // Check Time Duration (>= 500ms) for remaining valid pairs.
+
+        // Iterate only VALID candidates to respect Step 8 outcomes
+        const validAfterStep8 = candidates.filter(c => c.valid);
+
+        for (let i = 0; i < validAfterStep8.length - 1; i++) {
+            if (validAfterStep8[i].type === 'Valley' && validAfterStep8[i + 1].type === 'Peak') {
+                const v = validAfterStep8[i];
+                const p = validAfterStep8[i + 1];
+
+                const dt = p.t - v.t;
+
                 if (dt < 500) {
-                    cv.valid = false;
-                    cp.valid = false;
+                    v.valid = false;
+                    p.valid = false;
                 }
             }
         }
