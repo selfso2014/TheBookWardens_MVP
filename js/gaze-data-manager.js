@@ -381,8 +381,7 @@ export class GazeDataManager {
         document.body.removeChild(link);
     }
 
-    // --- Line Detection Algorithm V4.6 (Return Sweep First) ---& Merging) ---
-    // --- Line Detection Algorithm V4.3 (Corrected Order & Logic) ---
+    // --- Line Detection Algorithm V4.7 (No Last Line Filter) ---
     detectLinesMobile() {
         if (this.data.length < 10) return 0;
 
@@ -424,38 +423,10 @@ export class GazeDataManager {
         if (candidates.length < 2) return 0;
 
         // ---------------------------------------------------------
-        // Step 1.5. Last Line Filtering (Filter Candidates First)
+        // Step 1.5. Last Line Filtering - SKIPPED (User Request)
         // ---------------------------------------------------------
-        let lastTextTime = 0;
-        for (let i = this.data.length - 1; i >= 0; i--) {
-            if (this.data[i].lineIndex !== undefined && this.data[i].lineIndex !== null && this.data[i].lineIndex !== "") {
-                lastTextTime = this.data[i].t;
-                break;
-            }
-        }
-
-        // Keep all BEFORE lastTextTime.
-        // Keep ONLY first [Valley, Peak] pair AFTER lastTextTime.
-        const filteredCandidates = [];
-        let postPairFound = false;
-        let postValleyFound = false;
-
-        for (let c of candidates) {
-            if (c.t <= lastTextTime) {
-                filteredCandidates.push(c);
-            } else {
-                if (!postPairFound) {
-                    if (c.type === 'Valley') {
-                        filteredCandidates.push(c);
-                        postValleyFound = true;
-                    } else if (c.type === 'Peak' && postValleyFound) {
-                        filteredCandidates.push(c);
-                        postPairFound = true; // Pair completed.
-                    }
-                }
-            }
-        }
-        candidates = filteredCandidates;
+        // Skipping filtering candidates based on lastTextTime.
+        // candidates remain as is.
 
         if (candidates.length < 2) return 0;
 
