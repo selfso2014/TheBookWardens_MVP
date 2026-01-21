@@ -382,13 +382,14 @@ export class GazeDataManager {
     }
 
     // --- Line Detection Algorithm V4.2 (Strict Filtering & Merging) ---
+    // --- Line Detection Algorithm V4.3 (Corrected Order & Logic) ---
     detectLinesMobile() {
         if (this.data.length < 10) return 0;
 
         // ---------------------------------------------------------
         // Step 0. Preprocessing
         // ---------------------------------------------------------
-        this.preprocessData(); // Ensure gx (SmoothX) is ready
+        this.preprocessData();
 
         // ---------------------------------------------------------
         // Step 1. Find All Extrema (Candidates)
@@ -423,7 +424,43 @@ export class GazeDataManager {
         if (candidates.length < 2) return 0;
 
         // ---------------------------------------------------------
-        // Step 2 & 3. Calculate Trend Lines
+        // Step 1.5. Last Line Filtering (Filter Candidates First)
+        // ---------------------------------------------------------
+        let lastTextTime = 0;
+        for (let i = this.data.length - 1; i >= 0; i--) {
+            if (this.data[i].lineIndex !== undefined && this.data[i].lineIndex !== null && this.data[i].lineIndex !== "") {
+                lastTextTime = this.data[i].t;
+                break;
+            }
+        }
+
+        // Keep all BEFORE lastTextTime.
+        // Keep ONLY first [Valley, Peak] pair AFTER lastTextTime.
+        const filteredCandidates = [];
+        let postPairFound = false;
+        let postValleyFound = false;
+
+        for (let c of candidates) {
+            if (c.t <= lastTextTime) {
+                filteredCandidates.push(c);
+            } else {
+                if (!postPairFound) {
+                    if (c.type === 'Valley') {
+                        filteredCandidates.push(c);
+                        postValleyFound = true;
+                    } else if (c.type === 'Peak' && postValleyFound) {
+                        filteredCandidates.push(c);
+                        postPairFound = true; // Pair completed.
+                    }
+                }
+            }
+        }
+        candidates = filteredCandidates;
+
+        if (candidates.length < 2) return 0;
+
+        // ---------------------------------------------------------
+        // Step 2 & 3. Calculate Trend Lines (from Valid Patterns)
         // ---------------------------------------------------------
         const allPeaks = candidates.filter(c => c.type === 'Peak').map(c => c.val);
         const allValleys = candidates.filter(c => c.type === 'Valley').map(c => c.val);
@@ -446,88 +483,43 @@ export class GazeDataManager {
         if (trendDistance < 50) return 0;
 
         // ---------------------------------------------------------
-        // Step 6.5. Filter Candidates after Last Text
-        // ---------------------------------------------------------
-        let lastTextTime = 0;
-        for (let i = this.data.length - 1; i >= 0; i--) {
-            if (this.data[i].lineIndex !== undefined && this.data[i].lineIndex !== null && this.data[i].lineIndex !== "") {
-                lastTextTime = this.data[i].t;
-                break;
-            }
-        }
-
-        // Logic: Keep all Before. Keep ONLY first [Valley, Peak] pair After.
-        const filteredCandidates = [];
-        let postPairFound = false;
-        let postValleyFound = false;
-
-        for (let c of candidates) {
-            if (c.t <= lastTextTime) {
-                filteredCandidates.push(c);
-            } else {
-                if (!postPairFound) {
-                    if (c.type === 'Valley') {
-                        filteredCandidates.push(c);
-                        postValleyFound = true;
-                    } else if (c.type === 'Peak' && postValleyFound) {
-                        filteredCandidates.push(c);
-                        postPairFound = true; // Pair completed, stop adding.
-                    }
-                }
-            }
-        }
-        candidates = filteredCandidates;
-
-        // ---------------------------------------------------------
-        // Step 7 & 8. Validate Pairs (Strict Filtering Logic)
+        // Step 7, 8, 9. Validate Pairs
         // ---------------------------------------------------------
 
-        // Pass 1: Validate Reading Segments (Valley -> Peak)
-        // Rule: Time >= 500ms AND Dist >= 50% Threshold. Else Remove BOTH.
+        // We iterate specifically looking for Valley -> Peak segments.
+        // If a segment fails, we mark both Valley and Peak as invalid (remove them).
+
         for (let i = 0; i < candidates.length - 1; i++) {
+            // Find Valley -> Peak
             if (candidates[i].type === 'Valley' && candidates[i + 1].type === 'Peak') {
-                const v = candidates[i];
-                const p = candidates[i + 1];
+                const cv = candidates[i];
+                const cp = candidates[i + 1];
 
-                const dt = p.t - v.t;
-                const dx = p.val - v.val;
+                const dx = cp.val - cv.val; // Distance
+                const dt = cp.t - cv.t;     // Duration
 
-                if (dt < 500 || dx < distThreshold) {
-                    v.valid = false;
-                    p.valid = false;
+                // Step 8: Distance Check (>= 50% Trend)
+                if (dx < distThreshold) {
+                    cv.valid = false;
+                    cp.valid = false;
+                    continue;
                 }
-            }
-        }
 
-        // Pass 2: Validate Return Sweeps (Peak -> Valley)
-        // Rule: Dist >= 50% Threshold. Else Remove BOTH (Merge lines).
-        // Only verify valid candidates.
-        let activeCandidates = candidates.filter(c => c.valid);
-
-        // Re-evaluate active list
-        for (let i = 0; i < activeCandidates.length - 1; i++) {
-            if (activeCandidates[i].type === 'Peak' && activeCandidates[i + 1].type === 'Valley') {
-                const p = activeCandidates[i];
-                const v = activeCandidates[i + 1];
-
-                // Return Sweep: High to Low. Distance = Peak - Valley
-                const dist = p.val - v.val;
-
-                if (dist < distThreshold) {
-                    p.valid = false;
-                    v.valid = false;
+                // Step 9: Time Check (>= 500ms)
+                if (dt < 500) {
+                    cv.valid = false;
+                    cp.valid = false;
                 }
             }
         }
 
         // ---------------------------------------------------------
-        // Step 9. Finalize
+        // Step 10. Finalize (Count Valid Lines)
         // ---------------------------------------------------------
         const finalCandidates = candidates.filter(c => c.valid);
         const validLines = [];
 
-        // Reconstruct lines from remaining Valleys and Peaks
-        // Expect pattern: V, P, V, P... (Because invalid middles were removed)
+        // Reconstruct lines: V -> P
         let lineCounter = 1;
         for (let i = 0; i < finalCandidates.length - 1; i++) {
             if (finalCandidates[i].type === 'Valley' && finalCandidates[i + 1].type === 'Peak') {
@@ -554,7 +546,7 @@ export class GazeDataManager {
         });
 
         const count = validLines.length;
-        console.log(`[GazeDataManager V4.2] Found ${count} lines. (TrendDist: ${trendDistance.toFixed(0)})`, validLines);
+        console.log(`[GazeDataManager V4.3] Found ${count} lines. (TrendDist: ${trendDistance.toFixed(0)})`, validLines);
 
         return count;
     }
