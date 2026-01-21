@@ -195,7 +195,7 @@ export class GazeDataManager {
         this.preprocessData();
 
         // CSV Header
-        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,LineIndex,CharIndex,AlgoLineIndex,Extrema\n";
+        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,AlgoLineIndex,Extrema\n";
 
         // Rows
         this.data.forEach(d => {
@@ -207,6 +207,7 @@ export class GazeDataManager {
                 d.vx !== undefined && d.vx !== null ? d.vx.toFixed(4) : "",
                 d.vy !== undefined && d.vy !== null ? d.vy.toFixed(4) : "",
                 d.type,
+                (d.isReturnSweep ? "TRUE" : ""),
                 (d.lineIndex !== undefined && d.lineIndex !== null) ? d.lineIndex : "",
                 (d.charIndex !== undefined && d.charIndex !== null) ? d.charIndex : "",
                 (d.detectedLineIndex !== undefined) ? d.detectedLineIndex : "",
@@ -419,8 +420,8 @@ export class GazeDataManager {
         }));
 
         // Detect Spikes using MAD
-        // Using k=6 based on user preference/demo
-        const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 6, gapMs: 120, expandOneSample: true });
+        // Using k=3 based on user request (approx 30-50% robust sensitivity)
+        const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 3, gapMs: 120, expandOneSample: true });
 
         // Identify Return Sweeps (Large Negative Velocity)
         // We filter spikes where the mean velocity is negative
@@ -444,6 +445,7 @@ export class GazeDataManager {
         for (let i = 0; i < this.data.length; i++) {
             delete this.data[i].detectedLineIndex;
             delete this.data[i].extrema;
+            delete this.data[i].isReturnSweep;
         }
 
         let lineNum = 1;
@@ -471,6 +473,11 @@ export class GazeDataManager {
 
             // Next line starts after sweep
             lastEndIdx = sweep.endIndex + 1;
+
+            // Mark Return Sweep in Data
+            for (let k = sweep.startIndex; k <= sweep.endIndex; k++) {
+                if (this.data[k]) this.data[k].isReturnSweep = true;
+            }
         }
 
         // Process final segment
