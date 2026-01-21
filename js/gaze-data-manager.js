@@ -334,26 +334,50 @@ export class GazeDataManager {
                     label: 'Extrema: LineStart',
                     data: lineStarts,
                     type: 'scatter',
-                    backgroundColor: 'blue',
-                    pointRadius: 5,
-                    parsing: { xAxisKey: 'x', yAxisKey: 'y' } // Use explicit keys for scatter
+                    backgroundColor: 'green',
+                    pointRadius: 6,
+                    pointStyle: 'triangle',
+                    rotation: 180,
+                    parsing: { xAxisKey: 'x', yAxisKey: 'y' }
                 });
                 chartConfig.data.datasets.push({
                     label: 'Extrema: PosMax',
                     data: posMaxs,
                     type: 'scatter',
-                    backgroundColor: 'orange',
-                    pointRadius: 5,
+                    backgroundColor: 'red',
+                    pointRadius: 6,
+                    pointStyle: 'triangle',
+                    parsing: { xAxisKey: 'x', yAxisKey: 'y' }
+                });
+
+                // Add Ignored Extrema Visualization
+                const valleyIgnored = [];
+                const peakIgnored = [];
+                this.data.forEach(d => {
+                    if (d.extrema === 'Valley(Ignored)') valleyIgnored.push({ x: d.t, y: d.gx });
+                    if (d.extrema === 'Peak(Ignored)') peakIgnored.push({ x: d.t, y: d.gx });
+                });
+
+                chartConfig.data.datasets.push({
+                    label: 'Ignored Valley',
+                    data: valleyIgnored,
+                    type: 'scatter',
+                    backgroundColor: 'rgba(50,50,50,0.5)',
+                    pointRadius: 4,
+                    pointStyle: 'triangle',
+                    rotation: 180,
                     parsing: { xAxisKey: 'x', yAxisKey: 'y' }
                 });
                 chartConfig.data.datasets.push({
-                    label: 'Extrema: PosMax(Last)',
-                    data: posMaxLasts,
+                    label: 'Ignored Peak',
+                    data: peakIgnored,
                     type: 'scatter',
-                    backgroundColor: 'red',
-                    pointRadius: 6,
+                    backgroundColor: 'rgba(50,50,50,0.5)',
+                    pointRadius: 4,
+                    pointStyle: 'triangle',
                     parsing: { xAxisKey: 'x', yAxisKey: 'y' }
                 });
+
                 chartConfig.options.plugins.legend = { display: true };
             }
 
@@ -408,7 +432,10 @@ export class GazeDataManager {
                     isMin = false; break;
                 }
             }
-            if (isMin) candidates.push({ type: 'Valley', index: i, t, val: currVal, valid: true });
+            if (isMin) {
+                candidates.push({ type: 'Valley', index: i, t, val: currVal, valid: true });
+                this.data[i].extrema = "Valley(Ignored)";
+            }
 
             // Check Peak (Local Max)
             let isMax = true;
@@ -417,7 +444,10 @@ export class GazeDataManager {
                     isMax = false; break;
                 }
             }
-            if (isMax) candidates.push({ type: 'Peak', index: i, t, val: currVal, valid: true });
+            if (isMax) {
+                candidates.push({ type: 'Peak', index: i, t, val: currVal, valid: true });
+                this.data[i].extrema = "Peak(Ignored)";
+            }
         }
 
         if (candidates.length < 2) return 0;
@@ -552,11 +582,10 @@ export class GazeDataManager {
             }
         }
 
-        // Reset Extrema Visuals
-        for (let i = 0; i < this.data.length; i++) delete this.data[i].extrema;
+        // Reset Detected Line Index (but keep Extrema tags for debugging/export)
         for (let i = 0; i < this.data.length; i++) delete this.data[i].detectedLineIndex;
 
-        // Apply
+        // Apply Valid Tags (Overwriting 'Ignored')
         validLines.forEach(line => {
             this.data[line.startIdx].extrema = "LineStart";
             this.data[line.endIdx].extrema = "PosMax";
