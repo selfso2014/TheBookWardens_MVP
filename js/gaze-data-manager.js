@@ -415,22 +415,35 @@ export class GazeDataManager {
         if (this.data.length < 10) return 0;
         this.preprocessData(); // Ensure velX is calculated
 
-        // Filter data by time range
-        const validData = this.data.filter(d => d.t >= startTime && d.t <= endTime);
-        if (validData.length < 10) return 0;
+        // 1. Find the index range in the global array
+        let startIndex = -1;
+        let endIndex = -1;
 
-        // Prepare samples for MAD detector
-        const samples = validData.map(d => ({
+        for (let i = 0; i < this.data.length; i++) {
+            const t = this.data[i].t;
+            if (t >= startTime && startIndex === -1) startIndex = i;
+            if (t <= endTime) endIndex = i;
+        }
+
+        if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
+            console.warn("[GazeDataManager] No data in specified time range.");
+            return 0;
+        }
+
+        const validDataSlice = this.data.slice(startIndex, endIndex + 1);
+        if (validDataSlice.length < 10) return 0;
+
+        // 2. Prepare samples (Velocity Data)
+        const samples = validDataSlice.map(d => ({
             ts_ms: d.t,
             velX: d.vx
         }));
 
-        // Detect Spikes using MAD
-        // Using k=3 based on user request (approx 30-50% robust sensitivity)
-        const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 3, gapMs: 120, expandOneSample: true });
+        // 3. Detect Spikes using MAD (Sensitivity k=5)
+        // Adjusted to 5 to be LESS sensitive (stricter), catching only clearer/faster return sweeps
+        const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 5, gapMs: 120, expandOneSample: true });
 
-        // Identify Return Sweeps (Large Negative Velocity)
-        // We filter spikes where the mean velocity is negative
+        // 4. Identify Return Sweeps
         const returnSweeps = spikeIntervals.filter(interval => {
             let sum = 0;
             let count = 0;
@@ -447,51 +460,67 @@ export class GazeDataManager {
         // Sort by time
         returnSweeps.sort((a, b) => a.start_ms - b.start_ms);
 
-        // Reset existing detection
+        // 5. Reset detections ONLY within the target range? 
+        // Or global reset? User likely wants a clean slate for this session.
+        // Let's do global reset for safety as we usually process session-by-session.
         for (let i = 0; i < this.data.length; i++) {
             delete this.data[i].detectedLineIndex;
             delete this.data[i].extrema;
             delete this.data[i].isReturnSweep;
         }
 
+        // 6. Apply Lines (Adjusting for startIndex offset)
         let lineNum = 1;
-        let lastEndIdx = 0;
 
-        const markLine = (start, end, num) => {
-            if (end <= start) return;
-            for (let k = start; k < end; k++) {
-                this.data[k].detectedLineIndex = num;
+        // Note: interval.startIndex is relative to 'samples' (validDataSlice)
+        // We must add 'startIndex' to map to 'this.data'
+
+        // Track the end of the last sweep (Relative Index)
+        let lastEndRelIdx = 0;
+
+        const markLine = (relStart, relEnd, num) => {
+            if (relEnd <= relStart) return;
+            // Map to Global
+            const globalStart = startIndex + relStart;
+            const globalEnd = startIndex + relEnd;
+
+            for (let k = globalStart; k < globalEnd; k++) {
+                if (this.data[k]) this.data[k].detectedLineIndex = num;
             }
-            if (this.data[start]) this.data[start].extrema = "LineStart";
-            if (this.data[end - 1]) this.data[end - 1].extrema = "PosMax";
+
+            if (this.data[globalStart]) this.data[globalStart].extrema = "LineStart";
+
+            // PosMax is usually the last point of the line
+            if (this.data[globalEnd - 1]) this.data[globalEnd - 1].extrema = "PosMax";
         };
 
         for (const sweep of returnSweeps) {
-            // Found a sweep. The segment BEFORE this sweep is a line.
-            // Sweep starts at sweep.startIndex.
-            const lineEndIdx = sweep.startIndex;
+            // sweep.startIndex, sweep.endIndex are RELATIVE to slice
 
-            // Heuristic section length check (e.g. > 100ms or 5 samples)
-            if (lineEndIdx - lastEndIdx > 5) {
-                markLine(lastEndIdx, lineEndIdx, lineNum);
+            const lineEndRelIdx = sweep.startIndex;
+
+            // Check segment length
+            if (lineEndRelIdx - lastEndRelIdx > 5) {
+                markLine(lastEndRelIdx, lineEndRelIdx, lineNum);
                 lineNum++;
             }
 
             // Next line starts after sweep
-            lastEndIdx = sweep.endIndex + 1;
+            lastEndRelIdx = sweep.endIndex + 1;
 
-            // Mark Return Sweep in Data
+            // Mark Return Sweep in Data (Map to Global)
             for (let k = sweep.startIndex; k <= sweep.endIndex; k++) {
-                if (this.data[k]) this.data[k].isReturnSweep = true;
+                const globalIdx = startIndex + k;
+                if (this.data[globalIdx]) this.data[globalIdx].isReturnSweep = true;
             }
         }
 
         // Process final segment
-        if (this.data.length - lastEndIdx > 5) {
-            markLine(lastEndIdx, this.data.length, lineNum);
+        if (samples.length - lastEndRelIdx > 5) {
+            markLine(lastEndRelIdx, samples.length, lineNum);
         }
 
-        console.log(`[GazeDataManager] MAD Line Detection: Found ${lineNum} lines from ${spikeIntervals.length} spikes (${returnSweeps.length} sweeps). Threshold: ${threshold.toFixed(4)}`);
+        console.log(`[GazeDataManager] MAD Line Detection: Found ${lineNum} lines. Range: ${startTime}~${endTime}ms (Indices: ${startIndex}~${endIndex})`);
 
         return lineNum;
     }
