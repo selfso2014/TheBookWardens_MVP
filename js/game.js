@@ -1097,23 +1097,18 @@ Game.typewriter = {
             lastRawT = d.t;
 
             // B. Calculate Y (Target Snap Mode)
-            // Forcefully snap Y to the actual text line Y position.
-            // This prevents "drift" where the green circle sags below the text.
+            // B. Calculate Y (CSV AvgCoolGazeY_Px Mode)
+            // Use the Average Smooth Y calculated during export (AvgCoolGazeY_Px)
             const idx = d.detectedLineIndex;
             const visualIdx = idx - minLineIdx;
 
-            let Dy = 0;
-            // Use Game.lineYData for perfect accuracy
-            if (this.lineYData && this.lineYData[visualIdx]) {
-                // Target Y + Content Offset + User Adjustment (-5px)
-                Dy = this.lineYData[visualIdx].y + contentRect.top - 5;
-            } else {
-                // Fallback: Use Visual Lines calculation
-                // Need to compute visualIdx first (moved up)
-                const visualLines = this.getVisualLines(this.currentP);
-                if (visualIdx >= 0 && visualIdx < visualLines.length) {
-                    const vLine = visualLines[visualIdx];
-                    Dy = vLine.top + (vLine.bottom - vLine.top) * 0.5;
+            let Dy = d.avgY;
+
+            // Fallback if avgY is not computed (e.g. invalid lineIndex timestamp)
+            if (Dy === undefined || Dy === null) {
+                if (this.lineYData && this.lineYData[visualIdx]) {
+                    // Fallback to Target Snap
+                    Dy = this.lineYData[visualIdx].y + contentRect.top - 5;
                 } else {
                     // Extreme fallback
                     Dy = d.gy || d.y;
