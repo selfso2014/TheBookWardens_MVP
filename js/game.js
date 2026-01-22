@@ -1226,14 +1226,14 @@ Game.typewriter = {
                 ctx.arc(pt.x, pt.y, pt.r, 0, 2 * Math.PI);
 
                 if (pt.type === 'Fixation') {
-                    ctx.fillStyle = 'rgba(0, 255, 0, 0.4)';
-                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+                    ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
                     ctx.lineWidth = 2;
                     ctx.fill();
                     ctx.stroke();
                 } else {
                     // Saccade / Move
-                    ctx.fillStyle = 'rgba(100, 255, 100, 0.5)';
+                    ctx.fillStyle = 'rgba(100, 255, 100, 0.05)';
                     ctx.fill();
                 }
             }
