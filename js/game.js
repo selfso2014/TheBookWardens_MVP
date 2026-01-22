@@ -1043,6 +1043,18 @@ Game.typewriter = {
         // -------------------------------------------------------------
         // PRE-CALCULATION: X-Axis Min/Max per line (for Normalization)
         // (Y-axis uses direct Target Snap, so no pre-calc needed for Y)
+        validData.forEach(d => {
+            const idx = d.detectedLineIndex;
+            if (idx !== undefined && idx !== null) {
+                if (!lineGroups[idx]) {
+                    lineGroups[idx] = { minX: Infinity, maxX: -Infinity, count: 0 };
+                }
+                const valX = d.gx || d.x;
+                if (valX < lineGroups[idx].minX) lineGroups[idx].minX = valX;
+                if (valX > lineGroups[idx].maxX) lineGroups[idx].maxX = valX;
+                lineGroups[idx].count++;
+            }
+        });
         // -------------------------------------------------------------
 
         // 3. Build Replay Stream (Continuous Offset)
