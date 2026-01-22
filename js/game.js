@@ -1059,6 +1059,27 @@ Game.typewriter = {
         });
         // -------------------------------------------------------------
 
+        // -------------------------------------------------------------
+        // PRE-CALCULATION: Global Y Offset (Anchor Line 1)
+        // -------------------------------------------------------------
+        let globalYOffset = 0;
+        // Find the first valid avgY for the starting line
+        const firstLineData = validData.find(d => d.detectedLineIndex === minLineIdx && d.avgY !== undefined && d.avgY !== null);
+
+        if (firstLineData && this.lineYData && this.lineYData[0]) {
+            // Target Y: The actual visual Y of the first detected line
+            // Note: lineYData stores offsetTop relative to paragraph. We need screen coordinates.
+            // visualIdx for minLineIdx is 0.
+            const targetY_Line1 = this.lineYData[0].y + contentRect.top;
+            const avgY_Line1 = firstLineData.avgY;
+
+            // Offset = Where it SHOULD be - Where it IS
+            globalYOffset = targetY_Line1 - avgY_Line1;
+            console.log(`[Replay] Global Y Offset: ${globalYOffset.toFixed(2)}px (Target: ${targetY_Line1}, Avg: ${avgY_Line1})`);
+        } else {
+            console.warn("[Replay] Could not calculate Global Y Offset (Missing First Line Data). Defaulting to 0.");
+        }
+
         // 3. Build Replay Stream (Continuous Offset)
         const replayData = [];
         let virtualTime = 0;
@@ -1096,7 +1117,6 @@ Game.typewriter = {
             }
             lastRawT = d.t;
 
-            // B. Calculate Y (Target Snap Mode)
             // B. Calculate Y (CSV AvgCoolGazeY_Px Mode)
             // Use the Average Smooth Y calculated during export (AvgCoolGazeY_Px)
             const idx = d.detectedLineIndex;
@@ -1104,13 +1124,14 @@ Game.typewriter = {
 
             let Dy = d.avgY;
 
-            // Fallback if avgY is not computed (e.g. invalid lineIndex timestamp)
-            if (Dy === undefined || Dy === null) {
+            // Apply Global Offset if avgY exists
+            if (Dy !== undefined && Dy !== null) {
+                Dy += globalYOffset;
+            } else {
+                // Fallback mechanisms
                 if (this.lineYData && this.lineYData[visualIdx]) {
-                    // Fallback to Target Snap
                     Dy = this.lineYData[visualIdx].y + contentRect.top - 5;
                 } else {
-                    // Extreme fallback
                     Dy = d.gy || d.y;
                 }
             }
