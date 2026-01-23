@@ -957,18 +957,33 @@ Game.typewriter = {
         if (currentSegment.length > 0) segments.push(currentSegment);
 
         const numSegments = segments.length;
-        console.log(`[Replay] Total Lines: ${totalLines}, Segments: ${numSegments}`);
 
-        // 4. Algorithm Branching (Strict Case A Only - V16 Robust)
+        // 1.5. Calculate AvgSmoothY & Global Offset (AvgSmoothY Correction)
+        const segmentMeans = segments.map(seg => {
+            const sum = seg.reduce((acc, d) => acc + (d.gy !== undefined ? d.gy : (d.y || 0)), 0);
+            return seg.length > 0 ? sum / seg.length : 0;
+        });
+
+        let globalYOffset = 0;
+        if (this.lineYData && this.lineYData.length > 0 && segmentMeans.length > 0) {
+            const firstSegMean = segmentMeans[0];
+            const firstLineY = this.lineYData[0].y + (contentRect ? contentRect.top : 0);
+            globalYOffset = firstLineY - firstSegMean;
+        }
+
+        console.log(`[Replay] Total Lines: ${totalLines}, Segments: ${numSegments}, Offset: ${globalYOffset.toFixed(2)}`);
+
+        // Determine Base Line Index (V17 Logic)
+        const baseLineIdx = (this.lineYData && this.lineYData.length > 0)
+            ? this.lineYData[0].lineIndex
+            : (minLineIdx < 9999 ? minLineIdx : 0);
+
+        // 4. Algorithm Branching
         if (numSegments >= totalLines) {
             console.log("[Replay] Condition Met (Segments >= TotalLines). Applying Logic.");
 
+            console.log("[Replay] Case A: Sequential Mapping (Segments >= Ln)");
             // A. Ry: Sequential Mapping based on Segments
-            // Determine Base Line Index from Layout Data (Visual Truth) to ensure we start from the actual top line
-            const baseLineIdx = (this.lineYData && this.lineYData.length > 0)
-                ? this.lineYData[0].lineIndex
-                : (minLineIdx < 9999 ? minLineIdx : 0);
-
             segments.forEach((seg, segIdx) => {
                 let targetLineRelIdx = segIdx;
 
@@ -991,29 +1006,70 @@ Game.typewriter = {
                 seg.forEach(d => d.ry = targetY - 5);
             });
 
-            // B. Rx: Existing Logic (Applied unconditionally)
-            validData.forEach(d => {
-                const idx = d.detectedLineIndex;
-                const visualIdx = idx - minLineIdx;
-                let Dx = d.gx || d.x;
+        } else {
+            // Case B: Time-Dependent Snap (V18 New Requirement)
+            console.log("[Replay] Case B: Time-Dependent Snap (Segments < Ln)");
+            const totalDuration = tEnd - tStart;
 
-                if (visualIdx >= 0 && visualIdx < visualLines.length && lineGroups[idx]) {
-                    const vLine = visualLines[visualIdx];
-                    const gInfo = lineGroups[idx];
-                    let normX = 0;
-                    if (gInfo.maxX > gInfo.minX + 1) {
-                        normX = (Dx - gInfo.minX) / (gInfo.maxX - gInfo.minX);
-                    } else {
-                        normX = 0.5;
+            segments.forEach((seg, i) => {
+                // AvgSmoothY correction
+                const segMean = segmentMeans[i];
+                const alignedSegY = segMean + globalYOffset;
+
+                // Time Progress
+                const segMidT = seg.length > 0 ? seg[Math.floor(seg.length / 2)].t : tStart;
+                const progress = totalDuration > 0 ? (segMidT - tStart) / totalDuration : 0;
+
+                // Available Lines
+                let allowedCount = Math.ceil(progress * totalLines);
+                if (allowedCount < 1) allowedCount = 1;
+                if (allowedCount > totalLines) allowedCount = totalLines;
+
+                // Find Nearest TargetY
+                let bestDiff = Infinity;
+                let bestY = 0;
+
+                for (let k = 0; k < allowedCount; k++) {
+                    const candidateIdx = baseLineIdx + k;
+                    const yData = this.lineYData.find(y => y.lineIndex === candidateIdx) || (this.lineYData.length > k ? this.lineYData[k] : null);
+
+                    if (yData) {
+                        const currentTargetY = yData.y + (contentRect ? contentRect.top : 0);
+                        const diff = Math.abs(currentTargetY - alignedSegY);
+                        if (diff < bestDiff) {
+                            bestDiff = diff;
+                            bestY = currentTargetY;
+                        }
                     }
-                    normX = Math.max(0, Math.min(1, normX));
-                    Dx = vLine.left + normX * (vLine.right - vLine.left);
                 }
-                d.rx = Dx;
+
+                if (bestY !== 0) seg.forEach(d => d.ry = bestY - 5);
             });
         }
 
-        console.log(`[Replay] V14 Calculation Complete.`);
+        // B. Rx: Existing Logic (Applied unconditionally for all cases)
+        console.log("[Replay] Calculating Rx (Common)...");
+        validData.forEach(d => {
+            const idx = d.detectedLineIndex;
+            const visualIdx = idx - minLineIdx;
+            let Dx = d.gx || d.x;
+
+            if (visualIdx >= 0 && visualIdx < visualLines.length && lineGroups[idx]) {
+                const vLine = visualLines[visualIdx];
+                const gInfo = lineGroups[idx];
+                let normX = 0;
+                if (gInfo.maxX > gInfo.minX + 1) {
+                    normX = (Dx - gInfo.minX) / (gInfo.maxX - gInfo.minX);
+                } else {
+                    normX = 0.5;
+                }
+                normX = Math.max(0, Math.min(1, normX));
+                Dx = vLine.left + normX * (vLine.right - vLine.left);
+            }
+            d.rx = Dx;
+        });
+
+        console.log(`[Replay] V18 Calculation Complete.`);
     },
 
     startGazeReplay() {
