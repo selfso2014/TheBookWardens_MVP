@@ -262,8 +262,8 @@ Game.typewriter = {
     cursorBlob: null,
 
     // Speed and WPM
-    baseSpeed: 10, // ms delay
-    chunkDelay: 300, // delay between chunks
+    baseSpeed: 20, // ms delay
+    chunkDelay: 800, // delay between chunks
     startTime: null,
     totalPausedTime: 0,
     pauseStartTimestamp: null,
@@ -273,7 +273,7 @@ Game.typewriter = {
     start() {
         // Reset
         this.currentParaIndex = 0;
-        this.baseSpeed = 10; // Reset speed
+        this.baseSpeed = 20; // Reset speed
         this.wordCount = 0;
         this.startTime = null;
         this.totalPausedTime = 0;
@@ -549,7 +549,7 @@ Game.typewriter = {
             let nextDelay = this.baseSpeed;
             const lastChar = char;
             if (lastChar === '.' || lastChar === '!' || lastChar === '?') {
-                nextDelay = 600;
+                nextDelay = 800;
             }
             this.timer = setTimeout(() => this.tick(), nextDelay);
         }
