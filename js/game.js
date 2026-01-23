@@ -882,13 +882,15 @@ Game.typewriter = {
     calculateReplayCoords(tStart, tEnd) {
         console.log("[Game] Calculating Replay Coordinates (Rx, Ry) - V14 (Strict Case A Only)...");
 
-        // 1. Data Filtering
+        // 1. Data Filtering (Include ReturnSweeps even if LineIndex is null, to ensure correct segmentation)
         const rawData = window.gazeDataManager.getAllData();
         const validData = rawData.filter(d =>
             d.t >= tStart &&
             d.t <= tEnd &&
-            d.detectedLineIndex !== undefined &&
-            d.detectedLineIndex !== null
+            (
+                (d.detectedLineIndex !== undefined && d.detectedLineIndex !== null) ||
+                d.isReturnSweep
+            )
         );
 
         if (validData.length === 0) return;
@@ -897,8 +899,10 @@ Game.typewriter = {
         let minLineIdx = 9999;
         let maxLineIdx = -9999;
         validData.forEach(d => {
-            if (d.detectedLineIndex < minLineIdx) minLineIdx = d.detectedLineIndex;
-            if (d.detectedLineIndex > maxLineIdx) maxLineIdx = d.detectedLineIndex;
+            if (d.detectedLineIndex !== undefined && d.detectedLineIndex !== null) {
+                if (d.detectedLineIndex < minLineIdx) minLineIdx = d.detectedLineIndex;
+                if (d.detectedLineIndex > maxLineIdx) maxLineIdx = d.detectedLineIndex;
+            }
         });
 
         const totalLines = (maxLineIdx - minLineIdx) + 1;
