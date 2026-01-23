@@ -1082,8 +1082,6 @@ Game.typewriter = {
 
         // 3. Build Replay Stream (Continuous Offset)
         const replayData = [];
-        // 3. Build Replay Stream (Continuous Offset)
-        const replayData = [];
         let virtualTime = 0;
         let lastRawT = validData[0].t;
 
