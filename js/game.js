@@ -262,8 +262,8 @@ Game.typewriter = {
     cursorBlob: null,
 
     // Speed and WPM
-    baseSpeed: 30, // ms delay
-    chunkDelay: 1000, // delay between chunks
+    baseSpeed: 10, // ms delay
+    chunkDelay: 300, // delay between chunks
     startTime: null,
     totalPausedTime: 0,
     pauseStartTimestamp: null,
@@ -273,7 +273,7 @@ Game.typewriter = {
     start() {
         // Reset
         this.currentParaIndex = 0;
-        this.baseSpeed = 30; // Reset speed
+        this.baseSpeed = 10; // Reset speed
         this.wordCount = 0;
         this.startTime = null;
         this.totalPausedTime = 0;
