@@ -259,7 +259,11 @@ export class GazeDataManager {
             if (lIdx !== undefined && lIdx !== null) {
                 // Store in Data Structure Permanently
                 d.targetY = targetYMap[lIdx] !== undefined ? targetYMap[lIdx] : null;
-                d.avgY = lineYAvg[lIdx] !== undefined ? parseFloat(lineYAvg[lIdx].toFixed(2)) : null;
+
+                // V18 Fix: Preserve pre-calculated avgY from Game.js if available
+                if (d.avgY === undefined || d.avgY === null) {
+                    d.avgY = lineYAvg[lIdx] !== undefined ? parseFloat(lineYAvg[lIdx].toFixed(2)) : null;
+                }
 
                 targetY = d.targetY !== null ? d.targetY : "";
                 avgY = d.avgY !== null ? d.avgY : "";
