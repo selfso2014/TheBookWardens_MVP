@@ -895,15 +895,32 @@ Game.typewriter = {
 
         if (validData.length === 0) return;
 
-        // 2. Identify Meta Info
-        let minLineIdx = 9999;
-        let maxLineIdx = -9999;
+        // 2. Identify Meta Info (Robust Outlier Filtering)
+        const lineCounts = {};
         validData.forEach(d => {
             if (d.detectedLineIndex !== undefined && d.detectedLineIndex !== null) {
-                if (d.detectedLineIndex < minLineIdx) minLineIdx = d.detectedLineIndex;
-                if (d.detectedLineIndex > maxLineIdx) maxLineIdx = d.detectedLineIndex;
+                lineCounts[d.detectedLineIndex] = (lineCounts[d.detectedLineIndex] || 0) + 1;
             }
         });
+
+        const threshold = Math.max(3, validData.length * 0.01);
+        const validIndices = Object.keys(lineCounts).map(Number).filter(idx => lineCounts[idx] >= threshold);
+
+        let minLineIdx = 9999;
+        let maxLineIdx = -9999;
+
+        if (validIndices.length > 0) {
+            minLineIdx = Math.min(...validIndices);
+            maxLineIdx = Math.max(...validIndices);
+        } else {
+            // Fallback if filtering removes all (sparse data)
+            validData.forEach(d => {
+                if (d.detectedLineIndex !== undefined && d.detectedLineIndex !== null) {
+                    if (d.detectedLineIndex < minLineIdx) minLineIdx = d.detectedLineIndex;
+                    if (d.detectedLineIndex > maxLineIdx) maxLineIdx = d.detectedLineIndex;
+                }
+            });
+        }
 
         const totalLines = (maxLineIdx - minLineIdx) + 1;
         const visualLines = this.getVisualLines(this.currentP);
@@ -942,7 +959,7 @@ Game.typewriter = {
         const numSegments = segments.length;
         console.log(`[Replay] Total Lines: ${totalLines}, Segments: ${numSegments}`);
 
-        // 4. Algorithm Branching (Strict Case A Only)
+        // 4. Algorithm Branching (Strict Case A Only - V16 Robust)
         if (numSegments >= totalLines) {
             console.log("[Replay] Condition Met (Segments >= TotalLines). Applying Logic.");
 
@@ -962,7 +979,7 @@ Game.typewriter = {
                 seg.forEach(d => d.ry = targetY - 5);
             });
 
-            // B. Rx: Existing Logic (Applied ONLY if Condition Met)
+            // B. Rx: Existing Logic (Applied unconditionally)
             validData.forEach(d => {
                 const idx = d.detectedLineIndex;
                 const visualIdx = idx - minLineIdx;
@@ -982,9 +999,6 @@ Game.typewriter = {
                 }
                 d.rx = Dx;
             });
-
-        } else {
-            console.warn(`[Replay] Condition NOT Met (Segments ${numSegments} < Lines ${totalLines}). SKIPPING ALL Calculation per user request.`);
         }
 
         console.log(`[Replay] V14 Calculation Complete.`);
