@@ -245,7 +245,7 @@ export class GazeDataManager {
         });
 
         // CSV Header
-        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,AlgoLineIndex,Extrema,TargetY_Px,AvgCoolGazeY_Px\n";
+        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,AlgoLineIndex,Extrema,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY\n";
 
         // Rows
         this.data.forEach(d => {
@@ -279,7 +279,9 @@ export class GazeDataManager {
                 (d.detectedLineIndex !== undefined) ? d.detectedLineIndex : "",
                 (d.extrema !== undefined) ? d.extrema : "",
                 targetY,
-                avgY
+                avgY,
+                (d.rx !== undefined && d.rx !== null) ? d.rx.toFixed(2) : "",
+                (d.ry !== undefined && d.ry !== null) ? d.ry.toFixed(2) : ""
             ];
             csv += row.join(",") + "\n";
         });

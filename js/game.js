@@ -528,6 +528,9 @@ Game.typewriter = {
                     const resEl = document.getElementById("line-detect-result");
                     if (resEl) resEl.innerText = `Line detection: ${detectedLines}`;
 
+                    // NEW: Calculate Replay Coordinates (Rx, Ry) and store in data
+                    this.calculateReplayCoords(tStart, tEnd);
+
                     // 3. Export CSV (End of Recording)
                     if (!Game.hasExported) {
                         console.log(`[Game] Exporting CSV (Range: ${tStart} ~ ${tEnd}ms).`);
@@ -635,7 +638,7 @@ Game.typewriter = {
             gemDisplay = document.createElement("div");
             gemDisplay.id = "modal-gem-display";
             gemDisplay.style.cssText = "position: absolute; top: 20px; right: 20px; font-size: 1.5rem; color: #00d4ff; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 20px;";
-            // Append to villain-card, not container directly if possible, but modal works too 
+            // Append to villain-card, not container directly if possible, but modal works too
             const card = modal.querySelector(".villain-card");
             if (card) card.appendChild(gemDisplay);
         }
@@ -795,12 +798,12 @@ Game.typewriter = {
                 // But here we are just reviewing. The gaze data collected was from the previous screen ("screen-read").
                 // The coordinates form the reading session won't match the new "Review" screen layout!
                 // The user request says: "위 자료구조를 활용해 텍스트 지문을 읽고 나서 화면에 픽세이션인 점을을... 그린다."
-                // Since the layout is different (Reading Mode vs Review Mode), the dots will be in "wrong" places relative to text content 
-                // UNLESS the prompt implies plotting them WHERE THEY WERE LOOKING during reading (spatial heatmap) 
+                // Since the layout is different (Reading Mode vs Review Mode), the dots will be in "wrong" places relative to text content
+                // UNLESS the prompt implies plotting them WHERE THEY WERE LOOKING during reading (spatial heatmap)
                 // OR plotting them relative to the text (which is very hard without word-level timestamp mapping).
 
                 // Given "Reading Game", assuming we just overlay where they looked on the SCREEN to show their pattern.
-                // But the review screen has the text. If we just plot X,Y coords, and the text layout changed, 
+                // But the review screen has the text. If we just plot X,Y coords, and the text layout changed,
                 // it might look weird. However, re-creating the EXACT reading environment is complex.
                 // We will assume plotting the RAW screen coordinates is the goal (to show scan path pattern).
                 // We will append a fullscreen transparent container for dots.
@@ -874,6 +877,133 @@ Game.typewriter = {
 
     // --- Gaze Feedback Logic ---
     // --- Gaze Replay Logic ---
+
+    // NEW FUNCTION: Calculate Rx and Ry based on V9.1 Logic and store in data
+    calculateReplayCoords(tStart, tEnd) {
+        console.log("[Game] Calculating Replay Coordinates (Rx, Ry)...");
+
+        const rawData = window.gazeDataManager.getAllData();
+        const validData = rawData.filter(d =>
+            d.t >= tStart &&
+            d.t <= tEnd &&
+            d.detectedLineIndex !== undefined &&
+            d.detectedLineIndex !== null
+        );
+
+        if (validData.length === 0) return;
+
+        let minLineIdx = 9999;
+        let maxLineIdx = -9999;
+        validData.forEach(d => {
+            if (d.detectedLineIndex < minLineIdx) minLineIdx = d.detectedLineIndex;
+            if (d.detectedLineIndex > maxLineIdx) maxLineIdx = d.detectedLineIndex;
+        });
+
+        const visualLines = this.getVisualLines(this.currentP);
+        const lineGroups = {};
+        const contentEl = document.getElementById("book-content");
+        const contentRect = contentEl ? contentEl.getBoundingClientRect() : { top: 0 };
+
+        // X Pre-calc
+        validData.forEach(d => {
+            const idx = d.detectedLineIndex;
+            if (idx !== undefined && idx !== null) {
+                if (!lineGroups[idx]) lineGroups[idx] = { minX: Infinity, maxX: -Infinity };
+                const valX = d.gx || d.x;
+                if (valX < lineGroups[idx].minX) lineGroups[idx].minX = valX;
+                if (valX > lineGroups[idx].maxX) lineGroups[idx].maxX = valX;
+            }
+        });
+
+        // Y Offset
+        let globalYOffset = 0;
+        const firstLineData = validData.find(d => d.detectedLineIndex === minLineIdx && d.avgY !== undefined && d.avgY !== null);
+        if (firstLineData && this.lineYData && this.lineYData[0]) {
+            const targetY_Line1 = this.lineYData[0].y + contentRect.top;
+            const avgY_Line1 = firstLineData.avgY;
+            globalYOffset = targetY_Line1 - avgY_Line1;
+        }
+
+        // Logic Loop
+        let currentFloorLine = minLineIdx;
+        window._lastSweepState = false;
+
+        validData.forEach((d) => {
+            // Priority 1: Sweep sets Floor
+            if (d.isReturnSweep && !d._sweepHandled) {
+                if (!window._lastSweepState) {
+                    currentFloorLine++;
+                    if (currentFloorLine > maxLineIdx) currentFloorLine = maxLineIdx;
+                }
+                window._lastSweepState = true;
+            } else if (!d.isReturnSweep) {
+                window._lastSweepState = false;
+            }
+            d._sweepHandled = true;
+
+            // Priority 2: Time-Constraint
+            const currentGy = (d.gy !== undefined && d.gy !== null) ? d.gy : d.y;
+            const alignedGy = currentGy + globalYOffset;
+
+            const totalDuration = validData[validData.length - 1].t - validData[0].t;
+            let progress = (totalDuration > 0) ? (d.t - validData[0].t) / totalDuration : 0;
+            progress = Math.max(0, Math.min(1.0, progress));
+
+            const totalL = (maxLineIdx - minLineIdx) + 1;
+            let allowedCount = Math.ceil(progress * totalL);
+            if (allowedCount < 1) allowedCount = 1;
+
+            let timeAllowedMaxLine = minLineIdx + allowedCount - 1;
+            if (timeAllowedMaxLine < currentFloorLine) timeAllowedMaxLine = currentFloorLine;
+
+            let bestLineIdx = currentFloorLine;
+            let minDiff = Infinity;
+
+            for (let k = currentFloorLine; k <= timeAllowedMaxLine; k++) {
+                const vIdx = k - minLineIdx;
+                if (this.lineYData && this.lineYData[vIdx]) {
+                    const targetY = this.lineYData[vIdx].y + contentRect.top;
+                    const diff = Math.abs(alignedGy - targetY);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        bestLineIdx = k;
+                    }
+                }
+            }
+
+            const bestVIdx = bestLineIdx - minLineIdx;
+            let Dy = alignedGy;
+            if (this.lineYData && this.lineYData[bestVIdx]) {
+                Dy = this.lineYData[bestVIdx].y + contentRect.top;
+            }
+            Dy -= 5;
+
+            // X Calculation
+            const idx = d.detectedLineIndex;
+            const visualIdx = idx - minLineIdx;
+            let Dx = d.gx || d.x;
+
+            if (visualIdx >= 0 && visualIdx < visualLines.length && lineGroups[idx]) {
+                const vLine = visualLines[visualIdx];
+                const gInfo = lineGroups[idx];
+                let normX = 0;
+                if (gInfo.maxX > gInfo.minX + 1) {
+                    normX = (Dx - gInfo.minX) / (gInfo.maxX - gInfo.minX);
+                } else {
+                    normX = 0.5;
+                }
+                normX = Math.max(0, Math.min(1, normX));
+                Dx = vLine.left + normX * (vLine.right - vLine.left);
+            }
+
+            // STORE CALCULATED VALUES IN DATA
+            d.rx = Dx;
+            d.ry = Dy;
+        });
+
+        console.log(`[Game] Replay Coords Calculated for ${validData.length} points.`);
+    },
+
     startGazeReplay() {
         console.log("[Game] Starting Gaze Replay Logic...");
 
@@ -883,82 +1013,27 @@ Game.typewriter = {
             const tStart = startTime !== null ? startTime : 0;
             const tEnd = endTime !== null ? endTime : Infinity;
 
-            console.log(`[Replay] Filtering Data using CharIndex Range: ${tStart} ~ ${tEnd}ms`);
-
+            // Filter by Time Range AND LineIndex AND ensure rx/ry are calculated
             const rawData = window.gazeDataManager.getAllData();
-            // Filter by Time Range AND LineIndex
             const validData = rawData.filter(d =>
                 d.t >= tStart &&
                 d.t <= tEnd &&
                 d.detectedLineIndex !== undefined &&
-                d.detectedLineIndex !== null
+                d.detectedLineIndex !== null &&
+                d.rx !== undefined // Ensure replay coordinates are pre-calculated
             );
-            console.log(`[Replay] Valid Data Count: ${validData.length}`);
-
-            // Find minimum detected line index for auto-alignment
-            let minLineIdx = 9999;
-            validData.forEach(d => {
-                if (d.detectedLineIndex < minLineIdx) minLineIdx = d.detectedLineIndex;
-            });
+            console.log(`[Replay] Valid Data Count with Rx/Ry: ${validData.length}`);
 
             if (validData.length === 0) {
-                console.warn("No valid gaze data for replay. Proceeding to Villain Quiz directly.");
+                console.warn("[Replay] No valid gaze data for replay (or rx/ry missing). Proceeding to Villain Quiz directly.");
                 this.showVillainQuiz();
                 return;
             }
 
-            const visualLines = this.getVisualLines(this.currentP);
-            console.log(`[Replay] Visual Lines Count: ${visualLines.length}`);
-
-            const lineGroups = {};
-            // Get content container position for absolute alignment
-            const contentEl = document.getElementById("book-content");
-            const contentRect = contentEl ? contentEl.getBoundingClientRect() : { top: 0 };
-
-            // -------------------------------------------------------------
-            // PRE-CALCULATION: X-Axis Min/Max per line (for Normalization)
-            // -------------------------------------------------------------
-            validData.forEach(d => {
-                const idx = d.detectedLineIndex;
-                if (idx !== undefined && idx !== null) {
-                    if (!lineGroups[idx]) {
-                        lineGroups[idx] = { minX: Infinity, maxX: -Infinity, count: 0 };
-                    }
-                    const valX = d.gx || d.x;
-                    if (valX < lineGroups[idx].minX) lineGroups[idx].minX = valX;
-                    if (valX > lineGroups[idx].maxX) lineGroups[idx].maxX = valX;
-                    lineGroups[idx].count++;
-                }
-            });
-
-            // -------------------------------------------------------------
-            // PRE-CALCULATION: Global Y Offset (Anchor Line 1)
-            // -------------------------------------------------------------
-            let globalYOffset = 0;
-            const firstLineData = validData.find(d => d.detectedLineIndex === minLineIdx && d.avgY !== undefined && d.avgY !== null);
-            let maxLineIdx = minLineIdx;
-            // Also find Max Line Index correctly
-            validData.forEach(d => {
-                if (d.detectedLineIndex > maxLineIdx) maxLineIdx = d.detectedLineIndex;
-            });
-
-            if (firstLineData && this.lineYData && this.lineYData[0]) {
-                const targetY_Line1 = this.lineYData[0].y + contentRect.top;
-                const avgY_Line1 = firstLineData.avgY;
-                globalYOffset = targetY_Line1 - avgY_Line1;
-                console.log(`[Replay] Global Y Offset: ${globalYOffset.toFixed(2)}px`);
-            } else {
-                console.warn("[Replay] Could not calculate Global Y Offset. Defaulting to 0.");
-            }
-
-            // 3. Build Replay Stream
+            // 3. Build Replay Stream using stored rx/ry
             const replayData = [];
             let virtualTime = 0;
             let lastRawT = validData[0].t;
-
-            // V9.1 Logic State
-            let currentFloorLine = minLineIdx;
-            window._lastSweepState = false;
 
             validData.forEach((d, i) => {
                 if (i > 0) {
@@ -967,77 +1042,10 @@ Game.typewriter = {
                 }
                 lastRawT = d.t;
 
-                // Priority 1: Sweep sets Floor
-                if (d.isReturnSweep && !d._sweepHandled) {
-                    if (!window._lastSweepState) {
-                        currentFloorLine++;
-                        if (currentFloorLine > maxLineIdx) currentFloorLine = maxLineIdx;
-                    }
-                    window._lastSweepState = true;
-                } else if (!d.isReturnSweep) {
-                    window._lastSweepState = false;
-                }
-                d._sweepHandled = true;
-
-                // Priority 2: Time-Constraint
-                const currentGy = (d.gy !== undefined && d.gy !== null) ? d.gy : d.y;
-                const alignedGy = currentGy + globalYOffset;
-
-                const totalDuration = validData[validData.length - 1].t - validData[0].t;
-                let progress = (totalDuration > 0) ? (d.t - validData[0].t) / totalDuration : 0;
-                progress = Math.max(0, Math.min(1.0, progress));
-
-                const totalL = (maxLineIdx - minLineIdx) + 1;
-                let allowedCount = Math.ceil(progress * totalL);
-                if (allowedCount < 1) allowedCount = 1;
-
-                let timeAllowedMaxLine = minLineIdx + allowedCount - 1;
-                if (timeAllowedMaxLine < currentFloorLine) timeAllowedMaxLine = currentFloorLine;
-
-                let bestLineIdx = currentFloorLine;
-                let minDiff = Infinity;
-
-                for (let k = currentFloorLine; k <= timeAllowedMaxLine; k++) {
-                    const vIdx = k - minLineIdx;
-                    if (this.lineYData && this.lineYData[vIdx]) {
-                        const targetY = this.lineYData[vIdx].y + contentRect.top;
-                        const diff = Math.abs(alignedGy - targetY);
-                        if (diff < minDiff) {
-                            minDiff = diff;
-                            bestLineIdx = k;
-                        }
-                    }
-                }
-
-                const bestVIdx = bestLineIdx - minLineIdx;
-                let Dy = alignedGy;
-                if (this.lineYData && this.lineYData[bestVIdx]) {
-                    Dy = this.lineYData[bestVIdx].y + contentRect.top;
-                }
-                Dy -= 5;
-
-                // X Calculation
-                const idx = d.detectedLineIndex;
-                const visualIdx = idx - minLineIdx;
-                let Dx = d.gx || d.x;
-
-                if (visualIdx >= 0 && visualIdx < visualLines.length && lineGroups[idx]) {
-                    const vLine = visualLines[visualIdx];
-                    const gInfo = lineGroups[idx];
-                    let normX = 0;
-                    if (gInfo.maxX > gInfo.minX + 1) {
-                        normX = (Dx - gInfo.minX) / (gInfo.maxX - gInfo.minX);
-                    } else {
-                        normX = 0.5;
-                    }
-                    normX = Math.max(0, Math.min(1, normX));
-                    Dx = vLine.left + normX * (vLine.right - vLine.left);
-                }
-
                 replayData.push({
                     t: virtualTime,
-                    x: Dx,
-                    y: Dy,
+                    x: d.rx, // Use pre-calculated Rx
+                    y: d.ry, // Use pre-calculated Ry
                     r: 20,
                     type: d.type
                 });

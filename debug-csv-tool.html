@@ -220,7 +220,8 @@
                 targetY: -1, avgY: -1,
                 algoLineIndex: -1,
                 isReturnSweep: -1,
-                extrema: -1
+                extrema: -1,
+                rx: -1, ry: -1
             };
 
             let startRow = 0;
@@ -262,6 +263,9 @@
                         else if (p.includes('avgcool')) colMap.avgY = i;
                         else if (p.includes('returnsweep')) colMap.isReturnSweep = i;
                         else if (p.includes('extrema')) colMap.extrema = i;
+                        // Replay
+                        else if (p.includes('replayx')) colMap.rx = i;
+                        else if (p.includes('replayy')) colMap.ry = i;
                     });
 
                     startRow = 1;
@@ -272,7 +276,7 @@
                 }
             }
 
-            log(`Mapped Columns: T=${colMap.t}, X=${colMap.x}, SmoothX=${colMap.gx}, LineIndex=${colMap.lineIndex}, AlgoIdx=${colMap.algoLineIndex}`);
+            log(`Mapped Columns: T=${colMap.t}, X=${colMap.x}, SmoothX=${colMap.gx}, LineIndex=${colMap.lineIndex}, AlgoIdx=${colMap.algoLineIndex}, Rx=${colMap.rx}, Ry=${colMap.ry}`);
 
             // 2. Parse Data
             let lastValidLineIndex = null;
@@ -327,6 +331,8 @@
                     detectedLineIndex: getVal(colMap.algoLineIndex),
                     extrema: getVal(colMap.extrema),
                     isReturnSweep: isRS,
+                    rx: getVal(colMap.rx),
+                    ry: getVal(colMap.ry),
                     type: 'Unknown' // Not critically used in viz
                 });
             }
@@ -598,7 +604,7 @@
             });
             algoCharts.push(chart1);
 
-            // --- Chart 2: SmoothY, TargetY, AvgCoolGazeY ---
+            // --- Chart 2: SmoothY, TargetY, AvgCoolGazeY, ReplayY ---
             const ctx2 = createCanvas('chart2', "Chart 2: Vertical Y Analysis");
             const chart2 = new Chart(ctx2, {
                 type: 'line',
@@ -607,7 +613,8 @@
                     datasets: [
                         { label: 'SmoothY', data: data.map(d => d.gy), borderColor: 'orange', borderWidth: 1.5, pointRadius: 0 },
                         { label: 'TargetY_Px', data: data.map(d => d.targetY), borderColor: 'blue', borderWidth: 2, pointRadius: 0, stepped: true },
-                        { label: 'AvgCoolGazeY_Px', data: data.map(d => d.avgY), borderColor: 'green', borderWidth: 2, pointRadius: 0, borderDash: [5, 5], stepped: true }
+                        { label: 'AvgCoolGazeY_Px', data: data.map(d => d.avgY), borderColor: 'green', borderWidth: 2, pointRadius: 0, borderDash: [5, 5], stepped: true },
+                        { label: 'ReplayY', data: data.map(d => d.ry), borderColor: '#9932CC', borderWidth: 2, pointRadius: 0, borderDash: [2, 2] } // DarkOrchid Dashed
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { maxTicksLimit: 20 } } } },
@@ -615,7 +622,7 @@
             });
             algoCharts.push(chart2);
 
-            // --- Chart 3: SmoothX, Extrema, ReturnSweep ---
+            // --- Chart 3: SmoothX, Extrema, ReturnSweep, ReplayX ---
             const lineStarts = data.map(d => d.extrema === 'LineStart' ? d.gx : null);
             const posMaxs = data.map(d => d.extrema === 'PosMax' ? d.gx : null);
 
@@ -626,6 +633,7 @@
                     labels: labels,
                     datasets: [
                         { label: 'SmoothX', data: data.map(d => d.gx), borderColor: 'blue', borderWidth: 1.5, pointRadius: 0 },
+                        { label: 'ReplayX', data: data.map(d => d.rx), borderColor: '#00FFFF', borderWidth: 2, pointRadius: 0, borderDash: [2, 2] }, // Cyan Dashed
                         { label: 'ReturnSweep', data: data.map(d => d.isReturnSweep ? d.gx : null), type: 'scatter', backgroundColor: 'magenta', pointStyle: 'rectRot', radius: 4 },
                         { label: 'LineStart', data: lineStarts, type: 'scatter', backgroundColor: 'green', pointStyle: 'triangle', radius: 6, rotation: 180 },
                         { label: 'PosMax', data: posMaxs, type: 'scatter', backgroundColor: 'red', pointStyle: 'triangle', radius: 6 }
