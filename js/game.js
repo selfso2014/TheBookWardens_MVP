@@ -964,19 +964,23 @@ Game.typewriter = {
             console.log("[Replay] Condition Met (Segments >= TotalLines). Applying Logic.");
 
             // A. Ry: Sequential Mapping based on Segments
+            // Determine Base Line Index from Layout Data (Visual Truth) to ensure we start from the actual top line
+            const baseLineIdx = (this.lineYData && this.lineYData.length > 0)
+                ? this.lineYData[0].lineIndex
+                : (minLineIdx < 9999 ? minLineIdx : 0);
+
             segments.forEach((seg, segIdx) => {
                 let targetLineRelIdx = segIdx;
 
                 // Smart Clamp: Only clamp if the projected line index does NOT exist in lineYData.
-                // This allows accessing the last line even if 'totalLines' was under-calculated (e.g. outlier filtering removed the last line's sparse data).
-                const projectedLineIdx = minLineIdx + targetLineRelIdx;
+                const projectedLineIdx = baseLineIdx + targetLineRelIdx;
                 const hasYData = this.lineYData && this.lineYData.some(y => y.lineIndex === projectedLineIdx);
 
                 if (!hasYData) {
                     if (targetLineRelIdx >= totalLines) targetLineRelIdx = totalLines - 1; // Fallback Clamp
                 }
 
-                const targetLineIdx = minLineIdx + targetLineRelIdx;
+                const targetLineIdx = baseLineIdx + targetLineRelIdx;
 
                 let targetY = 0;
                 if (this.lineYData) {
