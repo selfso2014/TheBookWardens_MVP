@@ -1023,6 +1023,7 @@ Game.typewriter = {
             d.detectedLineIndex !== undefined &&
             d.detectedLineIndex !== null
         );
+        console.log(`[Replay] Valid Data Count: ${validData.length}`);
 
         // Find minimum detected line index for auto-alignment
         let minLineIdx = 9999;
@@ -1037,6 +1038,8 @@ Game.typewriter = {
         }
 
         const visualLines = this.getVisualLines(this.currentP);
+        console.log(`[Replay] Visual Lines Count: ${visualLines.length}`);
+
         const lineGroups = {};
         // Get content container position for absolute alignment
         const contentEl = document.getElementById("book-content");
@@ -1269,7 +1272,8 @@ Game.typewriter = {
 
             // Find current point in stream
             let pt = null;
-            // Linear search
+            // Linear search optimization: start from last index? No, simple linear is fine for <10k points
+            // For smoother replay, we might interpolate between points, but strictly snapping to sample is fine for now.
             for (let i = 0; i < replayData.length; i++) {
                 if (replayData[i].t > progress) {
                     pt = replayData[i > 0 ? i - 1 : 0];
@@ -1282,20 +1286,29 @@ Game.typewriter = {
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, pt.r, 0, 2 * Math.PI);
 
+                // Make ALL points visible
                 if (pt.type === 'Fixation') {
-                    ctx.fillStyle = 'rgba(0, 255, 0, 0.4)';
-                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+                    ctx.fillStyle = 'rgba(0, 255, 0, 0.6)'; // More opaque green
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
                     ctx.lineWidth = 2;
                     ctx.fill();
                     ctx.stroke();
                 } else {
-                    // Saccade / Move
-                    ctx.fillStyle = 'rgba(100, 255, 100, 0.005)';
+                    // Saccade / Unknown - Make visible!
+                    ctx.fillStyle = 'rgba(0, 200, 0, 0.3)'; // Visible faint green
+                    ctx.strokeStyle = 'rgba(0, 200, 0, 0.4)';
+                    ctx.lineWidth = 1;
                     ctx.fill();
+                    ctx.stroke();
                 }
+
+                // Debug Text on Canvas
+                // ctx.fillStyle = "red";
+                // ctx.font = "12px sans-serif";
+                // ctx.fillText(`T: ${Math.round(progress)}ms | Line: ${pt.lineIndex || '?'}`, pt.x + 25, pt.y);
             }
 
-            if (progress < totalDuration + 200) {
+            if (progress < totalDuration + 1000) { // Keep last frame for 1s
                 requestAnimationFrame(animate);
             } else {
                 setTimeout(() => {
