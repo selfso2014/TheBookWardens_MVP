@@ -878,9 +878,9 @@ Game.typewriter = {
     // --- Gaze Feedback Logic ---
     // --- Gaze Replay Logic ---
 
-    // NEW FUNCTION: Calculate Rx and Ry based on V11 Logic (Segment-based)
+    // NEW FUNCTION: Calculate Rx and Ry based on V14 Logic (Strict Case A Only)
     calculateReplayCoords(tStart, tEnd) {
-        console.log("[Game] Calculating Replay Coordinates (Rx, Ry) - User Logic V11...");
+        console.log("[Game] Calculating Replay Coordinates (Rx, Ry) - V14 (Strict Case A Only)...");
 
         // 1. Data Filtering
         const rawData = window.gazeDataManager.getAllData();
@@ -893,7 +893,7 @@ Game.typewriter = {
 
         if (validData.length === 0) return;
 
-        // 2. Identify Metadata
+        // 2. Identify Meta Info
         let minLineIdx = 9999;
         let maxLineIdx = -9999;
         validData.forEach(d => {
@@ -907,7 +907,7 @@ Game.typewriter = {
         const contentEl = document.getElementById("book-content");
         const contentRect = contentEl ? contentEl.getBoundingClientRect() : { top: 0 };
 
-        // X Pre-calc (Rx Logic Preservation)
+        // X Pre-calc
         validData.forEach(d => {
             const idx = d.detectedLineIndex;
             if (idx !== undefined && idx !== null) {
@@ -918,15 +918,12 @@ Game.typewriter = {
             }
         });
 
-        // 3. Segmentation by ReturnSweep
-        // "returnsweep 1개: 2구간, n개: n+1 구간"
-        // FIXED: Group consecutive sweep points as a single event.
+        // 3. Segmentation (Fixed Logic with Rising Edge)
         const segments = [];
         let currentSegment = [];
         let wasSweep = false;
 
         validData.forEach(d => {
-            // Rising Edge: Previous segment ends, New segment (Sweep + Line) starts
             if (d.isReturnSweep && !wasSweep) {
                 if (currentSegment.length > 0) {
                     segments.push(currentSegment);
@@ -936,20 +933,16 @@ Game.typewriter = {
             currentSegment.push(d);
             wasSweep = d.isReturnSweep;
         });
-
-        if (currentSegment.length > 0) {
-            segments.push(currentSegment);
-        }
+        if (currentSegment.length > 0) segments.push(currentSegment);
 
         const numSegments = segments.length;
         console.log(`[Replay] Total Lines: ${totalLines}, Segments: ${numSegments}`);
 
-        // 4. Algorithm Branching
-        // 4. Algorithm Branching (Strict Case A Only - V12)
+        // 4. Algorithm Branching (Strict Case A Only)
         if (numSegments >= totalLines) {
-            console.log("[Replay] Condition Met (Segments >= TotalLines). Applying Case A Logic.");
+            console.log("[Replay] Condition Met (Segments >= TotalLines). Applying Logic.");
 
-            // Ry: Sequential Mapping based on Segments
+            // A. Ry: Sequential Mapping based on Segments
             segments.forEach((seg, segIdx) => {
                 let targetLineRelIdx = segIdx;
                 if (targetLineRelIdx >= totalLines) targetLineRelIdx = totalLines - 1; // Clamp
@@ -962,12 +955,10 @@ Game.typewriter = {
                     if (yData) targetY = yData.y + contentRect.top;
                 }
 
-                seg.forEach(d => {
-                    d.ry = targetY - 5; // Fixed Offset
-                });
+                seg.forEach(d => d.ry = targetY - 5);
             });
 
-            // Rx: Existing Logic (Only when condition met)
+            // B. Rx: Existing Logic (Applied ONLY if Condition Met)
             validData.forEach(d => {
                 const idx = d.detectedLineIndex;
                 const visualIdx = idx - minLineIdx;
@@ -989,10 +980,10 @@ Game.typewriter = {
             });
 
         } else {
-            console.warn(`[Replay] Condition NOT Met (Segments ${numSegments} < Lines ${totalLines}). Skipping Replay Calculation.`);
+            console.warn(`[Replay] Condition NOT Met (Segments ${numSegments} < Lines ${totalLines}). SKIPPING ALL Calculation per user request.`);
         }
 
-        console.log(`[Replay] V12 Calculation Complete.`);
+        console.log(`[Replay] V14 Calculation Complete.`);
     },
 
     startGazeReplay() {
