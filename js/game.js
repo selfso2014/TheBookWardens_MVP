@@ -458,6 +458,11 @@ Game.typewriter = {
 
         // 3. Visual Line Detection
         const currentTop = this.cursorBlob.offsetTop;
+        // Debugging Line Detection
+        if (this.charIndex % 30 === 0) {
+            console.log(`[LineDetect] Top:${currentTop}, Last:${this.lastOffsetTop}, Line:${this.visualLineIndex}`);
+        }
+
         if (this.lastOffsetTop === undefined) {
             this.lastOffsetTop = currentTop;
         } else {
