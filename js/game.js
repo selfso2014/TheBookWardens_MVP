@@ -279,8 +279,9 @@ Game.typewriter = {
         this.totalPausedTime = 0;
 
         // Chunk Display Logic Init
-        this.currentChunkNodes = [];
-        this.shouldClearPreviousChunk = false;
+        this.currentChunkNodes = []; // Nodes of currently typing chunk
+        this.visibleChunksQueue = []; // Queue of completed chunks
+        this.shouldClearOldestChunk = false;
 
         Game.state.ink = 0; // Reset Ink
         Game.hasExported = false; // Reset export flag
@@ -358,7 +359,8 @@ Game.typewriter = {
 
         // Reset Chunk Logic per Paragraph
         this.currentChunkNodes = [];
-        this.shouldClearPreviousChunk = false;
+        this.visibleChunksQueue = [];
+        this.shouldClearOldestChunk = false;
 
         if (this.pauseStartTimestamp) {
             this.totalPausedTime += Date.now() - this.pauseStartTimestamp;
@@ -417,15 +419,19 @@ Game.typewriter = {
             return;
         }
 
-        // --- 1. CHUNK CLEARING LOGIC ---
-        // If the previous chunk ended (flag set), we clear it NOW before typing the new chunk.
-        if (this.shouldClearPreviousChunk) {
-            console.log("[Game] Clearing previous chunk (preserving layout).");
-            this.currentChunkNodes.forEach(node => {
-                node.style.visibility = "hidden"; // Preserve space for layout/eye-tracking
-            });
-            this.currentChunkNodes = []; // Start new chunk accumulation
-            this.shouldClearPreviousChunk = false;
+        // --- 1. CHUNK CLEARING LOGIC (Capacity Control) ---
+        // Rule: "1st created, 2nd created. When 3rd created, delete 1st."
+        // We maintain a visible window of 2 chunks (previous complete + current typing).
+
+        if (this.shouldClearOldestChunk) {
+            while (this.visibleChunksQueue.length >= 2) {
+                console.log("[Game] Clearing oldest chunk to maintain 2-chunk window.");
+                const chunkToRemove = this.visibleChunksQueue.shift();
+                chunkToRemove.forEach(node => {
+                    node.style.visibility = "hidden"; // Preserve layout
+                });
+            }
+            this.shouldClearOldestChunk = false;
         }
 
         // --- 2. TYPING LOGIC ---
@@ -441,8 +447,12 @@ Game.typewriter = {
             separatorSpan.textContent = " ";
             this.currentP.insertBefore(separatorSpan, this.cursorBlob);
 
-            // Add separator to current chunk (it will disappear with the chunk)
+            // Add to current chunk
             this.currentChunkNodes.push(separatorSpan);
+
+            // Archive the current chunk
+            this.visibleChunksQueue.push([...this.currentChunkNodes]); // Copy array
+            this.currentChunkNodes = []; // Reset for next chunk
 
             this.charIndex++; // Skip the slash
 
@@ -451,11 +461,11 @@ Game.typewriter = {
                 this.charIndex++;
             }
 
-            // Flag to clear THIS chunk when the next tick starts
-            this.shouldClearPreviousChunk = true;
+            // Trigger limit check on next tick
+            this.shouldClearOldestChunk = true;
 
             nextDelay = this.chunkDelay || 1000;
-            console.log(`[Game] Chunk End. Pause: ${nextDelay}ms. Next tick will clear this chunk.`);
+            console.log(`[Game] Chunk End. Pause: ${nextDelay}ms.`);
         }
         // B. Normal Character
         else if (this.charIndex < this.currentText.length) {
