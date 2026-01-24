@@ -37,6 +37,7 @@ export class GazeDataManager {
 
         // 3. Eye Movement Classification
         // 0: Fixation, 2: Saccade, Others: Unknown
+
         // 3. Eye Movement Classification
         // 0: Fixation, 2: Saccade, Others: Unknown
         let type = 'Unknown';
@@ -638,41 +639,31 @@ export class GazeDataManager {
 
             // Perform Check if we have valid LineIndex metadata
             if (currentLineIndex !== null && currentLineIndex !== undefined) {
-                // Algorithm 1 Refined:
-                // Check if target line is visible.
-                // Issue: Typewriter may lag behind gaze.
-                // Fix: "Timestamp Check" -> If target line is not visible *yet*, check a small window forward (Lookahead).
-
                 const visibleLinesNow = Number(currentLineIndex) + 1;
                 const targetLineNum = currentLineNum + 1;
 
                 if (targetLineNum > visibleLinesNow) {
-                    // Potential Premature Sweep.
-                    // Check if the line appears shortly after (e.g., within 300ms of sweep end)
-                    let foundFutureLine = false;
-                    const lookaheadWindow = 300; // ms
-                    const searchUntil = sweep.end_ms + lookaheadWindow;
+                    // Algorithm 1 Refined: Post-Sweep Validation
+                    // Validate if the target line exists AFTER the sweep completes.
+                    const postSweepData = validDataSlice[sweep.endIndex];
+                    let postIndex = postSweepData.lineIndex;
 
-                    // Scan forward from sweep.endIndex
-                    for (let k = sweep.endIndex; k < validDataSlice.length; k++) {
-                        const futureD = validDataSlice[k];
-                        if (futureD.t > searchUntil) break;
-
-                        if (futureD.lineIndex !== null && futureD.lineIndex !== undefined) {
-                            const futureVisible = Number(futureD.lineIndex) + 1;
-                            if (futureVisible >= targetLineNum) {
-                                foundFutureLine = true;
-                                break; // Found it! The line appeared within tolerance.
+                    // Fallback backward search if null at immediate end
+                    if (postIndex == null) {
+                        for (let k = sweep.endIndex; k >= sweep.startIndex; k--) {
+                            if (validDataSlice[k].lineIndex != null) {
+                                postIndex = validDataSlice[k].lineIndex;
+                                break;
                             }
                         }
                     }
 
-                    if (!foundFutureLine) {
-                        console.log(`[Reject Sweep] Premature: TargetLine ${targetLineNum} > VisibleLines ${visibleLinesNow} (and didn't appear within ${lookaheadWindow}ms) at T=${sweepTime}`);
-                        continue;
-                    } else {
-                        // Accepted via Lookahead
-                        // console.log(`[Accept Sweep] Anticipated: Line appeared within tolerance at T=${sweepTime}`);
+                    if (postIndex != null) {
+                        const visibleAfter = Number(postIndex) + 1;
+                        if (targetLineNum > visibleAfter) {
+                            console.log(`[Reject Sweep] Premature: Target ${targetLineNum} > Visible ${visibleAfter} (at Sweep End)`);
+                            continue;
+                        }
                     }
                 }
             }

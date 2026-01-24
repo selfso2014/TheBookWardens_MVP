@@ -304,27 +304,25 @@ function detectLinesMobile(geoData, startTime = 0, endTime = Infinity) {
             const targetLineNum = currentLineNum + 1;
 
             if (targetLineNum > visibleLinesNow) {
-                // Lookahead Check
-                let foundFutureLine = false;
-                const lookaheadWindow = 300; // ms
-                const searchUntil = sweep.end_ms + lookaheadWindow;
+                // Algorithm 1 Refined: Validate Post-Sweep
+                const postSweepData = validDataSlice[sweep.endIndex];
+                let pIdx = postSweepData.lineIndex;
 
-                for (let k = sweep.endIndex; k < validDataSlice.length; k++) {
-                    const futureD = validDataSlice[k];
-                    if (futureD.t > searchUntil) break;
-
-                    if (futureD.lineIndex !== null && futureD.lineIndex !== undefined) {
-                        const futureVisible = Number(futureD.lineIndex) + 1;
-                        if (futureVisible >= targetLineNum) {
-                            foundFutureLine = true;
+                if (pIdx == null) {
+                    for (let k = sweep.endIndex; k >= sweep.startIndex; k--) {
+                        if (validDataSlice[k].lineIndex != null) {
+                            pIdx = validDataSlice[k].lineIndex;
                             break;
                         }
                     }
                 }
 
-                if (!foundFutureLine) {
-                    console.log(`[Reject Sweep] Premature: TargetLine ${targetLineNum} > VisibleLines ${visibleLinesNow} (No Lookahead Success) at T=${sweepTime}`);
-                    continue;
+                if (pIdx != null) {
+                    const visibleAfter = Number(pIdx) + 1;
+                    if (targetLineNum > visibleAfter) {
+                        console.log(`[Reject Sweep] Premature: Target ${targetLineNum} > Visible ${visibleAfter} (at Sweep End)`);
+                        continue;
+                    }
                 }
             }
         }
@@ -393,5 +391,3 @@ data.forEach(d => {
 
 fs.writeFileSync(outputFile, csvContent, 'utf-8');
 console.log("Done.");
-
-

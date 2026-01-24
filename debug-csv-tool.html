@@ -1139,27 +1139,27 @@
                         const targetLineNum = currentLineNum + 1;
 
                         if (targetLineNum > visibleLinesNow) {
-                            // Lookahead Check (300ms window)
-                            let foundFutureLine = false;
-                            const lookaheadWindow = 300;
-                            const searchUntil = sweep.end_ms + lookaheadWindow;
+                            // Algorithm 1 Refined: Validate Post-Sweep
+                            // Check if the target line is visible immediately after the sweep
+                            const postSweepData = data[sweep.endIndex];
+                            let pIdx = postSweepData.lineIndex;
 
-                            for (let k = sweep.endIndex; k < data.length; k++) {
-                                const futureD = data[k];
-                                if (futureD.t > searchUntil) break;
-
-                                if (futureD.lineIndex !== null && futureD.lineIndex !== undefined) {
-                                    const futureVisible = Number(futureD.lineIndex) + 1;
-                                    if (futureVisible >= targetLineNum) {
-                                        foundFutureLine = true;
+                            // Fallback
+                            if (pIdx == null) {
+                                for (let k = sweep.endIndex; k >= sweep.startIndex; k--) {
+                                    if (data[k].lineIndex != null) {
+                                        pIdx = data[k].lineIndex;
                                         break;
                                     }
                                 }
                             }
 
-                            if (!foundFutureLine) {
-                                // log(`[Chart11 Reject] Premature: TargetLine ${targetLineNum} > VisibleLines ${visibleLinesNow} (No Lookahead)`);
-                                continue;
+                            if (pIdx != null) {
+                                const visibleAfter = Number(pIdx) + 1;
+                                if (targetLineNum > visibleAfter) {
+                                    // log(`[Chart11 Reject] Premature: Target ${targetLineNum} > Visible ${visibleAfter} (at Sweep End)`);
+                                    continue;
+                                }
                             }
                         }
                     }
