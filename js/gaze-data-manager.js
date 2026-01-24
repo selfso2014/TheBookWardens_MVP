@@ -157,8 +157,9 @@ export class GazeDataManager {
             } else {
                 const dt = this.data[i].t - this.data[i - 1].t;
                 if (dt > 0) {
-                    this.data[i].vx = (this.data[i].gx - this.data[i - 1].gx) / dt; // px/ms
-                    this.data[i].vy = (this.data[i].gy - this.data[i - 1].gy) / dt;
+                    // User Request: Use Raw X/Y (Interpolated) for Velocity Calculation
+                    this.data[i].vx = (this.data[i].x - this.data[i - 1].x) / dt; // px/ms
+                    this.data[i].vy = (this.data[i].y - this.data[i - 1].y) / dt;
                 } else {
                     this.data[i].vx = 0;
                     this.data[i].vy = 0;
@@ -531,8 +532,8 @@ export class GazeDataManager {
         }));
 
         // 3. Detect Spikes using MAD (Sensitivity k=3.5)
-        // With positive velocities removed, the baseline noise is low. Revert k to 2.0 to avoid noise.
-        const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 2.0, gapMs: 120, expandOneSample: true });
+        // With positive velocities removed, the baseline noise is low. Revert k to 1.0 to avoid noise.
+        const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 1.0, gapMs: 120, expandOneSample: true });
 
         // 4. Identify Return Sweeps
         const returnSweeps = spikeIntervals.filter(interval => {

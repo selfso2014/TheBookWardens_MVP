@@ -127,7 +127,7 @@
             return median(arr.filter(Number.isFinite).map(v => Math.abs(v - med)));
         }
 
-        function detectVelXSpikes(samples, { k = 3.5, gapMs = 120, expandOneSample = true } = {}) {
+        function detectVelXSpikes(samples, { k = 1.0, gapMs = 120, expandOneSample = true } = {}) {
             const ts = samples.map(s => Number(s.ts_ms));
             const velX = samples.map(s => Number(s.velX));
             const absVel = velX.map(v => Math.abs(v));
@@ -426,8 +426,9 @@
                 } else {
                     const dt = geoData[i].t - geoData[i - 1].t;
                     if (dt > 0) {
-                        geoData[i].vx = (geoData[i].gx - geoData[i - 1].gx) / dt;
-                        geoData[i].vy = (geoData[i].gy - geoData[i - 1].gy) / dt;
+                        // User Request: Use Raw X/Y for Velocity
+                        geoData[i].vx = (geoData[i].x - geoData[i - 1].x) / dt;
+                        geoData[i].vy = (geoData[i].y - geoData[i - 1].y) / dt;
                     } else {
                         geoData[i].vx = 0;
                         geoData[i].vy = 0;
@@ -442,8 +443,8 @@
             // Use all data
             const samples = geoData.map(d => ({ ts_ms: d.t, velX: d.vx }));
 
-            // *** K = 3.5 ***
-            const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 3.5, gapMs: 120, expandOneSample: true });
+            // *** K = 1.0 (Updated) ***
+            const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 1.0, gapMs: 120, expandOneSample: true });
 
             const returnSweeps = spikeIntervals.filter(interval => {
                 let sum = 0;
@@ -518,7 +519,7 @@
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
 
-            const newName = originalFilename.replace(/\.(csv|txt)$/i, "") + "_processed_k3.5.csv";
+            const newName = originalFilename.replace(/\.(csv|txt)$/i, "") + "_processed_k1.0.csv";
 
             link.href = url;
             link.setAttribute("download", newName);
@@ -728,6 +729,210 @@
                 plugins: [shadingPlugin]
             });
             algoCharts.push(chart7);
+
+            // --- Chart 8: Spatial Plot (RawX vs RawY) with Target Lines ---
+            const maxX = Math.max(...data.map(d => typeof d.x === 'number' ? d.x : 0), 1000);
+            // Filter unique TargetY values
+            const uniqueTargetYs = [...new Set(data.map(d => d.targetY))].filter(y => y !== null && y !== "" && !isNaN(y)).sort((a, b) => a - b);
+
+            // Color Palette for Segments
+            const segmentColors = [
+                'rgba(255, 0, 0, 0.6)',    // Red
+                'rgba(255, 140, 0, 0.6)',  // Dark Orange
+                'rgba(200, 200, 0, 0.6)',  // Darker Yellow (for visibility)
+                'rgba(0, 150, 0, 0.6)',    // Green
+                'rgba(0, 0, 255, 0.6)',    // Blue
+                'rgba(75, 0, 130, 0.6)',   // Indigo
+                'rgba(148, 0, 211, 0.6)',  // Violet
+                'rgba(0, 139, 139, 0.6)',  // Dark Cyan
+                'rgba(128, 0, 0, 0.6)',    // Maroon
+                'rgba(85, 107, 47, 0.6)'   // Olive
+            ];
+
+            const spatialDatasets = [];
+            const sweepPoints = [];
+
+            let currentSegment = [];
+            let segIndex = 0;
+            let isInSweep = false;
+
+            data.forEach((d, i) => {
+                // User Request: Force X to 100 for all points
+                const pt = { x: 100, y: d.y };
+
+                if (d.isReturnSweep) {
+                    sweepPoints.push(pt);
+
+                    // If we were not in a sweep, this marks the end of a segment
+                    if (!isInSweep) {
+                        if (currentSegment.length > 0) {
+                            spatialDatasets.push({
+                                label: `Segment ${segIndex + 1}`,
+                                data: [...currentSegment],
+                                backgroundColor: segmentColors[segIndex % segmentColors.length],
+                                pointRadius: 3,
+                                type: 'scatter'
+                            });
+                            currentSegment = [];
+                            segIndex++;
+                        }
+                        isInSweep = true;
+                    }
+                } else {
+                    // Reset sweep flag if we are back to normal
+                    if (isInSweep) {
+                        isInSweep = false;
+                    }
+                    currentSegment.push(pt);
+                }
+            });
+
+            // Add remaining segment
+            if (currentSegment.length > 0) {
+                spatialDatasets.push({
+                    label: `Segment ${segIndex + 1}`,
+                    data: [...currentSegment],
+                    backgroundColor: segmentColors[segIndex % segmentColors.length],
+                    pointRadius: 3,
+                    type: 'scatter'
+                });
+            }
+
+            // Add Return Sweeps Dataset (Visualized on top)
+            if (sweepPoints.length > 0) {
+                spatialDatasets.push({
+                    label: 'Return Sweep',
+                    data: sweepPoints,
+                    backgroundColor: 'rgba(255, 0, 255, 0.9)', // Bright Magenta
+                    pointRadius: 4,
+                    pointStyle: 'triangle',
+                    type: 'scatter'
+                });
+            }
+
+            // Add Lines for TargetY
+            uniqueTargetYs.forEach((yVal, idx) => {
+                spatialDatasets.push({
+                    label: `Line Y=${yVal}`,
+                    data: [{ x: 0, y: yVal }, { x: maxX, y: yVal }], // Horizontal line
+                    type: 'line',
+                    borderColor: 'rgba(255, 0, 0, 0.8)',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    borderDash: [5, 5],
+                    fill: false
+                });
+            });
+
+            const ctx8 = createCanvas('chart8', "Chart 8: Spatial Gaze Plot (RawX vs RawY) - Color Coded by Line Segment");
+            const chart8 = new Chart(ctx8, {
+                data: { datasets: spatialDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            reverse: true, // Screen coordinate system (Y goes down)
+                            title: { display: true, text: 'Raw Y (Px) - Reversed' },
+                            beginAtZero: true
+                        },
+                        x: {
+                            position: 'top',
+                            title: { display: true, text: 'Raw X (Px)' },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                filter: function (item, chart) {
+                                    // Show Segments and Return Sweep, hide individual target lines to save space if needed
+                                    // But showing target line legend is okay.
+                                    return true;
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    if (context.dataset.type === 'line') return `Target Line Y: ${context.parsed.y}`;
+                                    return `(${context.parsed.x}, ${context.parsed.y}) [${context.dataset.label}]`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            algoCharts.push(chart8);
+
+            // --- Chart 9: Positive VelY Spike Detection (k=1.0) ---
+            // Detect Positive VelY spikes (Downward movement = Line Breaks)
+            const velySamples = data.map(d => ({
+                ts_ms: d.t,
+                velX: (typeof d.vy === 'number' && d.vy > 0) ? d.vy : 0 // FILTER: Positive Only
+            }));
+
+            const velYResult = detectVelXSpikes(velySamples, { k: 1.0, gapMs: 120, expandOneSample: true });
+
+            // Map spikes back to data for visualization
+            const velYSpikePoints = [];
+            velYResult.spikeIntervals.forEach(interval => {
+                for (let k = interval.startIndex; k <= interval.endIndex; k++) {
+                    if (data[k] && data[k].vy > 0) velYSpikePoints.push({ x: data[k].t, y: data[k].vy });
+                }
+            });
+
+            const ctx9 = createCanvas('chart9', "Chart 9: Positive Vertical Velocity (VelY > 0) Analysis (k=1.0)");
+            const chart9 = new Chart(ctx9, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Positive VelY',
+                            data: data.map(d => (d.vy > 0 ? d.vy : 0)), // Display only positive
+                            borderColor: 'brown',
+                            borderWidth: 1,
+                            pointRadius: 0
+                        },
+                        {
+                            label: 'Detected Spikes (k=1.0)',
+                            data: velYSpikePoints,
+                            type: 'scatter',
+                            backgroundColor: 'red',
+                            pointRadius: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 20 } },
+                        y: { beginAtZero: true, min: 0 } // Force Y axis to start at 0
+                    },
+                    plugins: {
+                        annotation: {
+                            annotations: {
+                                thresholdLine: {
+                                    type: 'line',
+                                    yMin: velYResult.threshold,
+                                    yMax: velYResult.threshold,
+                                    borderColor: 'rgba(255, 0, 0, 0.5)',
+                                    borderWidth: 1,
+                                    borderDash: [5, 5],
+                                    label: {
+                                        content: `Threshold: ${velYResult.threshold.toFixed(2)}`,
+                                        enabled: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            algoCharts.push(chart9);
         }
 
         // --- 3. UI Events ---
