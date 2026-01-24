@@ -127,7 +127,7 @@
             return median(arr.filter(Number.isFinite).map(v => Math.abs(v - med)));
         }
 
-        function detectVelXSpikes(samples, { k = 3.5, gapMs = 120, expandOneSample = true } = {}) {
+        function detectVelXSpikes(samples, { k = 3.0, gapMs = 120, expandOneSample = true } = {}) {
             const ts = samples.map(s => Number(s.ts_ms));
             const velX = samples.map(s => Number(s.velX));
             const absVel = velX.map(v => Math.abs(v));
@@ -443,8 +443,8 @@
             // Use all data
             const samples = geoData.map(d => ({ ts_ms: d.t, velX: d.vx }));
 
-            // *** K = 3.5 (Updated) ***
-            const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 3.5, gapMs: 120, expandOneSample: true });
+            // *** K = 3.0 (Updated) ***
+            const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 3.0, gapMs: 120, expandOneSample: true });
 
             const returnSweeps = spikeIntervals.filter(interval => {
                 let sum = 0;
@@ -519,7 +519,7 @@
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
 
-            const newName = originalFilename.replace(/\.(csv|txt)$/i, "") + "_processed_k3.5.csv";
+            const newName = originalFilename.replace(/\.(csv|txt)$/i, "") + "_processed_k3.0.csv";
 
             link.href = url;
             link.setAttribute("download", newName);
@@ -866,14 +866,14 @@
             });
             algoCharts.push(chart8);
 
-            // --- Chart 9: Positive VelY Spike Detection (k=3.5) ---
+            // --- Chart 9: Positive VelY Spike Detection (k=3.0) ---
             // Detect Positive VelY spikes (Downward movement = Line Breaks)
             const velySamples = data.map(d => ({
                 ts_ms: d.t,
                 velX: (typeof d.vy === 'number' && d.vy > 0) ? d.vy : 0 // FILTER: Positive Only
             }));
 
-            const velYResult = detectVelXSpikes(velySamples, { k: 3.5, gapMs: 120, expandOneSample: true });
+            const velYResult = detectVelXSpikes(velySamples, { k: 3.0, gapMs: 120, expandOneSample: true });
 
             // Map spikes back to data for visualization
             const velYSpikePoints = [];
@@ -883,7 +883,7 @@
                 }
             });
 
-            const ctx9 = createCanvas('chart9', "Chart 9: Positive Vertical Velocity (VelY > 0) Analysis (k=3.5)");
+            const ctx9 = createCanvas('chart9', "Chart 9: Positive Vertical Velocity (VelY > 0) Analysis (k=3.0)");
             const chart9 = new Chart(ctx9, {
                 type: 'line',
                 data: {
@@ -983,8 +983,8 @@
                 velX: v < 0 ? v : 0
             }));
 
-            // 2. Run Detection (k=3.5)
-            const reCalcResult = detectVelXSpikes(reCalcSamples, { k: 3.5, gapMs: 120, expandOneSample: true });
+            // 2. Run Detection (k=3.0)
+            const reCalcResult = detectVelXSpikes(reCalcSamples, { k: 3.0, gapMs: 120, expandOneSample: true });
 
             // 3. Identify Return Sweeps (Filter by Displacement > 100px)
             // Need SmoothX (gx) for displacement check. If not available, use RawX.

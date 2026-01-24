@@ -233,9 +233,9 @@ function detectLinesMobile(geoData, startTime = 0, endTime = Infinity) {
         velX: d.vx < 0 ? d.vx : 0
     }));
 
-    // 3. Detect Spikes using MAD (Sensitivity k=3.5)
+    // 3. Detect Spikes using MAD (Sensitivity k=3.0)
     // With positive velocities removed, the baseline noise is low.
-    const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 3.5, gapMs: 120, expandOneSample: true });
+    const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 3.0, gapMs: 120, expandOneSample: true });
 
     const returnSweeps = spikeIntervals.filter(interval => {
         // Check Displacement
