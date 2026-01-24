@@ -300,12 +300,32 @@ function detectLinesMobile(geoData, startTime = 0, endTime = Infinity) {
         // In this file, carry-forward is already done in loading phase, so lineIndex should be reliable.
 
         if (currentLineIndex !== null && currentLineIndex !== undefined) {
-            const visibleLines = Number(currentLineIndex) + 1;
+            const visibleLinesNow = Number(currentLineIndex) + 1;
             const targetLineNum = currentLineNum + 1;
 
-            if (targetLineNum > visibleLines + 1) {
-                console.log(`[Reject Sweep] Premature: TargetLine ${targetLineNum} > VisibleLines ${visibleLines} + 1 Buffer at T=${sweepTime}`);
-                continue;
+            if (targetLineNum > visibleLinesNow) {
+                // Lookahead Check
+                let foundFutureLine = false;
+                const lookaheadWindow = 300; // ms
+                const searchUntil = sweep.end_ms + lookaheadWindow;
+
+                for (let k = sweep.endIndex; k < validDataSlice.length; k++) {
+                    const futureD = validDataSlice[k];
+                    if (futureD.t > searchUntil) break;
+
+                    if (futureD.lineIndex !== null && futureD.lineIndex !== undefined) {
+                        const futureVisible = Number(futureD.lineIndex) + 1;
+                        if (futureVisible >= targetLineNum) {
+                            foundFutureLine = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!foundFutureLine) {
+                    console.log(`[Reject Sweep] Premature: TargetLine ${targetLineNum} > VisibleLines ${visibleLinesNow} (No Lookahead Success) at T=${sweepTime}`);
+                    continue;
+                }
             }
         }
 
