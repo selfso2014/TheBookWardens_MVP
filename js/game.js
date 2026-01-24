@@ -883,244 +883,64 @@ Game.typewriter = {
     // --- Gaze Feedback Logic ---
     // --- Gaze Replay Logic ---
 
-    // NEW FUNCTION: Calculate Rx and Ry based on V14 Logic (Strict Case A Only)
+    // NEW FUNCTION: Calculate Rx and Ry based on V20 Logic (Direct Line Mapping)
     calculateReplayCoords(tStart, tEnd) {
-        console.log("[Game] Calculating Replay Coordinates (Rx, Ry) - V14 (Strict Case A Only)...");
+        console.log(`[Replay] Calculating Replay Coordinates (Simplifed V20) Range: ${tStart}~${tEnd}`);
 
-        // 1. Data Filtering (Include ReturnSweeps even if LineIndex is null, to ensure correct segmentation)
+        // 1. Get Visual Lines from current text geometry
+        const contentEl = document.getElementById("book-content");
+        if (!contentEl) return;
+
+        const visualLines = this.getVisualLines(contentEl);
+        if (visualLines.length === 0) {
+            console.warn("[Replay] No visual lines detected.");
+            return;
+        }
+
         const rawData = window.gazeDataManager.getAllData();
         const validData = rawData.filter(d =>
-            d.t >= tStart &&
-            d.t <= tEnd &&
-            (
-                (d.detectedLineIndex !== undefined && d.detectedLineIndex !== null) ||
-                d.isReturnSweep
-            )
+            d.t >= tStart && d.t <= tEnd &&
+            d.detectedLineIndex !== null && d.detectedLineIndex !== undefined
         );
 
         if (validData.length === 0) return;
 
-        // 2. Identify Meta Info (Robust Outlier Filtering)
-        const lineCounts = {};
-        validData.forEach(d => {
-            if (d.detectedLineIndex !== undefined && d.detectedLineIndex !== null) {
-                lineCounts[d.detectedLineIndex] = (lineCounts[d.detectedLineIndex] || 0) + 1;
-            }
-        });
-
-        const threshold = Math.max(3, validData.length * 0.01);
-        const validIndices = Object.keys(lineCounts).map(Number).filter(idx => lineCounts[idx] >= threshold);
-
-        let minLineIdx = 9999;
-        let maxLineIdx = -9999;
-
-        if (validIndices.length > 0) {
-            minLineIdx = Math.min(...validIndices);
-            maxLineIdx = Math.max(...validIndices);
-        } else {
-            // Fallback if filtering removes all (sparse data)
-            validData.forEach(d => {
-                if (d.detectedLineIndex !== undefined && d.detectedLineIndex !== null) {
-                    if (d.detectedLineIndex < minLineIdx) minLineIdx = d.detectedLineIndex;
-                    if (d.detectedLineIndex > maxLineIdx) maxLineIdx = d.detectedLineIndex;
-                }
-            });
-        }
-
-        const totalLines = (maxLineIdx - minLineIdx) + 1;
-        const visualLines = this.getVisualLines(this.currentP);
+        // 2. Pre-calculate Min/Max X for Rx normalization
         const lineGroups = {};
-        const contentEl = document.getElementById("book-content");
-        const contentRect = contentEl ? contentEl.getBoundingClientRect() : { top: 0 };
-
-        // X Pre-calc
         validData.forEach(d => {
             const idx = d.detectedLineIndex;
-            if (idx !== undefined && idx !== null) {
-                if (!lineGroups[idx]) lineGroups[idx] = { minX: Infinity, maxX: -Infinity };
-                const valX = d.gx || d.x;
-                if (valX < lineGroups[idx].minX) lineGroups[idx].minX = valX;
-                if (valX > lineGroups[idx].maxX) lineGroups[idx].maxX = valX;
-            }
+            if (!lineGroups[idx]) lineGroups[idx] = { min: Infinity, max: -Infinity };
+            const val = d.gx || d.x;
+            if (val < lineGroups[idx].min) lineGroups[idx].min = val;
+            if (val > lineGroups[idx].max) lineGroups[idx].max = val;
         });
 
-        // 3. Segmentation (Fixed Logic with Rising Edge)
-        let segments = [];
-        let currentSegment = [];
-        let wasSweep = false;
-
-        validData.forEach(d => {
-            if (d.isReturnSweep && !wasSweep) {
-                if (currentSegment.length > 0) {
-                    segments.push(currentSegment);
-                    currentSegment = [];
-                }
-            }
-            currentSegment.push(d);
-            wasSweep = d.isReturnSweep;
-        });
-        if (currentSegment.length > 0) segments.push(currentSegment);
-
-        // V18 Enhancement: Fallback to Time-Sliced Segmentation if Sweeps are Missing
-        // This addresses the issue where segmentation is incorrect due to missed return sweeps.
-        const rawNumSegments = segments.length;
-        if (rawNumSegments < totalLines && totalLines > 0) {
-            console.warn(`[Replay] Not enough sweeps (${rawNumSegments} < ${totalLines}). Switching to Time-Sliced Segmentation.`);
-
-            segments = [];
-            const duration = tEnd - tStart;
-            // Prevent division by zero
-            if (duration > 0) {
-                const sliceDuration = duration / totalLines;
-
-                // Initialize buckets
-                for (let i = 0; i < totalLines; i++) {
-                    segments.push([]); // Create empty segments for each line
-                }
-
-                // Distribute data points into time slices
-                validData.forEach(d => {
-                    let sliceIdx = Math.floor((d.t - tStart) / sliceDuration);
-                    // Clamp index
-                    if (sliceIdx < 0) sliceIdx = 0;
-                    if (sliceIdx >= totalLines) sliceIdx = totalLines - 1;
-
-                    segments[sliceIdx].push(d);
-                });
-            }
-        }
-
-        const numSegments = segments.length;
-
-        // 1.5. Calculate AvgSmoothY & Global Offset (AvgSmoothY Correction)
-        const segmentMeans = segments.map(seg => {
-            const sum = seg.reduce((acc, d) => acc + (d.gy !== undefined ? d.gy : (d.y || 0)), 0);
-            return seg.length > 0 ? sum / seg.length : 0;
-        });
-
-        let globalYOffset = 0;
-        if (this.lineYData && this.lineYData.length > 0 && segmentMeans.length > 0) {
-            const firstSegMean = segmentMeans[0];
-            const firstLineY = this.lineYData[0].y + (contentRect ? contentRect.top : 0);
-            globalYOffset = firstLineY - firstSegMean;
-        }
-
-        // Correct AvgCoolGazeY (d.avgY) using current segmentation
-        segments.forEach((seg, i) => {
-            const alignedSegY = segmentMeans[i] + globalYOffset;
-            seg.forEach(d => d.avgY = alignedSegY);
-        });
-
-        console.log(`[Replay] Total Lines: ${totalLines}, Segments: ${numSegments}, Offset: ${globalYOffset.toFixed(2)}`);
-
-        // Determine Base Line Index (V17 Logic)
-        const baseLineIdx = (this.lineYData && this.lineYData.length > 0)
-            ? this.lineYData[0].lineIndex
-            : (minLineIdx < 9999 ? minLineIdx : 0);
-
-        // 4. Algorithm Branching
-        if (numSegments >= totalLines) {
-            console.log("[Replay] Condition Met (Segments >= TotalLines). Applying Logic.");
-
-            console.log("[Replay] Case A: Sequential Mapping (Segments >= Ln)");
-            // A. Ry: Sequential Mapping based on Segments
-            let lastValidTargetY = (this.lineYData && this.lineYData.length > 0)
-                ? (this.lineYData[0].y + (contentRect ? contentRect.top : 0))
-                : 0;
-
-            segments.forEach((seg, segIdx) => {
-                let targetLineRelIdx = segIdx;
-
-                // Smart Clamp: Only clamp if the projected line index does NOT exist in lineYData.
-                const projectedLineIdx = baseLineIdx + targetLineRelIdx;
-                const hasYData = this.lineYData && this.lineYData.some(y => y.lineIndex === projectedLineIdx);
-
-                if (!hasYData) {
-                    if (targetLineRelIdx >= totalLines) targetLineRelIdx = totalLines - 1; // Fallback Clamp
-                }
-
-                const targetLineIdx = baseLineIdx + targetLineRelIdx;
-
-                let targetY = 0;
-                if (this.lineYData) {
-                    // Safety: Ensure index is within bounds for fallback array access
-                    const safeFallbackIdx = Math.min(Math.max(0, targetLineRelIdx), this.lineYData.length - 1);
-                    const yData = this.lineYData.find(y => y.lineIndex === targetLineIdx) || this.lineYData[safeFallbackIdx];
-
-                    if (yData) targetY = yData.y + (contentRect ? contentRect.top : 0);
-                }
-
-                // V18 Fix: Prevent targetY falling to 0 (resulting in -5) if mapping fails
-                if (targetY === 0 && lastValidTargetY !== 0) targetY = lastValidTargetY;
-                if (targetY !== 0) lastValidTargetY = targetY;
-
-                seg.forEach(d => d.ry = targetY - 5);
-            });
-
-        } else {
-            // Case B: Time-Dependent Snap (V18 New Requirement)
-            console.log("[Replay] Case B: Time-Dependent Snap (Segments < Ln)");
-            const totalDuration = tEnd - tStart;
-
-            segments.forEach((seg, i) => {
-                // AvgSmoothY correction
-                const segMean = segmentMeans[i];
-                const alignedSegY = segMean + globalYOffset;
-
-                // Time Progress
-                const segMidT = seg.length > 0 ? seg[Math.floor(seg.length / 2)].t : tStart;
-                const progress = totalDuration > 0 ? (segMidT - tStart) / totalDuration : 0;
-
-                // Available Lines
-                let allowedCount = Math.ceil(progress * totalLines);
-                if (allowedCount < 1) allowedCount = 1;
-                if (allowedCount > totalLines) allowedCount = totalLines;
-
-                // Find Nearest TargetY
-                let bestDiff = Infinity;
-                let bestY = 0;
-
-                for (let k = 0; k < allowedCount; k++) {
-                    const candidateIdx = baseLineIdx + k;
-                    const yData = this.lineYData.find(y => y.lineIndex === candidateIdx) || (this.lineYData.length > k ? this.lineYData[k] : null);
-
-                    if (yData) {
-                        const currentTargetY = yData.y + (contentRect ? contentRect.top : 0);
-                        const diff = Math.abs(currentTargetY - alignedSegY);
-                        if (diff < bestDiff) {
-                            bestDiff = diff;
-                            bestY = currentTargetY;
-                        }
-                    }
-                }
-
-                if (bestY !== 0) seg.forEach(d => d.ry = bestY - 5);
-            });
-        }
-
-        // B. Rx: Existing Logic (Applied unconditionally for all cases)
-        console.log("[Replay] Calculating Rx (Common)...");
+        // 3. Assign Rx/Ry
         validData.forEach(d => {
             const idx = d.detectedLineIndex;
-            const visualIdx = idx - minLineIdx;
-            let Dx = d.gx || d.x;
+            const vLine = visualLines[idx];
 
-            if (visualIdx >= 0 && visualIdx < visualLines.length && lineGroups[idx]) {
-                const vLine = visualLines[visualIdx];
-                const gInfo = lineGroups[idx];
-                let normX = 0;
-                if (gInfo.maxX > gInfo.minX + 1) {
-                    normX = (Dx - gInfo.minX) / (gInfo.maxX - gInfo.minX);
-                } else {
-                    normX = 0.5;
+            if (vLine) {
+                // ReplayY: Center of the visual line
+                d.ry = vLine.top + (vLine.bottom - vLine.top) / 2;
+
+                // ReplayX: Normalize within line bounds
+                const bounds = lineGroups[idx];
+                let norm = 0.5;
+                if (bounds.max > bounds.min + 1) { // Avoid div by zero
+                    norm = ((d.gx || d.x) - bounds.min) / (bounds.max - bounds.min);
                 }
-                normX = Math.max(0, Math.min(1, normX));
-                Dx = vLine.left + normX * (vLine.right - vLine.left);
+                norm = Math.max(0, Math.min(1, norm));
+
+                // Map to Visual Line Width
+                d.rx = vLine.left + norm * (vLine.right - vLine.left);
+            } else {
+                d.rx = null;
+                d.ry = null;
             }
-            d.rx = Dx;
         });
 
-        console.log(`[Replay] V18 Calculation Complete.`);
+        console.log("[Replay] Coords Updated (V20 Simpler).");
     },
 
     startGazeReplay() {
