@@ -216,9 +216,15 @@ const Game = {
         }
 
         // Typewriter Gaze Feedback
-        if (this.typewriter && typeof this.typewriter.checkGazeDistance === "function") {
-            // Pass Gaze Data
-            this.typewriter.checkGazeDistance(x, y);
+        if (this.typewriter) {
+            // New Ink Logic
+            if (typeof this.typewriter.updateGazeStats === "function") {
+                this.typewriter.updateGazeStats(x, y);
+            }
+            // Legacy Logic (if exists)
+            if (typeof this.typewriter.checkGazeDistance === "function") {
+                this.typewriter.checkGazeDistance(x, y);
+            }
         }
     },
 
@@ -270,6 +276,58 @@ Game.typewriter = {
     wordCount: 0,
     wpmInterval: null,
 
+    // Gaze Coverage Logic
+    currentLineMinX: 99999,
+    currentLineMaxX: -99999,
+
+    updateGazeStats(x, y) {
+        // Only track if typing is active
+        if (!this.startTime || this.isPaused) return;
+
+        if (x < this.currentLineMinX) this.currentLineMinX = x;
+        if (x > this.currentLineMaxX) this.currentLineMaxX = x;
+    },
+
+    checkLineConfidence(lineTop, lineIndex) {
+        // Calculate coverage width
+        const coverage = this.currentLineMaxX - this.currentLineMinX;
+
+        const contentEl = document.getElementById("book-content");
+        const totalWidth = contentEl ? contentEl.clientWidth : window.innerWidth;
+        const threshold = totalWidth * 0.5; // 50% width threshold
+
+        console.log(`[Line ${lineIndex}] Coverage: ${Math.round(coverage)}px / ${threshold}px`);
+
+        if (coverage >= threshold) {
+            this.spawnInkIcon(lineTop);
+        }
+
+        // Reset for next line
+        this.currentLineMinX = 99999;
+        this.currentLineMaxX = -99999;
+    },
+
+    spawnInkIcon(top) {
+        const el = document.getElementById("book-content");
+        if (!el) return;
+
+        const ink = document.createElement("div");
+        ink.textContent = "💧";
+        ink.style.position = "absolute";
+        ink.style.right = "10px";
+        // Adjust top to align with text line (approx correction)
+        ink.style.top = `${top - el.getBoundingClientRect().top + el.scrollTop}px`;
+        ink.style.fontSize = "1.2rem";
+        ink.style.animation = "popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+        ink.style.filter = "drop-shadow(0 0 5px #00d4ff)";
+
+        el.appendChild(ink);
+
+        // Add to total ink
+        Game.state.ink = (Game.state.ink || 0) + 1; // +1 Ink per line success
+        Game.updateUI();
+    },
+
     start() {
         // Reset
         this.currentParaIndex = 0;
@@ -277,6 +335,10 @@ Game.typewriter = {
         this.wordCount = 0;
         this.startTime = null;
         this.totalPausedTime = 0;
+
+        // Reset Gaze Stats
+        this.currentLineMinX = 99999;
+        this.currentLineMaxX = -99999;
 
         // Chunk Display Logic Init
         this.currentChunkNodes = []; // Nodes of currently typing chunk
@@ -312,6 +374,7 @@ Game.typewriter = {
             el.style.height = "60vh";
             el.style.overflowY = "auto";
             el.style.width = "100%";
+            el.style.position = "relative"; // For absolute ink positioning
         }
 
         // Start WPM Timer
@@ -356,6 +419,10 @@ Game.typewriter = {
         this.visualLineIndex = 0;  // Actual visual line
         this.lastOffsetTop = undefined;
         this.charIndex = 0;
+
+        // Reset Gaze Stats for new Paragraph
+        this.currentLineMinX = 99999;
+        this.currentLineMaxX = -99999;
 
         // Reset Chunk Logic per Paragraph
         this.currentChunkNodes = [];
@@ -505,7 +572,7 @@ Game.typewriter = {
             }
         }
 
-        // --- 3. VISUAL LINE DETECTION ---
+        // --- 3. VISUAL LINE DETECTION & INK LOGIC ---
         const rect = this.cursorBlob.getBoundingClientRect();
         const currentTop = rect.top + window.scrollY;
 
@@ -519,8 +586,12 @@ Game.typewriter = {
         } else {
             // Check difference (> 5px threshold for new line)
             if (currentTop > this.lastOffsetTop + 5) {
-                // Line Break Detected
+                // Line Break Detected - PREVIOUS LINE FINISHED
                 this.recordLineY(this.lastOffsetTop, (this.visualLineIndex || 0));
+
+                // CHECK READING CONFIDENCE (50% Width or Return Sweep)
+                this.checkLineConfidence(this.lastOffsetTop, this.visualLineIndex);
+
                 this.visualLineIndex = (this.visualLineIndex || 0) + 1;
                 this.lastOffsetTop = currentTop;
             }
@@ -535,6 +606,9 @@ Game.typewriter = {
             // Record the very last line
             if (this.lastOffsetTop !== undefined) {
                 this.recordLineY(this.lastOffsetTop, (this.visualLineIndex || 0));
+
+                // CHECK LAST LINE CONFIDENCE
+                this.checkLineConfidence(this.lastOffsetTop, this.visualLineIndex);
             }
 
             this.finishSession();
