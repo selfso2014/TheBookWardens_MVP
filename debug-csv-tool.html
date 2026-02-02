@@ -266,6 +266,7 @@
                         // Replay
                         else if (p.includes('replayx')) colMap.rx = i;
                         else if (p.includes('replayy')) colMap.ry = i;
+                        else if (p.includes('inksuccess') || p === 'inksuccess' || p === 'success') colMap.inkSuccess = i;
                     });
 
                     startRow = 1;
@@ -333,6 +334,7 @@
                     isReturnSweep: isRS,
                     rx: getVal(colMap.rx),
                     ry: getVal(colMap.ry),
+                    inkSuccess: (getVal(colMap.inkSuccess) === "TRUE" || getVal(colMap.inkSuccess) === "true" || getVal(colMap.inkSuccess) === true),
                     type: 'Unknown' // Not critically used in viz
                 });
             }
@@ -1349,25 +1351,47 @@
                     // Context-Anchored Logic: Determine ReplayY based on Majority Vote of TargetY in this segment
                     // This aligns the "Physical Return Sweep" (Chart 11) with the "Logical Line" (Game Data).
 
-                    const targetYcounts = {};
-                    let majorityTargetY = null;
-                    let maxCount = 0;
+                    // Context-Anchored + Ink Priority Logic:
+                    // 1. Prioritize TargetY from 'InkSuccess' points (Confirmed Reads).
+                    // 2. Fallback to Majority TargetY of all points (Attempted Reads).
+                    // 3. Last resort: Synthetic Step.
+
+                    const successTargetYCounts = {};
+                    const allTargetYCounts = {};
+                    let modeSuccessY = null;
+                    let modeAllY = null;
+                    let maxSuccessCount = 0;
+                    let maxAllCount = 0;
 
                     for (let i = line.startIdx; i <= line.endIdx; i++) {
-                        const tY = data[i].targetY;
+                        const d = data[i];
+                        const tY = d.targetY;
+
                         if (tY !== null && tY !== "" && tY !== undefined) {
-                            targetYcounts[tY] = (targetYcounts[tY] || 0) + 1;
-                            if (targetYcounts[tY] > maxCount) {
-                                maxCount = targetYcounts[tY];
-                                majorityTargetY = tY;
+                            // Count ALL
+                            allTargetYCounts[tY] = (allTargetYCounts[tY] || 0) + 1;
+                            if (allTargetYCounts[tY] > maxAllCount) {
+                                maxAllCount = allTargetYCounts[tY];
+                                modeAllY = tY;
+                            }
+
+                            // Count SUCCESS
+                            if (d.inkSuccess) {
+                                successTargetYCounts[tY] = (successTargetYCounts[tY] || 0) + 1;
+                                if (successTargetYCounts[tY] > maxSuccessCount) {
+                                    maxSuccessCount = successTargetYCounts[tY];
+                                    modeSuccessY = tY;
+                                }
                             }
                         }
                     }
 
-                    // Fallback if no targetY found in this segment (e.g. noise between lines)
-                    // Use the synthetic estimate or keep previous (for visualization continuity)
-                    if (majorityTargetY === null) {
-                        // Try finding line index
+                    // Determination
+                    if (maxSuccessCount > 0) {
+                        majorityTargetY = modeSuccessY; // Best: Confirmed Success
+                    } else if (maxAllCount > 0) {
+                        majorityTargetY = modeAllY;     // Good: Attempted Line
+                    } else {
                         majorityTargetY = 200 + (idx * 40); // Synthetic fallback
                     }
 
