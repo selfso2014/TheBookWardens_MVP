@@ -1018,21 +1018,50 @@ Game.typewriter = {
     // --- Gaze Replay Logic ---
 
     // NEW FUNCTION: Calculate Rx and Ry based on Ink Success Status
+    // Fix: Use lineYData recorded during gameplay instead of getVisualLines (which fails if text is faded)
     calculateReplayCoords(tStart, tEnd) {
         console.log(`[Replay] Calculating Replay Coords (Ink-Based Logic) Range: ${tStart}~${tEnd}`);
 
-        // 1. Get Visual Lines from current text geometry
         const contentEl = document.getElementById("book-content");
         if (!contentEl) return;
 
-        const visualLines = this.getVisualLines(contentEl);
-        if (visualLines.length === 0) {
-            console.warn("[Replay] No visual lines detected.");
+        // Use Global Container Bounds for Rx mapping
+        const cRect = contentEl.getBoundingClientRect();
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
+
+        // Padding handling (Approximate based on CSS: 20px usually)
+        // Ideally get computed style
+        const style = window.getComputedStyle(contentEl);
+        const padLeft = parseFloat(style.paddingLeft) || 0;
+        const padRight = parseFloat(style.paddingRight) || 0;
+
+        const globalLeft = cRect.left + scrollX + padLeft;
+        const globalRight = cRect.right + scrollX - padRight;
+        const globalWidth = globalRight - globalLeft;
+
+        // Use lineYData for Ry mapping
+        const lineYData = this.lineYData || [];
+        if (lineYData.length === 0) {
+            console.warn("[Replay] No lineYData recorded.");
             return;
         }
 
+        // Estimate approximate line height from first two lines or default
+        let approxLineHeight = 40;
+        if (lineYData.length >= 2) {
+            approxLineHeight = Math.abs(lineYData[1].y - lineYData[0].y);
+        } else {
+            // Try to measure a sample p line height
+            const p = contentEl.querySelector('p');
+            if (p) {
+                const lh = parseFloat(window.getComputedStyle(p).lineHeight);
+                if (!isNaN(lh)) approxLineHeight = lh;
+            }
+        }
+
         const rawData = window.gazeDataManager.getAllData();
-        const lineMetadata = window.gazeDataManager.lineMetadata || {}; // Access per-line metadata
+        const lineMetadata = window.gazeDataManager.lineMetadata || {};
 
         const validData = rawData.filter(d =>
             d.t >= tStart && d.t <= tEnd &&
@@ -1054,24 +1083,25 @@ Game.typewriter = {
         // 3. Assign Rx/Ry
         validData.forEach(d => {
             const idx = d.lineIndex;
-            const vLine = visualLines[idx];
 
-            if (vLine) {
+            // Find recorded Y
+            const lineRec = lineYData.find(item => item.lineIndex === idx);
+
+            if (lineRec) {
                 // Determine Success Status from Metadata
                 const isLineSuccessful = lineMetadata[idx] && lineMetadata[idx].success;
 
                 // ReplayY Logic:
                 if (isLineSuccessful) {
                     // Success -> Snap to Center (Fixed Ry)
-                    d.ry = vLine.top + (vLine.bottom - vLine.top) / 2;
+                    // lineRec.y is TOP. Center = Top + Height/2
+                    d.ry = lineRec.y + (approxLineHeight / 2);
                 } else {
                     // Failed -> Use Smoothed Gaze Y (gy)
-                    // Clamp to visual area or just use raw? Usually clamp for safety but keep 'wobble' to show error.
-                    // We will use gy directly but ensure it exists.
                     d.ry = (d.gy !== undefined && d.gy !== null) ? d.gy : d.y;
                 }
 
-                // ReplayX Logic: (Existing) Normalize within line bounds
+                // ReplayX Logic: Normalize within line bounds -> Map to Container Width
                 const bounds = lineGroups[idx];
                 let norm = 0.5;
                 if (bounds.max > bounds.min + 1) { // Avoid div by zero
@@ -1079,15 +1109,15 @@ Game.typewriter = {
                 }
                 norm = Math.max(0, Math.min(1, norm));
 
-                // Map to Visual Line Width
-                d.rx = vLine.left + norm * (vLine.right - vLine.left);
+                // Map to Visual Line Width (Global)
+                d.rx = globalLeft + norm * globalWidth;
             } else {
                 d.rx = null;
                 d.ry = null;
             }
         });
 
-        console.log("[Replay] Coords Updated (Rx: Norm, Ry: Conditional on Ink).");
+        console.log("[Replay] Coords Updated (Rx: GlobalNorm, Ry: lineYData).");
     },
 
     startGazeReplay() {
