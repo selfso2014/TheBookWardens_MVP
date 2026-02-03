@@ -238,6 +238,12 @@ const Game = {
         const delay = Math.floor(10000 / wpm);
         this.targetSpeed = delay; // Store for typewriter.start to pick up
 
+        // Adjust Chunk Delay too (Pause between phrases)
+        // Faster WPM -> Shorter Pause
+        // Let's set pause roughly equal to typing 8 characters
+        this.targetChunkDelay = delay * 8;
+        console.log(`[Game] WPM: ${wpm} -> CharDelay: ${delay}ms, ChunkDelay: ${this.targetChunkDelay}ms`);
+
         // Initialize Eye Tracking & Calibration logic
         (async () => {
             if (this.trackingInitPromise) {
@@ -458,7 +464,8 @@ Game.typewriter = {
         // Reset
         this.currentParaIndex = 0;
         this.baseSpeed = Game.targetSpeed || 20; // Use user selected speed or default
-        console.log(`[Typewriter] Starting with Base Speed: ${this.baseSpeed}ms`);
+        this.chunkDelay = Game.targetChunkDelay || 800; // Apply dynamic chunk delay
+        console.log(`[Typewriter] Starting -> Base Speed: ${this.baseSpeed}ms, Chunk Delay: ${this.chunkDelay}ms`);
 
         this.wordCount = 0;
         this.startTime = null;
