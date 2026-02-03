@@ -1083,6 +1083,11 @@ Game.typewriter = {
         // Reset Coords
         validData.forEach(d => { d.rx = null; d.ry = null; });
 
+        // [Fix] Use current visual lines from DOM instead of stored lineYData
+        // stored lineYData (snapshot) may mismatch due to scrolling/clamping.
+        // visualLines gives the definitive current viewport position.
+        const visualLines = this.getVisualLines(this.currentP || contentEl);
+
         const K_VEL_THRESHOLD = 0.5;
         const segments = [];
         let segStart = 0;
@@ -1127,14 +1132,36 @@ Game.typewriter = {
             // Strategy: Use Majority LineIndex to map to visual line center
             // (Chart 7 does this)
             if (bestL !== -1) {
-                const lineRec = lineYData.find(Rec => Rec.lineIndex === bestL);
-                if (lineRec) {
+                // Prioritize Visual Lines from DOM (Current State)
+                if (visualLines[bestL]) {
+                    const vLine = visualLines[bestL];
                     const pStyle = window.getComputedStyle(this.currentP || contentEl);
                     const fSize = parseFloat(pStyle.fontSize) || 16;
 
-                    // Align ReplayY to the vertical center of the text line.
-                    // Reduced offset from fSize/2 to fSize/4 to fix "slightly below" alignment.
-                    targetRy = lineRec.y + (fSize / 4);
+                    // Use Viewport Top from visualLines
+                    // Add window.scrollY just in case, though usually 0 for this game style.
+                    // But getVisualLines returns Viewport coords. If we calculate Replay for Fixed Overlay, we want Viewport Coords.
+                    // game.js recordLineY used window.scrollY. 
+                    // Let's assume Fixed Overlay needs Viewport Y.
+                    // Wait, ReplayX logic uses globalLeft = cRect.left + scrollX.
+                    // So we must correspond.
+                    // If visualLines returns Viewport Y, adding scrollY makes it Page Y.
+                    // ReplayX is Global (Page X).
+                    // startGazeReplay draws on FIXED overlay?
+                    // Fixed Overlay aligns with Viewport.
+                    // If we use Page X/Y, and page is scrolled, Fixed Overlay drawing is offset by scroll.
+                    // But assume Page Scroll is 0. 
+
+                    targetRy = vLine.top + window.scrollY + (fSize / 4);
+                }
+                // Fallback to history if DOM lookup fails
+                else {
+                    const lineRec = lineYData.find(Rec => Rec.lineIndex === bestL);
+                    if (lineRec) {
+                        const pStyle = window.getComputedStyle(this.currentP || contentEl);
+                        const fSize = parseFloat(pStyle.fontSize) || 16;
+                        targetRy = lineRec.y + (fSize / 4);
+                    }
                 }
             }
             if (targetRy === null) {
