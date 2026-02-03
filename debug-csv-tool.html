@@ -102,7 +102,8 @@
         <div class="upload-area" id="dropZone">
             <p>Drag & Drop CSV file here or click to upload</p>
             <input type="file" id="fileInput" accept=".csv,.txt" style="display: none;">
-            <button class="btn" onclick="document.getElementById('fileInput').click()">Select File</button>
+            <button class="btn" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">Select
+                File</button>
         </div>
 
         <div id="log">Ready. Waiting for file...</div>
@@ -113,6 +114,17 @@
     </div>
 
     <script>
+        // Global Error Handler to catch and display script errors
+        window.onerror = function (msg, url, line, col, error) {
+            const el = document.getElementById('log');
+            if (el) {
+                el.innerText += `\n[ERROR] ${msg} (Line ${line})\n`;
+                el.style.color = '#ff5555';
+            }
+            console.error("Global Error:", msg, error);
+            return false;
+        };
+
         // --- 1. Core Algorithms (Inlined from velx-spike-detector.js) ---
 
         function median(arr) {
@@ -445,8 +457,8 @@
             // Use all data
             const samples = geoData.map(d => ({ ts_ms: d.t, velX: d.vx }));
 
-            // *** K = 2.0 (Updated) ***
-            const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 2.0, gapMs: 120, expandOneSample: true });
+            // *** K = 1.5 (Updated) ***
+            const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 1.5, gapMs: 120, expandOneSample: true });
 
             // 4. Identify Potential Return Sweeps
             const candidates = spikeIntervals.filter(interval => {
@@ -591,7 +603,7 @@
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
 
-            const newName = originalFilename.replace(/\.(csv|txt)$/i, "") + "_processed_k2.0.csv";
+            const newName = originalFilename.replace(/\.(csv|txt)$/i, "") + "_processed_k1.5.csv";
 
             link.href = url;
             link.setAttribute("download", newName);
@@ -1060,7 +1072,7 @@
 
             // --- Chart 11: Independent Return Sweep Detection & Visualization (Like Chart 3) ---
             // UI Calculation for K value
-            let dynamicK = 2.0; // Default
+            let dynamicK = 1.5; // Default
 
             // Function to Render Chart 11
             function renderChart11(kVal) {
@@ -1278,68 +1290,54 @@
                 algoCharts.push(chart11);
 
                 // 5. Generate Simulated Replay Data (Based on Chart 11 Sweeps)
-                // To visualize what Replay would look like with this K value.
+                // [Logic Update] Dual-Threshold Strategy
+                // 1. Detected RS (User K) -> Shown as Magenta Diamonds
+                // 2. Broad RS (Lower K) -> Used to define 'Clean Reading Segments' for Replay Simulation
 
-                // A. Segment Data into Lines based on Sweeps
-                const simLines = []; // Array of { startIdx, endIdx, minX, maxX }
+                // A. Calculate Broad Sweeps for Segmentation (K=0.5 for wide coverage)
+                // Use the same samples as before
+                const broadResult = detectVelXSpikes(reCalcSamples, { k: 0.5, gapMs: 120, expandOneSample: true });
+                const broadCandidates = broadResult.spikeIntervals.filter(interval => {
+                    const sIdx = interval.startIndex;
+                    const eIdx = interval.endIndex;
+                    if (data[sIdx] && data[eIdx]) {
+                        const startX = data[sIdx].x !== null ? data[sIdx].x : 0;
+                        const endX = data[eIdx].x !== null ? data[eIdx].x : 0;
+                        return (startX - endX) > 100; // Same 100px threshold
+                    }
+                    return false;
+                });
+
+                // Use broad sweeps to define lines
+                const simLines = [];
                 let currentStartIdx = 0;
+                broadCandidates.sort((a, b) => a.startIndex - b.startIndex);
 
-                // Sort sweeps by time just in case
-                validSweeps.sort((a, b) => a.startIndex - b.startIndex);
-
-                validSweeps.forEach(sw => {
-                    // Line ends at sweep START (or effectively sweep duration is transition)
-                    // Let's say line ends at sweep.startIndex.
+                broadCandidates.forEach(sw => {
+                    // Line ends at Broad Sweep START
                     const endIdx = sw.startIndex;
                     if (endIdx > currentStartIdx) {
                         simLines.push({ startIdx: currentStartIdx, endIdx: endIdx });
                     }
-                    // Next line starts after sweep ends? Or immediately?
-                    // Typically sweep duration is non-reading. Next line starts at sweep.endIndex.
+                    // Next line starts at Broad Sweep END (skipping the tail)
                     currentStartIdx = sw.endIndex;
                 });
-                // Last segment
                 if (currentStartIdx < data.length) {
                     simLines.push({ startIdx: currentStartIdx, endIdx: data.length - 1 });
                 }
 
-                // B. Calculate Min/Max and TargetY for each Sim Line
-                // Reuse uniqueTargetYs from parent scope if possible.
-                // We need to assume 'uniqueTargetYs' variable is accessible or re-derive it.
-                // Re-deriving uniqueTargetYs safely:
+                // B. Calculate Min/Max and TargetY for each Sim Line using Clean Segments
                 const validTargetYs = [...new Set(data.map(d => d.targetY))].filter(y => y !== null && y !== "" && !isNaN(y)).sort((a, b) => a - b);
-
-                // Fallback for TargetY if not enough found
-                const estimatedLineHeight = 60;
-                const getTargetY = (lineIdx) => {
-                    if (lineIdx < validTargetYs.length) return validTargetYs[lineIdx];
-                    // If out of bounds, extrapolate
-                    if (validTargetYs.length > 0) {
-                        return validTargetYs[validTargetYs.length - 1] + (lineIdx - validTargetYs.length + 1) * estimatedLineHeight;
-                    }
-                    return 100 + lineIdx * estimatedLineHeight;
-                };
 
                 const simReplayX = new Array(data.length).fill(null);
                 const simReplayY = new Array(data.length).fill(null);
-                const simReturnSweepPoints = []; // For visualization
+                // simReturnSweepPoints will be populated from the *User Detected* sweeps for correlation visualization
+                // But visualized at the 'jump' point.
 
-                // Global Container Width estimation (from Max Raw X observed or fixed)
-                // Let's use 0-1 normalization scaled to e.g. 1000px for graph.
-                const GRAPH_WIDTH = 350; // Matches typical Y-axis scale range for visibility?
-                // Actually Rx is usually screen coord (0-1920). Let's use 0-500 range for the chart visibility.
-                // Or preserve original scale? Chart 7 compares Rx and Ry. Ry is in pixels (e.g. 300).
-                // So Rx should be comparable. Let's assume normalized 0-1 maps to 0-WrapperWidth.
-                // Let's just use 0-100% of the Segment Min/Max? 
-                // Wait, User wants "ReplayX data values". Usually Rx is Screen Coordinates.
-                // Let's map normalized 0..1 to MinX..MaxX of the line? No, that reconstructs original.
-                // We want "Simulated Screen Coordinates". 
-                // Let's assume a standard line width of 800px starting at x=100.
-                const SIM_LINE_START_X = 50;
-                const SIM_LINE_WIDTH = 300; // Small width to fit on Y-axis scale (0-400 usually)
-
+                // Context Logic
                 simLines.forEach((line, idx) => {
                     let minX = Infinity, maxX = -Infinity;
+                    // Find Min/Max within this CLEAN segment
                     for (let i = line.startIdx; i <= line.endIdx; i++) {
                         const val = data[i].gx !== null ? data[i].gx : data[i].x;
                         if (val !== null && typeof val === 'number') {
@@ -1348,14 +1346,7 @@
                         }
                     }
 
-                    // Context-Anchored Logic: Determine ReplayY based on Majority Vote of TargetY in this segment
-                    // This aligns the "Physical Return Sweep" (Chart 11) with the "Logical Line" (Game Data).
-
-                    // Context-Anchored + Ink Priority Logic:
-                    // 1. Prioritize TargetY from 'InkSuccess' points (Confirmed Reads).
-                    // 2. Fallback to Majority TargetY of all points (Attempted Reads).
-                    // 3. Last resort: Synthetic Step.
-
+                    // Determine TargetY (Majority Vote)
                     const successTargetYCounts = {};
                     const allTargetYCounts = {};
                     let modeSuccessY = null;
@@ -1366,43 +1357,25 @@
                     for (let i = line.startIdx; i <= line.endIdx; i++) {
                         const d = data[i];
                         const tY = d.targetY;
-
                         if (tY !== null && tY !== "" && tY !== undefined) {
-                            // Count ALL
                             allTargetYCounts[tY] = (allTargetYCounts[tY] || 0) + 1;
-                            if (allTargetYCounts[tY] > maxAllCount) {
-                                maxAllCount = allTargetYCounts[tY];
-                                modeAllY = tY;
-                            }
+                            if (allTargetYCounts[tY] > maxAllCount) { maxAllCount = allTargetYCounts[tY]; modeAllY = tY; }
 
-                            // Count SUCCESS
                             if (d.inkSuccess) {
                                 successTargetYCounts[tY] = (successTargetYCounts[tY] || 0) + 1;
-                                if (successTargetYCounts[tY] > maxSuccessCount) {
-                                    maxSuccessCount = successTargetYCounts[tY];
-                                    modeSuccessY = tY;
-                                }
+                                if (successTargetYCounts[tY] > maxSuccessCount) { maxSuccessCount = successTargetYCounts[tY]; modeSuccessY = tY; }
                             }
                         }
                     }
 
-                    // Determination
-                    if (maxSuccessCount > 0) {
-                        majorityTargetY = modeSuccessY; // Best: Confirmed Success
-                    } else if (maxAllCount > 0) {
-                        majorityTargetY = modeAllY;     // Good: Attempted Line
-                    } else {
-                        majorityTargetY = 200 + (idx * 40); // Synthetic fallback
-                    }
+                    let majorityTargetY = (maxSuccessCount > 0) ? modeSuccessY : ((maxAllCount > 0) ? modeAllY : (200 + idx * 40));
 
+                    // Fill Replay Data
                     for (let i = line.startIdx; i <= line.endIdx; i++) {
                         const val = data[i].gx !== null ? data[i].gx : data[i].x;
                         if (val !== null && typeof val === 'number') {
-                            // Normalize
                             let norm = 0;
                             if (maxX > minX) norm = (val - minX) / (maxX - minX);
-
-                            // Map to Simulated Screen
                             simReplayX[i] = norm * 350;
                         }
                         simReplayY[i] = majorityTargetY;
@@ -1491,7 +1464,7 @@
             ctrlDiv.style.textAlign = 'center';
             ctrlDiv.innerHTML = `
                 <label style="font-weight:bold; margin-right:10px;">Chart 11 Sensitivity (K):</label>
-                <input type="number" id="inputK" value="3.0" step="0.1" style="width:60px;padding:5px; margin-right:10px;">
+                <input type="number" id="inputK" value="1.5" step="0.1" style="width:60px;padding:5px; margin-right:10px;">
                 <button class="btn" style="padding: 5px 15px;" onclick="window.updateChart11K(document.getElementById('inputK').value)">Update K</button>
             `;
 
@@ -1506,7 +1479,12 @@
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
 
-        dropZone.addEventListener('click', () => fileInput.click()); // Area click triggers input
+        // Area click triggers input, but ignore if clicked on button (handled inline) or input itself
+        dropZone.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON' && e.target !== fileInput) {
+                fileInput.click();
+            }
+        });
 
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
@@ -1531,6 +1509,7 @@
                 processFile(e.dataTransfer.files[0]);
             }
         });
-</body >
+    </script>
+</body>
 
-</html >
+</html>
