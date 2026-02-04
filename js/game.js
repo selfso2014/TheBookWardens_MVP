@@ -597,22 +597,24 @@ Game.typewriter = {
         }
 
         // Reveal next chunk
+        // Reveal next chunk
         if (this.chunkIndex < this.renderer.chunks.length) {
-            this.renderer.revealChunk(this.chunkIndex);
 
-            // Debug Log
-            console.log(`[Typewriter] Chunk ${this.chunkIndex} revealed.`);
+            // Wait for Animation to Finish (Promise-based)
+            this.renderer.revealChunk(this.chunkIndex).then(() => {
+                // Animation Done. Now wait for the "Reading Pause" delay.
+                this.chunkIndex++;
 
-            this.chunkIndex++;
+                // Calculate Delay (Pause AFTER valid reading)
+                let delay = Game.targetChunkDelay || 1500;
+                if (delay < 500) delay = 500; // Min pause
 
-            // Calculate Delay with Safety Clamp
-            let delay = Game.targetChunkDelay || 1500;
-            if (delay < 800) delay = 800; // Bump min safety to 0.8s
+                this.timer = setTimeout(() => {
+                    this.timer = null;
+                    this.tick();
+                }, delay);
+            });
 
-            this.timer = setTimeout(() => {
-                this.timer = null;
-                this.tick();
-            }, delay);
         } else {
             console.log("Paragraph Fully Revealed.");
         }
