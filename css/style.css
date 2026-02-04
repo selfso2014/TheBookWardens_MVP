@@ -134,13 +134,14 @@ body {
   height: 100%;
   position: relative;
   /* Changed from absolute for better flex behavior */
-  padding: 20px;
+  /* Reduced top/bottom padding to maximize reading space */
+  padding: 10px 20px;
   overflow-y: auto;
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  padding-bottom: 80px;
-  /* Safe area for bottom buttons */
+  padding-bottom: 20px;
+  /* Reduced from 80px to allow text further down */
 }
 
 .screen-owl {
@@ -260,7 +261,8 @@ body {
 #screen-read {
   justify-content: flex-start;
   /* Align text to top */
-  padding-top: 40px;
+  padding-top: 10px;
+  /* Reduced from 40px to start text higher */
 }
 
 .book-container {
