@@ -321,7 +321,16 @@ class TextRenderer {
 
             // Offset logic: Top of the tight box + 52% of height
             // User requested "slightly lower than center"
-            const visualY = currentRect.top + (currentRect.height * 0.52);
+            let visualY = currentRect.top + (currentRect.height * 0.52);
+
+            // COMPENSATE for CSS Transform on unrevealed words
+            // The .tr-word class has 'transform: translateY(10px)' initially.
+            // When revealed, it moves to 0.
+            // If we are positioning the cursor BEFORE reveal, we must subtract this 10px
+            // to align with the FINAL line position.
+            if (!wordObj.element.classList.contains("revealed")) {
+                visualY -= 10;
+            }
 
             // X Position based on Alignment
             let visualX;
