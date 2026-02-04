@@ -522,11 +522,11 @@ body {
 .tr-word {
   opacity: 0;
   transform: translateY(10px);
-  transition: opacity 0.4s ease-out, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.3s, text-shadow 0.3s;
+  transition: opacity 0.4s ease-out, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   display: inline-block;
   white-space: pre-wrap;
-  color: #ccc;
-  /* Default text color */
+  color: #fff;
+  /* Unified White */
 }
 
 /* Revealed State (Fade In + Slide Up) */
@@ -535,14 +535,12 @@ body {
   transform: translateY(0);
 }
 
-/* Read State (Gaze Hit) */
+/* Read State (Gaze Hit) - Minimal Feedback Only */
 .tr-word.read {
-  color: #fff !important;
-  text-shadow: 0 0 10px var(--primary-accent), 0 0 20px var(--primary-accent);
-  transform: scale(1.05);
-  /* Subtle pop */
+  /* color: #fff !important; -- Already white */
+  /* text-shadow: 0 0 10px var(--primary-accent); -- Removed glow */
+  /* transform: scale(1.05); -- Optional: keep only subtle pop? Removing for uniformity if requested "same" */
   z-index: 1;
-  /* Bring forward */
   position: relative;
 }
 
