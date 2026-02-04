@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TextRenderer Debug & Validation</title>
+    <!-- Use same font as game -->
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,700;1,400&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ccc;
+            font-family: sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+
+        #controls {
+            width: 250px;
+            background: #222;
+            padding: 20px;
+            border-right: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #stage {
+            flex: 1;
+            position: relative;
+            background: #0f0c15;
+            /* Game BG color */
+            overflow: hidden;
+            /* Prevent native scroll for exact gaze mapping */
+        }
+
+        #render-container {
+            position: absolute;
+            /* Fixed position within stage */
+            top: 50px;
+            left: 50px;
+            right: 50px;
+            bottom: 50px;
+            /* Border for visibility */
+            border: 1px dashed #555;
+        }
+
+        /* Canvas for debug overlay */
+        #debug-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            /* Click through */
+            z-index: 999;
+        }
+
+        button {
+            padding: 10px;
+            background: #444;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #666;
+        }
+
+        .info {
+            font-size: 12px;
+            color: #888;
+        }
+
+        /* Highlight styles */
+        .tr-word.revealed {
+            transition: color 0.1s;
+        }
+
+        .tr-word.gaze-hover {
+            color: #ffd700 !important;
+            /* Gold */
+            text-shadow: 0 0 10px #ff00ff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="controls">
+        <h2>TextRenderer Debug</h2>
+        <button id="btn-load">1. Load & Parse</button>
+        <button id="btn-lock">2. Lock Layout</button>
+        <button id="btn-next">3. Reveal Next Chunk</button>
+        <button id="btn-reset">Reset</button>
+        <hr>
+        <label><input type="checkbox" id="chk-debug" checked> Show Debug Rects</label>
+        <div class="info" id="status-info">Status: Ready</div>
+        <div class="info" id="hit-info">Hit: None</div>
+    </div>
+
+    <div id="stage">
+        <canvas id="debug-canvas"></canvas>
+        <div id="render-container"></div>
+    </div>
+
+    <script src="js/TextRenderer.js"></script>
+    <script>
+        const sampleText = "Alice was beginning to / get very tired / of sitting by her sister / on the bank, / and of having nothing to do: / once or twice / she had peeped into the book / her sister was reading, / but it had no pictures / or conversations / in it, / “and what is the use of a book,” / thought Alice / “without pictures / or conversations?\"";
+
+        const renderer = new TextRenderer("render-container", {
+            fontSize: "1.8rem",
+            lineHeight: "2.5",
+            wordSpacing: "0.2em"
+        });
+
+        const canvas = document.getElementById("debug-canvas");
+        const ctx = canvas.getContext("2d");
+        let currentChunk = 0;
+
+        // Resize canvas to match window
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Controls
+        document.getElementById("btn-load").onclick = () => {
+            renderer.prepare(sampleText);
+            currentChunk = 0;
+            document.getElementById("status-info").textContent = "Status: Text Parsed. Spans created.";
+            drawDebug(); // Initially won't show much until locked
+        };
+
+        document.getElementById("btn-lock").onclick = () => {
+            renderer.lockLayout();
+            document.getElementById("status-info").textContent = "Status: Layout Locked & Cached.";
+            drawDebug();
+        };
+
+        document.getElementById("btn-next").onclick = () => {
+            renderer.revealChunk(currentChunk++);
+        };
+
+        document.getElementById("btn-reset").onclick = () => {
+            renderer.prepare("");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            currentChunk = 0;
+        };
+
+        document.getElementById("chk-debug").onchange = () => {
+            drawDebug();
+        };
+
+        // Debug Drawing
+        function drawDebug() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (!document.getElementById("chk-debug").checked) return;
+            if (!renderer.isLayoutLocked) return;
+
+            // Draw Lines
+            ctx.strokeStyle = "rgba(0, 255, 255, 0.3)";
+            ctx.lineWidth = 1;
+            renderer.lines.forEach(line => {
+                const r = line.rect;
+                ctx.strokeRect(r.left, r.top, r.width, r.height);
+                ctx.fillStyle = "rgba(0, 255, 255, 0.1)";
+                ctx.fillText(`Line Y:${Math.round(r.top)}`, r.left - 40, r.top + 15);
+            });
+
+            // Draw Words
+            ctx.strokeStyle = "rgba(255, 0, 0, 0.3)";
+            renderer.words.forEach(w => {
+                const r = w.rect;
+                ctx.strokeRect(r.left, r.top, r.width, r.height);
+            });
+        }
+
+        // Mouse as Gaze Simulator
+        document.addEventListener("mousemove", (e) => {
+            if (!renderer.isLayoutLocked) return;
+
+            const x = e.clientX;
+            const y = e.clientY;
+
+            const hit = renderer.hitTest(x, y);
+
+            // Visual Feedback
+            const hitInfo = document.getElementById("hit-info");
+
+            // Reset previous highlights
+            document.querySelectorAll(".gaze-hover").forEach(el => el.classList.remove("gaze-hover"));
+
+            if (hit) {
+                if (hit.type === 'word') {
+                    hitInfo.textContent = `Hit: Word [${hit.word.text}] (Lines: ${hit.line.wordIndices.length} words)`;
+                    hit.word.element.classList.add("gaze-hover");
+                } else if (hit.type === 'line') {
+                    hitInfo.textContent = `Hit: Line (Whitespace)`;
+                }
+            } else {
+                hitInfo.textContent = "Hit: None";
+            }
+        });
+
+    </script>
+</body>
+
+</html>

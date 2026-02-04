@@ -357,7 +357,7 @@
       </div>
 
       <div id="book-content" class="book-container"
-        style="height: 75vh; overflow: hidden; padding: 20px; border: 1px solid #444; border-radius: 8px; background: rgba(0,0,0,0.3); column-fill: auto; column-width: 100%; column-gap: 80px;">
+        style="height: 75vh; overflow: hidden; padding: 20px; border: 1px solid #444; border-radius: 8px; background: rgba(0,0,0,0.3); position: relative; width: 100%;">
         <!-- Text will be injected here by JS -->
         <p>Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once
           or twice she had peeped into the book her sister was reading, but it had no <span
@@ -586,6 +586,8 @@
   <!-- 1. Eye Tracking Core -->
   <script type="module" src="./js/app.js?v=260126_0040"></script>
   <!-- 2. Game Logic -->
+  <script src="./js/calibration.js"></script>
+  <script src="./js/TextRenderer.js"></script>
   <script src="./js/game.js?v=260126_0040"></script>
 </body>
 
