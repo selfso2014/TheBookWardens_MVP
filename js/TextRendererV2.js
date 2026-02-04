@@ -297,6 +297,13 @@ class TextRenderer {
                     const leadTime = Math.min(interval * 0.8, 300);
                     setTimeout(() => {
                         this.updateCursor(w, 'start');
+
+                        // RHYTHM IMPACT: Pulse for internal line breaks
+                        if (this.cursor) {
+                            this.cursor.classList.remove("impact-pulse");
+                            void this.cursor.offsetWidth; // Trigger Reflow
+                            this.cursor.classList.add("impact-pulse");
+                        }
                     }, delay - leadTime);
                 }
 
