@@ -21,11 +21,28 @@ const Game = {
         console.log("Game Init");
         this.bindEvents();
 
-        // Note: UI is now initialized via HTML defaults (Splash is active)
         this.updateUI();
 
-        // 3. Auto-start if redirected from In-App Browser
+        // 3. Auto-start / Skip Logic
         const params = new URLSearchParams(window.location.search);
+
+        // NEW: Check for 'skip_intro=1' (Coming back from In-App Browser Redirect)
+        // If present, we skip the splash screen entirely and go to Home.
+        if (params.get("skip_intro") === "1" && !this.isInAppBrowser()) {
+            console.log("Skipping Intro (Returned from redirect)");
+            // Manually switch active screen from Splash (default) to Home
+            // But first, ensure DOM is ready or just force switch
+            document.addEventListener("DOMContentLoaded", () => {
+                this.switchScreen("screen-home");
+            });
+            // Also execute immediately in case DOM is already ready
+            this.switchScreen("screen-home");
+        } else {
+            // Normal Load: Splash is active by default in HTML. Do nothing.
+        }
+
+        // Legacy 'skip=1' logic - keeping for backward compatibility if needed, 
+        // but the new flow prefers 'skip_intro'.
         if (params.get("skip") === "1" && !this.isInAppBrowser()) {
             console.log("Auto-starting game due to skip param");
             const startBtn = document.getElementById("btn-start-game");
@@ -115,8 +132,10 @@ const Game = {
         const url = window.location.href;
         if (/Android/i.test(navigator.userAgent)) {
             let newUrl = url;
-            if (newUrl.indexOf("?") === -1) newUrl += "?skip=1";
-            else if (newUrl.indexOf("skip=1") === -1) newUrl += "&skip=1";
+            // Add 'skip_intro=1' to signal that we should skip the splash on re-entry
+            // Use 'skip_intro' instead of just 'skip' to differentiate intent if needed
+            if (newUrl.indexOf("?") === -1) newUrl += "?skip_intro=1";
+            else if (newUrl.indexOf("skip_intro=1") === -1) newUrl += "&skip_intro=1";
 
             const noProtocol = newUrl.replace(/^https?:\/\//, "");
             const intentUrl = `intent://${noProtocol}#Intent;scheme=https;package=com.android.chrome;end`;
@@ -367,6 +386,16 @@ const Game = {
     // --- 4. Splash Screen Logic ---
     dismissSplash() {
         console.log("Splash Displayed. User interaction detected.");
+
+        // 1. Check In-App Browser IMMEDIATELY upon touch
+        if (this.isInAppBrowser()) {
+            // If In-App, redirect to System Browser (Chrome) immediately.
+            // This will reload the page in Chrome with ?skip_intro=1
+            this.openSystemBrowser();
+            return;
+        }
+
+        // 2. If Normal Browser, Transition to Lobby
         // Audio interaction could go here
 
         // Transition to Lobby
