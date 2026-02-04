@@ -350,8 +350,8 @@ body {
   width: 200px;
   height: 200px;
   margin: 0 auto;
-  transform: translateY(-100px);
-  /* Move up 100px as requested */
+  /* Move up 250px to ensure it's visually above center */
+  transform: translateY(-250px);
 }
 
 .owl-head {
