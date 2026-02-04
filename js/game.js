@@ -582,8 +582,14 @@ Game.typewriter = {
             if (debugEl) debugEl.textContent = `Lines Cached: ${this.renderer.lines.length}`;
 
             // 3. Start Reading Flow
-            this.startTime = Date.now();
-            this.tick();
+            // Modification: 3-second delay with cursor at top-left
+            this.renderer.resetToStart();
+            console.log("[Typewriter] Cursor ready. Waiting 3s...");
+
+            setTimeout(() => {
+                this.startTime = Date.now();
+                this.tick();
+            }, 3000);
         });
     },
 

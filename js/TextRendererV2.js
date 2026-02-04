@@ -236,6 +236,16 @@ class TextRenderer {
     }
 
     /**
+     * Resets cursor to the start of the first word (Left side).
+     * Used for the initial 3-second ready phase.
+     */
+    resetToStart() {
+        if (this.words.length > 0) {
+            this.updateCursor(this.words[0], 'start');
+        }
+    }
+
+    /**
      * Visually reveals words in the chunk sequentially (Typing Effect).
      * @param {number} chunkIndex 
      * @param {number} interval - ms between words (default 150ms, relaxed pace)
@@ -251,8 +261,37 @@ class TextRenderer {
         const indices = this.chunks[chunkIndex];
 
         return new Promise((resolve) => {
+            // Check if this chunk starts a new line
+            // If so, we shift the timeline to allow cursor to "jump" to the start first
+            const firstW = this.words[indices[0]];
+            const chunkStartsLine = this.lines.some(l => l.startIndex === firstW.index);
+
+            // If it's a new line (and not the very first intro chunk which is handled by game.js),
+            // we insert a "Travel Time"
+            let timeOffset = 0;
+            if (chunkStartsLine && chunkIndex > 0) {
+                timeOffset = 400; // ms for cursor return sweep
+                // Trigger the move to start immediately (at t=0 relative to this call)
+                this.updateCursor(firstW, 'start');
+            }
+
             indices.forEach((wordIdx, i) => {
                 const w = this.words[wordIdx];
+                const delay = i * interval + timeOffset;
+
+                // Check Line Start for internal words
+                const isLineStart = this.lines.some(l => l.startIndex === w.index);
+
+                // CRITICAL: "Cursor moves first" logic for Line Breaks
+                // If this word starts a new line, flip cursor to the LEFT 
+                // slightly before the word appears.
+                if (isLineStart && i > 0) {
+                    const leadTime = Math.min(interval * 0.8, 300);
+                    setTimeout(() => {
+                        this.updateCursor(w, 'start');
+                    }, delay - leadTime);
+                }
+
                 // Staggered Timeout
                 setTimeout(() => {
                     // Force Opacity 1
@@ -260,17 +299,17 @@ class TextRenderer {
                     w.element.style.visibility = "visible"; // Extra safety
                     w.element.classList.add("revealed");
 
-                    // Move cursor along with words
-                    this.updateCursor(w);
-                }, i * interval);
+                    // Move cursor along with words (Standard: End of word)
+                    this.updateCursor(w, 'end');
+                }, delay);
             });
 
             // Resolve after total duration
-            setTimeout(resolve, indices.length * interval);
+            setTimeout(resolve, indices.length * interval + timeOffset);
         });
     }
 
-    updateCursor(wordObj) {
+    updateCursor(wordObj, align = 'end') {
         if (!this.cursor || !wordObj || !wordObj.element) return;
 
         try {
@@ -284,9 +323,17 @@ class TextRenderer {
             // User requested "slightly lower than center"
             const visualY = currentRect.top + (currentRect.height * 0.52);
 
+            // X Position based on Alignment
+            let visualX;
+            if (align === 'start' || align === 'left') {
+                visualX = currentRect.left - 4; // Start of word
+            } else {
+                visualX = currentRect.right + 2; // End of word
+            }
+
             // Apply Styles
             this.cursor.style.position = "fixed";
-            this.cursor.style.left = (currentRect.right + 2) + "px";
+            this.cursor.style.left = visualX + "px";
             this.cursor.style.top = visualY + "px";
             this.cursor.style.opacity = "1";
 
