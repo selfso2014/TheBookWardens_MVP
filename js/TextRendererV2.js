@@ -114,9 +114,18 @@ class TextRenderer {
             this.chunks.push(chunkWordIndices);
         });
 
-        // 3. Add a "cursor" element... (unchanged)
+        // 3. Add a "cursor" element at the end
         this.cursor = document.createElement("span");
         this.cursor.className = "tr-cursor";
+
+        // CRITICAL FIX: Remove cursor from document flow immediately.
+        // This prevents it from sitting "below the text" if JS updates fail.
+        this.cursor.style.position = "fixed";
+        this.cursor.style.top = "-1000px"; // Hide off-screen initially
+        this.cursor.style.left = "-1000px";
+        this.cursor.style.zIndex = "9999"; // Ensure it floats above text
+        this.cursor.style.pointerEvents = "none"; // Click-through
+
         this.container.appendChild(this.cursor);
     }
 
@@ -257,35 +266,36 @@ class TextRenderer {
     }
 
     updateCursor(wordObj) {
-        if (!this.cursor || !wordObj) return;
+        if (!this.cursor || !wordObj || !wordObj.rect) return;
 
-        // Correct Vertical Alignment: Center of the LINE BOX
-        // STRATEGY RESET: Use the Line Box (Blue Box) Geometry directly.
-        // Ignore individual word vertical alignment variations.
-        let visualY;
+        try {
+            // Correct Vertical Alignment: Center of the LINE BOX
+            // STRATEGY: Global Line Box Reference + 35~38% Offset
+            let visualY;
+            const OFFSET_FACTOR = 0.30; // Tuned for user feedback (High)
 
-        if (wordObj.lineIndex !== undefined && this.lines[wordObj.lineIndex]) {
-            const line = this.lines[wordObj.lineIndex];
-            // Start at the TOP of the Blue Box
-            // Add 38% of the box height (approx visual center for Crimson Text in generous leading)
-            // 50% is geometric center, but visual center is higher.
-            visualY = line.rect.top + (line.rect.height * 0.38);
-        } else {
-            // Fallback: Individual Word Box
-            // If line is unknown, use word top + 38% of presumed height (or height * 1.5 logic)
-            visualY = wordObj.rect.top + (wordObj.rect.height * 0.38);
+            if (wordObj.lineIndex !== undefined && this.lines && this.lines[wordObj.lineIndex]) {
+                const line = this.lines[wordObj.lineIndex];
+                visualY = line.rect.top + (line.rect.height * OFFSET_FACTOR);
+            } else {
+                // Fallback: Individual Word Box
+                visualY = wordObj.rect.top + (wordObj.rect.height * OFFSET_FACTOR);
+            }
+
+            // Safety: Ensure finite numbers
+            if (!Number.isFinite(visualY)) visualY = wordObj.rect.top;
+
+            const r = wordObj.rect;
+
+            // Apply Styles
+            this.cursor.style.position = "fixed"; // Re-enforce
+            this.cursor.style.left = (r.right + 2) + "px";
+            this.cursor.style.top = visualY + "px";
+            this.cursor.style.opacity = "1";
+
+        } catch (e) {
+            console.error("[TextRenderer] Cursor Update Error:", e);
         }
-
-        const r = wordObj.rect; // Use cached rect
-
-        this.cursor.style.position = "fixed";
-        this.cursor.style.left = (r.right + 2) + "px";
-        this.cursor.style.top = visualY + "px";
-
-        // Remove height override for Dot Cursor
-        this.cursor.style.height = "";
-
-        this.cursor.style.opacity = "1";
     }
 
     /**
