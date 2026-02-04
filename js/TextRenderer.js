@@ -139,9 +139,9 @@ class TextRenderer {
 
             // C. TYPOGRAPHIC CENTER STRATEGY
             // Geometric Center (0.5) is visually too low because of Descender space (g, p, y...).
-            // For 'Crimson Text', the x-height center is approx at 42% of the tight bounding box.
-            // This is the MATHEMATICALLY CORRECT visual center for this font.
-            const visualCenterY = r.top + (r.height * 0.42);
+            // User Feedback: 0.42 was still too low.
+            // Aggressive Correction: Shift to 0.35 (Upper-Middle, near x-height top).
+            const visualCenterY = r.top + (r.height * 0.35);
 
             word.rect = {
                 left: r.left,
