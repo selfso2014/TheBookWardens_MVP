@@ -630,13 +630,17 @@ body {
 }
 
 @keyframes particle-explode {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-
   100% {
     transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0);
     opacity: 0;
   }
+}
+
+/* --- Override Fade Out (Placed at end for priority) --- */
+span.tr-word.chunk-fade-out {
+  opacity: 0 !important;
+  visibility: hidden;
+  transform: translateY(-10px);
+  /* Optional: drift up slightly */
+  transition: opacity 1.0s ease-out, visibility 1.0s linear, transform 1.0s ease-out;
 }

@@ -362,6 +362,9 @@ class TextRenderer {
         indices.forEach(wordIdx => {
             const w = this.words[wordIdx];
             if (w && w.element) {
+                // FORCE RESOLUTION: Remove the 'revealed' class which holds opacity: 1 !important
+                w.element.classList.remove("revealed");
+                // Add fade-out class
                 w.element.classList.add("chunk-fade-out");
             }
         });
