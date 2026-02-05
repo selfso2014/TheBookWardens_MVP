@@ -133,12 +133,20 @@ class TextRenderer {
 
         // APPEND TO BODY to escape any CSS Stacking Context / Transform issues in container
         document.body.appendChild(this.cursor);
+
+        // FIX: Force cursor to first word position immediately if words exist
+        if (this.words.length > 0) {
+            // Need to wait for DOM layout? text content is already appended.
+            // Force a slight delay to ensure layout is ready
+            setTimeout(() => {
+                this.updateCursor(this.words[0], 'start');
+                this.cursor.style.opacity = '1';
+                console.log("[TextRenderer] Initial Cursor Posed at Word 0");
+            }, 50);
+        }
     }
 
-    /**
-     * Locks the layout by calculating and caching the geometry of every word.
-     * MUST be called after 'prepare' and before any interaction.
-     */
+
     lockLayout() {
         if (this.words.length === 0) return;
 
@@ -432,20 +440,54 @@ class TextRenderer {
         };
     }
     triggerReturnEffect() {
-        if (!this.cursor) return;
+        if (!this.cursor) return false;
 
         const now = Date.now();
-        const COOLDOWN = 1500; // 1.5 seconds cooldown
+        const COOLDOWN = 1500; // ms
+
+        // Visual Cooldown
         if (this.lastReturnTime && (now - this.lastReturnTime < COOLDOWN)) {
-            return false; // Cooldown active
+            return false;
         }
 
-        console.log("[TextRenderer] Return Spark TRIGGERED by Gaze!");
         this.lastReturnTime = now;
+        console.log("[TextRenderer] 🔥 Triggering Return Spark Effect (Overlay Check)!");
 
-        this.cursor.classList.remove("impact-pulse");
-        void this.cursor.offsetWidth; // Trigger Reflow
-        this.cursor.classList.add("impact-pulse");
+        // Create a separate element for the effect logic
+        const impact = document.createElement('div');
+        // impact.className = "impact-pulse"; 
+
+        // Force Inline Styles for Visibility
+        impact.style.position = "fixed";
+        impact.style.left = "10vw"; // Target Area
+        impact.style.top = "50vh";  // Center Vertically
+        impact.style.width = "50px";
+        impact.style.height = "50px";
+        impact.style.borderRadius = "50%";
+        impact.style.backgroundColor = "rgba(255, 0, 255, 0.8)";
+        impact.style.boxShadow = "0 0 30px magenta, 0 0 60px white";
+        impact.style.zIndex = "999999";
+        impact.style.pointerEvents = "none";
+        impact.style.transform = "translate(-50%, -50%) scale(0)";
+        impact.style.transition = "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease-out";
+
+        // Add to body
+        document.body.appendChild(impact);
+
+        // Animate
+        requestAnimationFrame(() => {
+            impact.style.transform = "translate(-50%, -50%) scale(1.5)";
+            setTimeout(() => {
+                impact.style.opacity = "0";
+                impact.style.transform = "translate(-50%, -50%) scale(2)";
+            }, 300);
+        });
+
+        // Remove after animation
+        setTimeout(() => {
+            if (impact.parentNode) impact.parentNode.removeChild(impact);
+        }, 700);
+
         return true;
     }
 }
