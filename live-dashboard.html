@@ -121,8 +121,8 @@
         <div class="card">
             <h2>📊 Chart 4: Comprehensive Trigger Analysis (Raw X, Y, Vel X)</h2>
             <p style="color:#666; font-size:0.9em;">
-                Green: Raw X (Left Axis) | Purple: Raw Y (Left Axis) | Blue: Velocity X (Right Axis) | Star: Trigger
-                Event
+                Green: Raw X (Position) | Blue: Velocity X (Right Axis) | Star: Trigger Event<br>
+                <em>(X-Axis ticks decimated for clarity)</em>
             </p>
             <canvas id="chart4"></canvas>
         </div>
@@ -274,7 +274,6 @@
 
             const labels = data.map(d => d.t);
             const triggers = data.map(d => d.didFire ? d.vx : null);
-            // Note: Triggers on Vel X chart should align with Vel X values
 
             // Chart 1: MAD Analysis
             chart1 = new Chart(document.getElementById('chart1'), {
@@ -290,9 +289,7 @@
                 options: { animation: false, interaction: { mode: 'index', intersect: false } }
             });
 
-            // Chart 4: Comprehensive Trigger Analysis
-            const triggerPointsForRaw = data.map(d => d.didFire ? d.x : null); // Trigger on X axis
-
+            // Chart 4: Comprehensive Trigger Analysis (Simplified)
             chart4 = new Chart(document.getElementById('chart4'), {
                 type: 'line',
                 data: {
@@ -315,7 +312,7 @@
                             pointRadius: 0,
                             borderDash: [2, 2],
                             yAxisID: 'yPos',
-                            hidden: false
+                            hidden: true // HIDDEN
                         },
                         // Right Axis: Velocity
                         {
@@ -330,26 +327,15 @@
                         },
                         // Events: Stars on X Position
                         {
-                            label: 'Trigger (on X)',
+                            label: 'Trigger Event',
                             data: data.map(d => d.didFire ? d.x : null),
                             type: 'scatter',
                             pointStyle: 'star',
-                            radius: 10,
+                            radius: 8,
                             backgroundColor: 'gold',
                             borderColor: 'black',
                             borderWidth: 1,
                             yAxisID: 'yPos'
-                        },
-                        // Events: Stars on Velocity (optional, to see relation)
-                        {
-                            label: 'Trigger (on Vel)',
-                            data: data.map(d => d.didFire ? d.vx : null),
-                            type: 'scatter',
-                            pointStyle: 'crossRot',
-                            radius: 6,
-                            backgroundColor: 'red',
-                            borderColor: 'red',
-                            yAxisID: 'yVel'
                         }
                     ]
                 },
@@ -357,6 +343,9 @@
                     animation: false,
                     interaction: { mode: 'index', intersect: false },
                     scales: {
+                        x: {
+                            ticks: { maxTicksLimit: 20 } // CLEANER X-AXIS
+                        },
                         yPos: {
                             type: 'linear',
                             display: true,
@@ -367,7 +356,7 @@
                             type: 'linear',
                             display: true,
                             position: 'right',
-                            grid: { drawOnChartArea: false }, // Avoid grid clutter
+                            grid: { drawOnChartArea: false },
                             title: { display: true, text: 'Velocity (px/frame)' }
                         }
                     }

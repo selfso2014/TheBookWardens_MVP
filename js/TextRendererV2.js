@@ -11,7 +11,7 @@
 
 class TextRenderer {
     constructor(containerId, options = {}) {
-        // v2026-02-05-1155: Final Robust Overlay
+        // v2026-02-05-1200: Fix Timing & Initial Trigger
         this.containerId = containerId;
         this.container = document.getElementById(containerId);
 
@@ -136,6 +136,10 @@ class TextRenderer {
                 console.log("[TextRenderer] Initial Cursor Posed at Word 0");
             }, 50);
         }
+
+        // FIX: Prevent immediate "false positive" return effect on game start
+        // Set cooldown to future (2 seconds from now) matches the READY PHASE
+        this.lastReturnTime = Date.now() + 2000;
     }
 
     lockLayout() {
@@ -317,7 +321,7 @@ class TextRenderer {
         if (this.lastReturnTime && (now - this.lastReturnTime < COOLDOWN)) return false;
 
         this.lastReturnTime = now;
-        console.log("[TextRenderer] 🔥 Return Spark!");
+        console.log("[TextRenderer] 🔥 Return Triggered!");
 
         // 1. Calculate Position based on CURRENT CURSOR Y
         const rect = this.cursor.getBoundingClientRect();
@@ -346,13 +350,14 @@ class TextRenderer {
         impact.style.opacity = "1";
         impact.style.left = "20px"; // Fixed Left Margin
         impact.style.top = targetY + "px";
-        impact.style.transform = "translate(-50%, -50%) scale(1)";
+        impact.style.transform = "translate(-50%, -50%) scale(0.5)";
 
         // Force Reflow
         void impact.offsetWidth;
 
-        // Animate
-        impact.style.transition = "transform 0.5s ease-out, opacity 0.5s ease-out";
+        // Animate: Snappy Pop (0.2s)
+        // cubic-bezier(0.175, 0.885, 0.32, 1.275) gives a nice "pop" effect
+        impact.style.transition = "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease-out";
         requestAnimationFrame(() => {
             impact.style.transform = "translate(-50%, -50%) scale(5)";
             impact.style.opacity = "0";
