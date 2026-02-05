@@ -64,12 +64,27 @@ export class GazeDataManager {
 
         this.data.push(entry);
 
+        // REAL-TIME VELOCITY CALC (Critical for Return Sweep Detection)
+        if (this.data.length > 1) {
+            const prev = this.data[this.data.length - 2];
+            const curr = this.data[this.data.length - 1];
+            // Simple finite difference (Raw)
+            const dt = curr.t - prev.t;
+            if (dt > 0) {
+                curr.vx = (curr.x - prev.x) / dt;
+                curr.vy = (curr.y - prev.y) / dt;
+            } else {
+                curr.vx = 0;
+                curr.vy = 0;
+            }
+        }
+
         // Debug Log (Raw Stream Check)
         // User Request: "콘솔로 시선좌표 및 fixation saccade인지 띄워라."
-        console.log(`[GazeRaw] Frame T:${t} | (${x.toFixed(1)}, ${y.toFixed(1)}) | Type: ${type} | State: ${gazeInfo.eyemovementState}`);
+        // console.log(`[GazeRaw] Frame T:${t} | (${x.toFixed(1)}, ${y.toFixed(1)}) | Type: ${type} | State: ${gazeInfo.eyemovementState}`);
 
         // Debug Log (Every ~1 sec aka 60 frames)
-        if (this.data.length % 60 === 0) console.log("[GazeData] Count:", this.data.length, "Latest:", entry);
+        if (this.data.length % 60 === 0) console.log("[GazeData] Count:", this.data.length, "Latest VX:", entry.vx ? entry.vx.toFixed(2) : "null");
     }
 
     /**
