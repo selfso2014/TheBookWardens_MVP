@@ -275,12 +275,14 @@ class TextRenderer {
                 this.updateCursor(firstW, 'start');
 
                 // RHYTHM IMPACT: Trigger "Pop" Animation
-                // Removed 'tr-blink' temporarily if needed, or just add pulse class
-                if (this.cursor) {
-                    this.cursor.classList.remove("impact-pulse");
-                    void this.cursor.offsetWidth; // Trigger Reflow
-                    this.cursor.classList.add("impact-pulse");
-                }
+                // DELAYED: Wait for cursor to visually arrive (approx 100ms CSS transition)
+                setTimeout(() => {
+                    if (this.cursor) {
+                        this.cursor.classList.remove("impact-pulse");
+                        void this.cursor.offsetWidth; // Trigger Reflow
+                        this.cursor.classList.add("impact-pulse");
+                    }
+                }, 100);
             }
 
             indices.forEach((wordIdx, i) => {
@@ -299,11 +301,14 @@ class TextRenderer {
                         this.updateCursor(w, 'start');
 
                         // RHYTHM IMPACT: Pulse for internal line breaks
-                        if (this.cursor) {
-                            this.cursor.classList.remove("impact-pulse");
-                            void this.cursor.offsetWidth; // Trigger Reflow
-                            this.cursor.classList.add("impact-pulse");
-                        }
+                        // DELAYED: Wait for arrival
+                        setTimeout(() => {
+                            if (this.cursor) {
+                                this.cursor.classList.remove("impact-pulse");
+                                void this.cursor.offsetWidth; // Trigger Reflow
+                                this.cursor.classList.add("impact-pulse");
+                            }
+                        }, 100);
                     }, delay - leadTime);
                 }
 
