@@ -1,13 +1,11 @@
 // --- FIREBASE CONFIGURATION ---
-// Step: Replace the object below with your actual keys from Firebase Console -> Project Settings -> General -> Your Apps
-// 중요: Realtime Database 규칙은 "테스트 모드"로 설정되어 있어야 합니다 (read/write: true)
-
+// Applied from User Request
 window.FIREBASE_CONFIG = {
-    apiKey: "YOUR_API_KEY_HERE",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef"
+    apiKey: "AIzaSyA_hopi6Xam996KfCXKq4piFZ-9ThoehjA",
+    authDomain: "graphdebug-2c507.firebaseapp.com",
+    databaseURL: "https://graphdebug-2c507-default-rtdb.firebaseio.com",
+    projectId: "graphdebug-2c507",
+    storageBucket: "graphdebug-2c507.firebasestorage.app",
+    messagingSenderId: "976043612079",
+    appId: "1:976043612079:web:17cd90582151970bc3815a"
 };
