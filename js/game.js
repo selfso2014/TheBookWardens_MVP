@@ -739,43 +739,59 @@ Game.typewriter = {
             }
         }
 
-        if (hit) {
-            // SYNC TO GAZE DATA MANAGER
-            if (window.gazeDataManager) {
-                const ctx = {
-                    lineIndex: hit.line ? hit.line.index : null,
-                    targetY: hit.line ? hit.line.visualY : null, // Store perfect grid Y
-                    paraIndex: this.currentParaIndex
-                };
+        let activeLine = null;
+        let activeWord = null;
 
-                if (hit.type === 'word') {
-                    ctx.wordIndex = hit.word.index;
-                    // Approximate CharIndex (Start of word)
-                    ctx.charIndex = 0;
-                }
-
-                window.gazeDataManager.setContext(ctx);
-            }
-
-            if (hit.type === 'word') {
-                const word = hit.word;
-                const line = hit.line;
-
-                // Highlight Effect
-                if (word.element && !word.element.classList.contains("read")) {
-                    word.element.classList.add("read");
-                    // Direct style/class manipulation
-                    word.element.style.color = "#fff";
-                    word.element.style.textShadow = "0 0 8px var(--primary-accent)";
-                }
-
-                // Track Line Progress
-                this.trackLineProgress(line, word.index);
-            }
+        if (hit && hit.line) {
+            activeLine = hit.line;
+            if (hit.type === 'word') activeWord = hit.word;
         } else {
-            // Reset temporary context if looking away? 
-            // Ideally keeps last known line or clears it. 
-            // Let's keep last known to avoid noisy flipping, or clear if desired.
+            // FALLBACK: Manual Infinite Snap if hitTest missed
+            // (Crucial for Data Logging continuity)
+            if (this.renderer.lines.length > 0) {
+                let minDist = Infinity;
+                let closest = null;
+                this.renderer.lines.forEach(l => {
+                    const dist = Math.abs(l.visualY - y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = l;
+                    }
+                });
+                if (closest) activeLine = closest;
+            }
+        }
+
+        // SYNC TO GAZE DATA MANAGER (Always update context if possible)
+        if (window.gazeDataManager) {
+            const ctx = {
+                lineIndex: activeLine ? activeLine.index : null,
+                targetY: activeLine ? activeLine.visualY : null,
+                paraIndex: this.currentParaIndex
+            };
+
+            if (activeWord) {
+                ctx.wordIndex = activeWord.index;
+                ctx.charIndex = 0; // Approximate
+            }
+
+            window.gazeDataManager.setContext(ctx);
+        }
+
+        // VISUAL INTERACTIONS (Only on strict hit)
+        if (hit && hit.type === 'word') {
+            const word = hit.word;
+            const line = hit.line;
+
+            // Highlight Effect
+            if (word.element && !word.element.classList.contains("read")) {
+                word.element.classList.add("read");
+                word.element.style.color = "#fff";
+                word.element.style.textShadow = "0 0 8px var(--primary-accent)";
+            }
+
+            // Track Line Progress
+            this.trackLineProgress(line, word.index);
         }
     },
 

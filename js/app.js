@@ -573,10 +573,6 @@ function attachSeesoCallbacks() {
     seeso.addGazeCallback((gazeInfo) => {
       lastGazeAt = performance.now();
 
-      if (window.gazeDataManager) {
-        window.gazeDataManager.processGaze(gazeInfo);
-      }
-
       // Raw values (for HUD/log)
       const xRaw = gazeInfo?.x;
       const yRaw = gazeInfo?.y;
@@ -596,9 +592,14 @@ function attachSeesoCallbacks() {
         confidence: gazeInfo?.confidence,
       };
 
-      // --- GAME INTEGRATION ---
+      // --- GAME INTEGRATION (First Update Context/Game State) ---
       if (typeof window.Game !== "undefined" && overlay.gaze.x !== null) {
         window.Game.onGaze(overlay.gaze.x, overlay.gaze.y);
+      }
+
+      // --- DATA LOGGING (Then Save Data with Updated Context) ---
+      if (window.gazeDataManager) {
+        window.gazeDataManager.processGaze(gazeInfo);
       }
       // ------------------------
 
