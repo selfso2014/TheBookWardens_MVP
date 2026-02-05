@@ -638,22 +638,43 @@ Game.typewriter = {
             });
 
         } else {
-            console.log("Paragraph Fully Revealed.");
+            console.log("Paragraph Fully Revealed. Clearing tail...");
 
-            // CLEANUP handled automatically by scheduleFadeOut!
-            // Just wait for the visual trail to finish before moving on.
-            // Max lifetime is 3000ms.
+            // CLEANUP TAIL: Fade out any remaining visible chunks
+            // We need to fade out from (chunkIndex - 3) up to (chunkIndex - 1)
+            // But actually, since the loop stopped, we just need to clear everything remaining.
+            // Let's sweep from max(0, this.chunkIndex - 3) to total chunks.
+
+            let cleanupDelay = 0;
+            const startCleanupIdx = Math.max(0, this.chunkIndex - 3);
+
+            // Schedule cleanups for remaining tail
+            for (let i = startCleanupIdx; i < this.renderer.chunks.length; i++) {
+                // Use the same staggered delay logic? or just sequence them
+                // Let's sequence them every 600ms to be safe and pretty
+                this.renderer.scheduleFadeOut(i, cleanupDelay + 600);
+                cleanupDelay += 600;
+            }
+
+            // AUTO-EXPORT SCV for Debugging on Mobile
+            // Waiting for cleanup to mostly finish
+            setTimeout(() => {
+                console.log("[Auto-Export] Saving Gaze Data...");
+                if (window.gazeDataManager) {
+                    window.gazeDataManager.exportCSV();
+                }
+            }, 3000);
 
             if (this.currentParaIndex < this.paragraphs.length - 1) {
                 setTimeout(() => {
                     this.currentParaIndex++;
                     this.playNextParagraph();
-                }, 3500); // Wait bit more than 3s to be safe
+                }, 4000); // Increased delay to allow export
             } else {
                 // Boss Battle Trigger (Game Over for text)
                 setTimeout(() => {
                     this.startBossBattle();
-                }, 3500);
+                }, 4000);
             }
         }
     },

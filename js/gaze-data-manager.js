@@ -281,7 +281,7 @@ export class GazeDataManager {
 
         // CSV Header
         // CSV Header
-        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,Extrema,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,InkCoverage_Px,isLagFix\n";
+        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,Extrema,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,InkCoverage_Px,isLagFix,IsArmed,DidFire\n";
 
         // Rows
         this.data.forEach(d => {
@@ -310,6 +310,7 @@ export class GazeDataManager {
                 d.x, d.y,
                 d.gx !== undefined && d.gx !== null ? d.gx.toFixed(2) : "",
                 d.gy !== undefined && d.gy !== null ? d.gy.toFixed(2) : "",
+                // Export Realtime VX if available, otherwise smoothed VX
                 d.vx !== undefined && d.vx !== null ? d.vx.toFixed(4) : "",
                 d.vy !== undefined && d.vy !== null ? d.vy.toFixed(4) : "",
                 d.type,
@@ -325,7 +326,9 @@ export class GazeDataManager {
                 (d.ry !== undefined && d.ry !== null) ? d.ry.toFixed(2) : "",
                 (this.lineMetadata[lIdx] && this.lineMetadata[lIdx].success) ? "TRUE" : "FALSE",
                 (this.lineMetadata[lIdx] && this.lineMetadata[lIdx].coverage !== undefined) ? this.lineMetadata[lIdx].coverage.toFixed(0) : "",
-                (d.isLagCorrection ? "TRUE" : "")
+                (d.isLagCorrection ? "TRUE" : ""),
+                (d.isArmed ? "TRUE" : ""),  // DEBUG: Arming State
+                (d.didFire ? "TRUE" : "")   // DEBUG: Firing State
             ];
             csv += row.join(",") + "\n";
         });
