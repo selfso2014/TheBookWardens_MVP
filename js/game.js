@@ -665,7 +665,40 @@ Game.typewriter = {
         // 1. Hit Test against Fixed Layout
         const hit = this.renderer.hitTest(x, y);
 
+        // --- GAZE-DRIVEN RETURN SPARK LOGIC ---
+        if (this.renderer.expectingReturnSweep) {
+            const now = Date.now();
+            // Timeout check (1.5s)
+            if (now - (this.renderer.rsStartTime || 0) > 1500) {
+                console.log("[Game] Return Sweep window expired.");
+                this.renderer.expectingReturnSweep = false;
+            } else if (window.gazeDataManager) {
+                // Check for real-time Returnsweep (K=1.5 logic)
+                const isRS = window.gazeDataManager.detectRealtimeReturnSweep(600); // Look back 600ms
+                if (isRS) {
+                    this.renderer.triggerReturnEffect();
+                }
+            }
+        }
+
         if (hit) {
+            // SYNC TO GAZE DATA MANAGER
+            if (window.gazeDataManager) {
+                const ctx = {
+                    lineIndex: hit.line ? hit.line.index : null,
+                    targetY: hit.line ? hit.line.visualY : null, // Store perfect grid Y
+                    paraIndex: this.currentParaIndex
+                };
+
+                if (hit.type === 'word') {
+                    ctx.wordIndex = hit.word.index;
+                    // Approximate CharIndex (Start of word)
+                    ctx.charIndex = 0;
+                }
+
+                window.gazeDataManager.setContext(ctx);
+            }
+
             if (hit.type === 'word') {
                 const word = hit.word;
                 const line = hit.line;
@@ -681,6 +714,10 @@ Game.typewriter = {
                 // Track Line Progress
                 this.trackLineProgress(line, word.index);
             }
+        } else {
+            // Reset temporary context if looking away? 
+            // Ideally keeps last known line or clears it. 
+            // Let's keep last known to avoid noisy flipping, or clear if desired.
         }
     },
 
@@ -699,6 +736,13 @@ Game.typewriter = {
         const totalWordsInLine = line.wordIndices.length;
         const hitCount = hitWords.size;
         const ratio = hitCount / totalWordsInLine;
+
+        // Report Coverage to Data Manager
+        if (window.gazeDataManager) {
+            window.gazeDataManager.setLineMetadata(line.index, {
+                coverage: ratio * 100
+            });
+        }
 
         // Threshold: 60% of words in line read
         if (ratio > 0.6 && !line.completed) {

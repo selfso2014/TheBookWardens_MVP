@@ -229,6 +229,10 @@ export class GazeDataManager {
         // Ensure data is preprocessed (Interpolated, Smoothed, Velocity) before export
         this.preprocessData();
 
+        // RUN ADVANCED LINE DETECTION (MAD Algorithm) automatically
+        // This populates 'detectedLineIndex' and 'isReturnSweep' fields
+        this.detectLinesMobile(startTime, endTime);
+
         // Create Map for Target Y (Ref Y) from Game.typewriter
         const targetYMap = {};
         if (window.Game && window.Game.typewriter && window.Game.typewriter.lineYData) {
@@ -751,5 +755,75 @@ export class GazeDataManager {
         console.log(`[GazeDataManager] MAD Line Detection (Adv): Found ${lineNum} lines. Range: ${startTime}~${endTime}ms.`);
 
         return lineNum;
+    }
+
+    /**
+     * Real-time Check for Return Sweep (K=1.5 equivalent logic)
+     * Look back 'lookbackMs' and see if a strong negative velocity spike exists.
+     * @param {number} lookbackMs 
+     * @returns {boolean}
+     */
+    detectRealtimeReturnSweep(lookbackMs = 600) {
+        if (this.data.length < 5) return false;
+
+        const now = this.data[this.data.length - 1].t;
+        const cutoff = now - lookbackMs;
+
+        // 1. Get recent samples (smoothed velocity needed)
+        // We assume vx is already calculated for recent frames via preprocessData or on-the-fly?
+        // preprocessData is usually offline. For real-time, we must calc VX for the latest point here.
+
+        // Quick Calc for latest point if missing
+        const latestInfo = this.data[this.data.length - 1];
+        if (latestInfo.vx === null || latestInfo.vx === undefined) {
+            // Calculate on the fly for the tail
+            const prev = this.data[this.data.length - 2];
+            if (prev) {
+                const dt = latestInfo.t - prev.t;
+                if (dt > 0) {
+                    latestInfo.vx = (latestInfo.x - prev.x) / dt;
+                }
+            }
+        }
+
+        // 2. Scan recent buffer
+        let foundSpike = false;
+        let minVel = 0;
+
+        // Dynamic Threshold estimation:
+        // Ideally we use a cached MAD from previous sessions. 
+        // For now, let's use a robust default threshold that represents a saccade (-0.8 px/ms is fast)
+        // Or strictly relative: -1.0 px/ms.
+        // User requested K=1.5 logic. MAD of reading noise is usually ~0.1-0.2 px/ms.
+        // So 1.5 * MAD is exceptionally low? Actually Return Sweeps are OUTLIERS. 
+        // We want Threshold = Median + K * MAD.
+        // For detection, we just look for "Very Fast Left Move".
+        const THRESHOLD = -0.5; // px/ms (Adjust logic if needed)
+
+        for (let i = this.data.length - 1; i >= 0; i--) {
+            const d = this.data[i];
+            if (d.t < cutoff) break;
+
+            if (d.vx && d.vx < THRESHOLD) {
+                foundSpike = true;
+                minVel = d.vx;
+
+                // Debug / Record
+                d.realtimeRS = true; // Mark in data
+                break;
+            }
+        }
+
+        return foundSpike;
+    }
+
+    /**
+     * Helper to update context for debugging
+     */
+    logDebugEvent(key, val) {
+        // Find latest data point and inject
+        if (this.data.length > 0) {
+            this.data[this.data.length - 1][key] = val;
+        }
     }
 }

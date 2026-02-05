@@ -270,18 +270,13 @@ class TextRenderer {
             // we insert a "Travel Time"
             let timeOffset = 0;
             if (chunkStartsLine && chunkIndex > 0) {
-                timeOffset = 400; // ms for cursor return sweep
-                // Trigger the move to start immediately (at t=0 relative to this call)
-                this.updateCursor(firstW, 'start');
-
                 // RHYTHM IMPACT: Trigger "Pop" Animation
-                // DELAYED: Wait for cursor to visually arrive (approx 100ms CSS transition)
+                // GAZE-DRIVEN: We no longer fire automatically.
+                // We set a flag to expect a User Return Sweep Gaze soon.
                 setTimeout(() => {
-                    if (this.cursor) {
-                        this.cursor.classList.remove("impact-pulse");
-                        void this.cursor.offsetWidth; // Trigger Reflow
-                        this.cursor.classList.add("impact-pulse");
-                    }
+                    this.expectingReturnSweep = true;
+                    this.rsStartTime = Date.now();
+                    console.log("[TextRenderer] Armed for Return Sweep Impact");
                 }, 100);
             }
 
@@ -301,13 +296,10 @@ class TextRenderer {
                         this.updateCursor(w, 'start');
 
                         // RHYTHM IMPACT: Pulse for internal line breaks
-                        // DELAYED: Wait for arrival
+                        // GAZE-DRIVEN: Arm trigger
                         setTimeout(() => {
-                            if (this.cursor) {
-                                this.cursor.classList.remove("impact-pulse");
-                                void this.cursor.offsetWidth; // Trigger Reflow
-                                this.cursor.classList.add("impact-pulse");
-                            }
+                            this.expectingReturnSweep = true;
+                            this.rsStartTime = Date.now();
                         }, 100);
                     }, delay - leadTime);
                 }
