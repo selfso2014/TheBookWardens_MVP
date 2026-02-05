@@ -277,8 +277,11 @@
 
         // --- Chart Rendering ---
         function renderCharts(data) {
-            // Register Plugin globally or locally (Safe check)
-            if (window.ChartDataLabels) Chart.register(ChartDataLabels);
+            // Register Plugin globally but DISABLE it by default
+            if (window.ChartDataLabels) {
+                Chart.register(ChartDataLabels);
+                Chart.defaults.set('plugins.datalabels', { display: false });
+            }
 
             // Destroy old
             if (chart1) chart1.destroy();
