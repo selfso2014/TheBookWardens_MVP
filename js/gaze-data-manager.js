@@ -383,19 +383,23 @@ export class GazeDataManager {
             this.preprocessData();
 
             // 3. Prepare Payload (Minimize data size if possible, but raw is fine for debug)
-            // Storing metadata + raw data
-            const payload = {
+            const rawPayload = {
                 meta: {
                     timestamp: Date.now(),
                     userAgent: navigator.userAgent,
                     lineMetadata: this.lineMetadata,
                     totalSamples: this.data.length
                 },
-                data: this.data // The raw array
+                data: this.data
             };
 
+            // SANITIZE: Firebase cannot store NaN. Convert all NaN -> null
+            const payload = JSON.parse(JSON.stringify(rawPayload, (key, value) => {
+                if (typeof value === 'number' && isNaN(value)) return null;
+                return value;
+            }));
+
             // 4. Write to DB
-            // Path: sessions/<sessionId>
             const db = firebase.database();
             await db.ref('sessions/' + sessionId).set(payload);
 
