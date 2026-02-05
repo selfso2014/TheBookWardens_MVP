@@ -11,7 +11,7 @@
 
 class TextRenderer {
     constructor(containerId, options = {}) {
-        // v2026-02-05-1200: Fix Timing & Initial Trigger
+        // v2026-02-05-1215: Retroactive Animation
         this.containerId = containerId;
         this.container = document.getElementById(containerId);
 
@@ -138,7 +138,6 @@ class TextRenderer {
         }
 
         // FIX: Prevent immediate "false positive" return effect on game start
-        // Set cooldown to future (2 seconds from now) matches the READY PHASE
         this.lastReturnTime = Date.now() + 2000;
     }
 
@@ -350,16 +349,19 @@ class TextRenderer {
         impact.style.opacity = "1";
         impact.style.left = "20px"; // Fixed Left Margin
         impact.style.top = targetY + "px";
-        impact.style.transform = "translate(-50%, -50%) scale(0.5)";
+
+        // VISUAL TRICK: Start "Mid-Explosion" (Retroactive Feedback)
+        // Compensates for detection latency by skipping the initial expansion frames.
+        // It feels like it "already happened" and we are catching up.
+        impact.style.transform = "translate(-50%, -50%) scale(2.0)";
 
         // Force Reflow
         void impact.offsetWidth;
 
-        // Animate: Snappy Pop (0.2s)
-        // cubic-bezier(0.175, 0.885, 0.32, 1.275) gives a nice "pop" effect
-        impact.style.transition = "transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease-out";
+        // Animate: Continue expansion quickly
+        impact.style.transition = "transform 0.25s ease-out, opacity 0.25s ease-in";
         requestAnimationFrame(() => {
-            impact.style.transform = "translate(-50%, -50%) scale(5)";
+            impact.style.transform = "translate(-50%, -50%) scale(6)";
             impact.style.opacity = "0";
         });
 
