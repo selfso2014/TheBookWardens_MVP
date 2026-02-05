@@ -98,8 +98,14 @@
         <div id="status">Waiting for connection...</div>
 
         <div class="input-group">
-            <input type="text" id="sessionIdInput" placeholder="Enter Session ID (e.g. session_1234)">
-            <button onclick="connectSession()">Connect</button>
+            <input type="text" id="sessionIdInput" placeholder="Enter Session ID (e.g. A1B2)">
+            <button onclick="connectSessionFromInput()">Connect</button>
+        </div>
+
+        <!-- Recent Sessions List -->
+        <div id="recentSessions" style="margin-bottom: 20px;">
+            <h3>🕒 Recent Sessions</h3>
+            <div id="sessionList" style="display:flex; gap:10px; flex-wrap:wrap;">Loading list...</div>
         </div>
     </div>
 
@@ -126,24 +132,70 @@
         // --- Global Chart Instances ---
         let chart1, chart2, chart3;
 
-        // --- Firebase Logic ---
-        function connectSession() {
-            const sessionId = document.getElementById('sessionIdInput').value.trim();
-            if (!sessionId) return alert("Please enter a Session ID.");
-
-            if (!window.firebase || !window.FIREBASE_CONFIG) return alert("Firebase Config Missing!");
-
+        // --- Init ---
+        window.onload = function () {
+            if (!window.firebase || !window.FIREBASE_CONFIG) {
+                alert("Firebase Config Missing!");
+                return;
+            }
             if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
-            const db = firebase.database();
 
+            // Listen for Recent Sessions
+            const db = firebase.database();
+            const listRef = db.ref('sessions').orderByChild('meta/timestamp').limitToLast(10);
+
+            listRef.on('value', (snapshot) => {
+                const listEl = document.getElementById('sessionList');
+                listEl.innerHTML = "";
+
+                const sessions = [];
+                snapshot.forEach(child => {
+                    sessions.push({ key: child.key, val: child.val() });
+                });
+
+                // Reverse to show newest first
+                sessions.reverse().forEach(item => {
+                    const btn = document.createElement("button");
+                    const timeStr = item.val.meta ? new Date(item.val.meta.timestamp).toLocaleTimeString() : "???";
+                    const agent = item.val.meta && item.val.meta.userAgent ? getDeviceName(item.val.meta.userAgent) : "Unknown";
+
+                    btn.innerHTML = `<b>${item.key}</b><br><small>${timeStr}</small><br><span style='font-size:0.8em; color:#ddd'>${agent}</span>`;
+                    btn.style.cssText = "background:#555; text-align:left; line-height:1.2;";
+                    btn.onclick = () => loadSession(item.key);
+                    listEl.appendChild(btn);
+                });
+
+                if (sessions.length === 0) listEl.innerText = "No sessions found yet. Play the game to upload data.";
+            });
+        };
+
+        function getDeviceName(ua) {
+            if (/Android/i.test(ua)) return "📱 Android";
+            if (/iPhone/i.test(ua)) return "📱 iPhone";
+            if (/Windows/i.test(ua)) return "💻 PC";
+            return "Unknown Device";
+        }
+
+        function connectSessionFromInput() {
+            const id = document.getElementById('sessionIdInput').value.trim();
+            if (id) loadSession(id);
+        }
+
+        // --- Firebase Logic ---
+        function loadSession(sessionId) {
+            // Update Input
+            document.getElementById('sessionIdInput').value = sessionId;
+
+            const db = firebase.database();
             document.getElementById('status').innerText = `Connecting to [${sessionId}]...`;
 
             // Listen for changes
             const ref = db.ref('sessions/' + sessionId);
+            ref.off(); // Detach previous listeners if any (simple approach)
             ref.on('value', (snapshot) => {
                 const val = snapshot.val();
                 if (val) {
-                    document.getElementById('status').innerHTML = `✅ Data Received! Last Update: ${new Date(val.meta.timestamp).toLocaleTimeString()}<br>User Agent: ${val.meta.userAgent}`;
+                    document.getElementById('status').innerHTML = `✅ Data Received! Last Update: ${new Date(val.meta.timestamp).toLocaleTimeString()}`;
                     // Process Data
                     processData(val.data);
                 } else {
