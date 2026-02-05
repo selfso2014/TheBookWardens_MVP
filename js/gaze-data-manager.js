@@ -281,7 +281,7 @@ export class GazeDataManager {
 
         // CSV Header
         // CSV Header
-        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,Extrema,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,InkCoverage_Px,isLagFix,IsArmed,DidFire\n";
+        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,Extrema,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,InkCoverage_Px,isLagFix,IsArmed,DidFire,Debug_Samples,Debug_Median,Debug_Threshold,Debug_RealtimeVX\n";
 
         // Rows
         this.data.forEach(d => {
@@ -310,14 +310,13 @@ export class GazeDataManager {
                 d.x, d.y,
                 d.gx !== undefined && d.gx !== null ? d.gx.toFixed(2) : "",
                 d.gy !== undefined && d.gy !== null ? d.gy.toFixed(2) : "",
-                // Export Realtime VX if available, otherwise smoothed VX
                 d.vx !== undefined && d.vx !== null ? d.vx.toFixed(4) : "",
                 d.vy !== undefined && d.vy !== null ? d.vy.toFixed(4) : "",
                 d.type,
                 (d.isReturnSweep ? "TRUE" : ""),
                 (d.lineIndex !== undefined && d.lineIndex !== null) ? d.lineIndex : "",
                 (d.charIndex !== undefined && d.charIndex !== null) ? d.charIndex : "",
-                (d.inkY !== undefined && d.inkY !== null) ? d.inkY.toFixed(0) : "", // New: InkY
+                (d.inkY !== undefined && d.inkY !== null) ? d.inkY.toFixed(0) : "",
                 (d.detectedLineIndex !== undefined) ? d.detectedLineIndex : "",
                 (d.extrema !== undefined) ? d.extrema : "",
                 targetY,
@@ -327,8 +326,12 @@ export class GazeDataManager {
                 (this.lineMetadata[lIdx] && this.lineMetadata[lIdx].success) ? "TRUE" : "FALSE",
                 (this.lineMetadata[lIdx] && this.lineMetadata[lIdx].coverage !== undefined) ? this.lineMetadata[lIdx].coverage.toFixed(0) : "",
                 (d.isLagCorrection ? "TRUE" : ""),
-                (d.isArmed ? "TRUE" : ""),  // DEBUG: Arming State
-                (d.didFire ? "TRUE" : "")   // DEBUG: Firing State
+                (d.isArmed ? "TRUE" : ""),
+                (d.didFire ? "TRUE" : ""),
+                (d.debugSamples !== undefined) ? d.debugSamples : "",
+                (d.debugMedian !== undefined) ? d.debugMedian.toFixed(3) : "",
+                (d.debugThreshold !== undefined) ? d.debugThreshold.toFixed(3) : "",
+                (d.debugVX !== undefined) ? d.debugVX.toFixed(3) : ""
             ];
             csv += row.join(",") + "\n";
         });
@@ -845,10 +848,18 @@ export class GazeDataManager {
         // Let's rely on the K=1.5 primarily but maybe check if it's statistically significant?
         // Actually, if K=1.5 works in your experiments, let's trust it.
 
-        // Scan Again for Spike
+        // Scan Again for Spike AND Log Debug Info to Data Stream
         for (let i = this.data.length - 1; i >= 0; i--) {
             const d = this.data[i];
             if (d.t < cutoff) break;
+
+            // INJECT DEBUG INFO (For all checking points)
+            if (d.vx !== undefined && d.vx !== null) {
+                d.debugSamples = samples.length;
+                d.debugMedian = median;
+                d.debugThreshold = dynamicThreshold;
+                d.debugVX = d.vx;
+            }
 
             if (d.vx && d.vx < dynamicThreshold) { // More negative than threshold
                 foundSpike = true;
