@@ -63,6 +63,9 @@ export class GazeDataManager {
                 curr.vy = 0;
             }
         }
+
+        // --- Execute Realtime Detection (Moved here to ensure it runs every frame) ---
+        this.detectRealtimeReturnSweep();
     }
 
     /**
@@ -470,6 +473,12 @@ export class GazeDataManager {
                     this.lastTriggerTime = now;
                     d0.didFire = true;
                     console.log(`[RS] 💥 CASCADE TRIGGER! Peak->Valley: ${timeSincePeak}ms | VX:${v1.toFixed(2)}`);
+
+                    // --- NEW: Immediately Fire Visual Effect ---
+                    if (window.Game && window.Game.typewriter && typeof window.Game.typewriter.triggerReturnEffect === 'function') {
+                        window.Game.typewriter.triggerReturnEffect();
+                    }
+
                     // Reset Peak Time to prevent double firing? (Optional, but safe)
                     this.lastPosPeakTime = 0;
                     return true;

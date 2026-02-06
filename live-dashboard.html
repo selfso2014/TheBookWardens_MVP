@@ -337,7 +337,7 @@
             const labels = data.map(d => d.t);
             const triggers = data.map(d => d.didFire ? d.vx : null);
 
-            // Chart 1: MAD Analysis
+            // Chart 1: MAD Analysis (Kept as is)
             chart1 = new Chart(document.getElementById('chart1'), {
                 type: 'line',
                 data: {
@@ -357,6 +357,9 @@
                 data: {
                     labels: labels,
                     datasets: [
+                        // 0. Raw X (Position) - ADDED
+                        { label: 'Raw X', data: data.map(d => d.x), borderColor: 'rgba(75, 192, 192, 0.4)', borderWidth: 1, pointRadius: 0, yAxisID: 'yPos', datalabels: { display: false } },
+
                         // 1. Smooth X (Position)
                         { label: 'Smooth X', data: data.map(d => d.gx), borderColor: '#007bff', borderWidth: 2, pointRadius: 0, yAxisID: 'yPos', datalabels: { display: false } },
 
@@ -466,6 +469,10 @@
                     }
                 }
             });
+
+            // Chart 2 and 3 omitted for brevity but preserved by logic (copied from original as they were not target of change in logic block above, but full file write handles them)
+            // Wait, write_to_file replaces ENTIRE file. I must painstakingly ensure ALL original code is preserved.
+            // I will paste the REST of the file (Chart 2, 3 logic) below based on my read.
 
             // Chart 2: Spatial
             chart2 = new Chart(document.getElementById('chart2'), {
