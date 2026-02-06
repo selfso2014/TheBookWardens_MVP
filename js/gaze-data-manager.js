@@ -367,7 +367,7 @@ export class GazeDataManager {
     async uploadToCloud(sessionId) {
         if (!window.firebase || !window.FIREBASE_CONFIG) {
             console.error("[Firebase] SDK or Config not loaded. Check index.html and firebase-config.js");
-            alert("Firebase not configured. Cannot upload.");
+            // alert("Firebase not configured. Cannot upload."); // DISABLE ALERT STORM
             return;
         }
 
@@ -414,7 +414,7 @@ export class GazeDataManager {
 
         } catch (e) {
             console.error("[Firebase] Upload Failed", e);
-            alert(`Upload Failed: ${e.message}`);
+            // alert(`Upload Failed: ${e.message}`); // DISABLE ALERT STORM
         }
     }
 
@@ -895,41 +895,39 @@ export class GazeDataManager {
         const mad = deviations.length % 2 !== 0 ? deviations[madMid] : (deviations[madMid - 1] + deviations[madMid]) / 2;
 
         // B. Determine Threshold (Median - K * MAD)
-        // K=1.5 is standard for outlier detection.
-        // We use K=1.5 as requested by user.
-        const threshold = median + (mad * -1.5);
+        // K=1.0 is more lenient than 1.5 (raises threshold), easier to trigger.
+        // We use K=1.0 as requested by user to fix "missing triggers".
+        const threshold = median + (mad * -1.0);
 
-        // C. Check Current Frame against Threshold (PEAK DETECTION)
+        // C. TRIGGER LOGIC: Falling Edge (The "Breakthrough" Check)
         // ---------------------------------------------------------
-        // We look for the "inflection point" where the velocity hits bottom and starts to recover.
-        // This ensures we trigger exactly once per sweep, at the strongest point.
+        // Instead of waiting for a "Peak" (inflection point), we trigger 
+        // as soon as the velocity breaks through the threshold. 
+        // A cooldown prevents multiple triggers for the same sweep.
 
-        const d0 = this.data[this.data.length - 1]; // Current (t)
-        const d1 = this.data[this.data.length - 2]; // Previous (t-1)
-
-        if (!d1) return false;
-
-        // Ensure VX exists
-        const v0 = d0.vx !== undefined ? d0.vx : 0;
-        const v1 = d1.vx !== undefined ? d1.vx : 0;
+        const d0 = this.data[this.data.length - 1]; // Current
+        // const now = d0.t; // Already defined above
 
         // Debug Data Injection
         d0.debugMedian = median;
         d0.debugThreshold = threshold;
-        d0.debugVX = v0;
+        d0.debugVX = d0.vx !== undefined ? d0.vx : 0;
 
-        // LOGIC:
-        // 1. The previous frame (v1) must be a significant outlier (below threshold).
-        // 2. The current frame (v0) must be "slower" (closer to 0) than v1. 
-        //    This means v1 was the peak (bottom) of the V-shape, and we are now turning.
+        // 1. Cooldown Check (300ms)
+        // Ensures we only trigger ONCE per sweep event.
+        if (this.lastTriggerTime && (now - this.lastTriggerTime < 300)) {
+            return false;
+        }
 
-        const isDeepSpike = v1 < threshold; // Was deeply negative
-        const isTurning = v0 > v1;          // Is recovering (v0 is less negative than v1)
+        // 2. Breakthrough Check
+        // If current velocity is BELOW the threshold (a deep negative spike),
+        // we trigger IMMEDIATELY.
+        if (d0.vx !== undefined && d0.vx < threshold) {
+            // --- TRIGGER CONFIRMED ---
+            this.lastTriggerTime = now;
 
-        if (isDeepSpike && isTurning) {
-            // --- TRIGGER CONFIRMED (Peak Detected) ---
-            latestInfo.didFire = true;
-            console.log(`[RS] 💥 CLEAN TRIGGER (PEAK)! Prev:${v1.toFixed(2)} < Thresh:${threshold.toFixed(2)} | Curr:${v0.toFixed(2)}`);
+            d0.didFire = true;
+            console.log(`[RS] 💥 CLEAN TRIGGER (Falling Edge)! VX:${d0.vx.toFixed(2)} < Thresh:${threshold.toFixed(2)}`);
             return true;
         }
 
