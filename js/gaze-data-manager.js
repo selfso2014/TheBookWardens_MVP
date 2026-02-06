@@ -1,4 +1,3 @@
-
 /**
  * Gaze Data Management
  * Stores and processes raw gaze data into structured format with Gaussian smoothing and velocity calculation.
@@ -16,6 +15,11 @@ export class GazeDataManager {
 
         // NEW: State for Max-Min Cascade
         this.lastPosPeakTime = 0;
+
+        // NEW: Rhythm Logic State
+        this.lastLineChangeTime = -9999;
+        this.prevLineIndex = -1;
+        this.pendingReturnSweep = null; // { t: timestamp, vx: velocity }
     }
 
     /**
@@ -45,7 +49,10 @@ export class GazeDataManager {
             type,
             sdkFixationX: gazeInfo.fixationX,
             sdkFixationY: gazeInfo.fixationY,
-            ...(this.context || {})
+            ...(this.context || {}),
+            // New Debug Fields
+            rsState: null,     // 'Pending', 'Immediate', 'Delayed', 'Missed', 'Timeout'
+            rsTriggerType: null // 'Immediate', 'Delayed'
         };
 
         this.data.push(entry);
@@ -163,6 +170,9 @@ export class GazeDataManager {
         this.lineMetadata = {};
         this.lastTriggerTime = 0;
         this.lastPosPeakTime = 0;
+        this.lastLineChangeTime = -9999;
+        this.prevLineIndex = -1;
+        this.pendingReturnSweep = null;
     }
 
     exportCSV(startTime = 0, endTime = Infinity) {
@@ -199,7 +209,7 @@ export class GazeDataManager {
             if (lineYCount[k] > 0) lineYAvg[k] = lineYSum[k] / lineYCount[k];
         });
 
-        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,DidFire,Debug_Median,Debug_Threshold,Debug_RealtimeVX\n";
+        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,DidFire,ReturnSweepState,TriggerType,Debug_Median,Debug_Threshold,Debug_RealtimeVX\n";
         this.data.forEach(d => {
             if (d.t < startTime || d.t > endTime) return;
             const lIdx = d.lineIndex;
@@ -229,6 +239,8 @@ export class GazeDataManager {
                 (d.ry !== undefined && d.ry !== null) ? d.ry.toFixed(2) : "",
                 (this.lineMetadata[lIdx] && this.lineMetadata[lIdx].success) ? "TRUE" : "FALSE",
                 (d.didFire ? "TRUE" : ""),
+                (d.rsState || ""),
+                (d.rsTriggerType || ""),
                 (d.debugMedian !== undefined) ? d.debugMedian.toFixed(3) : "",
                 (d.debugThreshold !== undefined) ? d.debugThreshold.toFixed(3) : "",
                 (d.debugVX !== undefined) ? d.debugVX.toFixed(3) : ""
@@ -411,11 +423,12 @@ export class GazeDataManager {
         return lineNum;
     }
 
-    // --- NEW: MAX-MIN CASCADE TRIGGER ---
+    // --- UPDATED: MAX-MIN CASCADE TRIGGER (V2 with Rhythm Game Logic) ---
     // Rule:
-    // 1. Detect Position Peak (SmoothX Rising -> Falling)
-    // 2. Detect Velocity Valley (VelX Falling -> Rising & Deeper than -0.4)
-    // 3. Trigger IF Valley happens within 200ms of Peak
+    // 1. Position Peak (Rising -> Falling)
+    // 2. Velocity Valley (Deep Negative V)
+    // 3. Cascade Check (Valley within 500ms of Peak)
+    // 4. Rhythm Check (Line Change within ±300ms of Valley)
     detectRealtimeReturnSweep(lookbackMs = 2000) {
         try {
             const len = this.data.length;
@@ -426,73 +439,126 @@ export class GazeDataManager {
             const d2 = this.data[len - 3]; // Prev-Prev (t-2)
             const now = d0.t;
 
-            // 1. Calculate Realtime SMOOTH X (Approximate)
-            // Note: Full Gaussian is expensive, use simple weighted avg for realtime smoothing
-            // Or assume raw x is okay if smoothed offline? No, we need smoothness.
-            // Let's use 3-tap avg for realtime smooth X to detect peaks reliably.
-            const smoothX = (d0.x * 0.5 + d1.x * 0.3 + d2.x * 0.2); // Simple Low Pass
-            d0.gx = smoothX; // Store it (approx)
-            if (d1.gx === null) d1.gx = d1.x; // Fallback
+            // --- 0. Update Line Change State ---
+            const currentLineIndex = d0.lineIndex; // From ProcessGaze -> Context
+            // Check if lineIndex changed (ensure valid numbers)
+            if (typeof currentLineIndex === 'number' && typeof this.prevLineIndex === 'number') {
+                if (currentLineIndex !== this.prevLineIndex) {
+                    this.lastLineChangeTime = now;
+                    this.prevLineIndex = currentLineIndex;
+
+                    // --- CHECK PENDING TRIGGERS (Future Check) ---
+                    // If we were waiting for a line change, here it is!
+                    if (this.pendingReturnSweep) {
+                        const diff = now - this.pendingReturnSweep.t;
+                        if (diff <= 300) { // Within 300ms window
+                            this._fireEffect("Delayed", this.pendingReturnSweep.vx);
+                            d0.rsState = "Delayed_Success"; // Mark current frame
+                        } else {
+                            // Too late? (Should be covered by timeout check below, but good to strict check)
+                            d0.rsState = "Delayed_Fail_TooLate";
+                        }
+                        this.pendingReturnSweep = null; // Clear pending
+                    }
+                }
+            } else if (typeof currentLineIndex === 'number') {
+                // First initialization
+                this.prevLineIndex = currentLineIndex;
+            }
+
+            // --- 0.5. Check Pending Timeout ---
+            if (this.pendingReturnSweep) {
+                if ((now - this.pendingReturnSweep.t) > 300) {
+                    this.pendingReturnSweep = null;
+                    d0.rsState = "Timeout";
+                    // console.log(`[RS] ❌ Pending Trigger Timeout`);
+                } else {
+                    d0.rsState = "Pending";
+                }
+            }
+
+
+            // 1. Calculate Realtime SMOOTH X
+            const smoothX = (d0.x * 0.5 + d1.x * 0.3 + d2.x * 0.2);
+            d0.gx = smoothX;
+            if (d1.gx === null) d1.gx = d1.x;
             if (d2.gx === null) d2.gx = d2.x;
 
             // -- STEP A: POSITION PEAK DETECTION --
-            // Condition: Prev (d2~d1) was rising, Now (d1~d0) is falling?
-            // Actually, we are at t. Peak happened at t-1 if d2 < d1 > d0.
-            // Let's use smoothed values
             const sx0 = d0.gx || d0.x;
             const sx1 = d1.gx || d1.x;
             const sx2 = d2.gx || d2.x;
-
-            // FIXED: Relaxed condition to catch rounded peaks/plateaus (>=)
             const isPosPeak = (sx1 >= sx2) && (sx1 > sx0);
             if (isPosPeak) {
                 this.lastPosPeakTime = d1.t;
-                // console.log(`[RS] Peak at ${d1.t}`);
             }
 
             // -- STEP B: VELOCITY VALLEY DETECTION --
-            // Instant Velocity Calculation
             const repairVX = (d) => { if (d.vx === null || d.vx === undefined || isNaN(d.vx)) return 0; return d.vx; };
             if (d0.vx === null) { const dt = d0.t - d1.t; d0.vx = dt > 0 ? (d0.x - d1.x) / dt : 0; }
-
-            const v0 = repairVX(d0); // t
-            const v1 = repairVX(d1); // t-1 (Possible Valley)
-            const v2 = repairVX(d2); // t-2
-
+            const v0 = repairVX(d0);
+            const v1 = repairVX(d1);
+            const v2 = repairVX(d2);
             // Condition: v2 > v1 < v0 (V-Shape) AND v1 < -0.4 (Depth)
             const isVelValley = (v2 > v1) && (v1 < v0);
             const isDeepEnough = v1 < -0.4;
 
             // -- STEP C: CASCADE CHECK --
+            // Global cooldown check (300ms since last FIRE)
             if (this.lastTriggerTime && (now - this.lastTriggerTime < 300)) return false;
 
             if (isVelValley && isDeepEnough) {
                 const timeSincePeak = d1.t - this.lastPosPeakTime;
-                // Validation: Must occur within 500ms of a Position Peak (Relaxed from 200ms)
-                if (timeSincePeak > 0 && timeSincePeak < 500) {
-                    this.lastTriggerTime = now;
-                    d0.didFire = true;
-                    console.log(`[RS] 💥 CASCADE TRIGGER! Peak->Valley: ${timeSincePeak}ms | VX:${v1.toFixed(2)}`);
 
-                    // --- NEW: Immediately Fire Visual Effect ---
-                    // FIX: Visual effect is on the renderer instance, not the typewriter wrapper!
-                    if (window.Game && window.Game.typewriter && window.Game.typewriter.renderer &&
-                        typeof window.Game.typewriter.renderer.triggerReturnEffect === 'function') {
-                        window.Game.typewriter.renderer.triggerReturnEffect();
+                // 1. Is it a valid potential return sweep? (Peak check)
+                if (timeSincePeak > 0 && timeSincePeak < 500) {
+
+                    // -- STEP D: RHYTHM CHECK (±300ms Line Change) --
+
+                    // Case 1: Past Check (Line Changed Recently?)
+                    const timeSinceLineChange = now - this.lastLineChangeTime;
+                    // Note: lastLineChangeTime init is -9999, so check sanity
+                    if (timeSinceLineChange >= 0 && timeSinceLineChange <= 300) {
+                        this._fireEffect("Immediate", v1);
+                        d0.rsState = "Immediate_Success";
+                        this.lastPosPeakTime = 0; // Reset peak
+                        return true;
                     }
 
-                    // Reset Peak Time to prevent double firing? (Optional, but safe)
-                    this.lastPosPeakTime = 0;
-                    return true;
-                } else {
-                    // Valley detected but no preceding peak? Maybe just noise or non-reading saccade.
-                    // console.log(`[RS] Ignored Valley (No Peak). dt: ${timeSincePeak}ms`);
+                    // Case 2: Future Check (Wait for Line Change)
+                    else {
+                        // Enter Pending State
+                        if (!this.pendingReturnSweep) {
+                            this.pendingReturnSweep = { t: now, vx: v1 };
+                            d0.rsState = "Pending_Start";
+                            // console.log(`[RS] ⏳ Pending... Waiting for Line Change`);
+                        }
+                    }
                 }
             }
             return false;
         } catch (e) {
             console.error(e);
             return false;
+        }
+    }
+
+    _fireEffect(type, vx) {
+
+        // Find the most recent data point (now)
+        const d0 = this.data[this.data.length - 1];
+
+        // Update Cooldown Timer
+        this.lastTriggerTime = d0.t;
+
+        d0.didFire = true;
+        d0.rsTriggerType = type;
+
+        console.log(`[RS] 💥 TRIGGER! (${type}) VX:${vx.toFixed(2)} at ${d0.t}ms`);
+
+        if (window.Game && window.Game.typewriter && window.Game.typewriter.renderer &&
+            typeof window.Game.typewriter.renderer.triggerReturnEffect === 'function') {
+            window.Game.typewriter.renderer.triggerReturnEffect();
         }
     }
 }
