@@ -13,6 +13,9 @@ export class GazeDataManager {
         this.context = {}; // Initialize context
         this.lineMetadata = {}; // Store per-line metadata
         this.lastTriggerTime = 0;
+
+        // NEW: State for Max-Min Cascade
+        this.lastPosPeakTime = 0;
     }
 
     /**
@@ -178,6 +181,7 @@ export class GazeDataManager {
         this.context = {};
         this.lineMetadata = {};
         this.lastTriggerTime = 0;
+        this.lastPosPeakTime = 0;
     }
 
     exportCSV(startTime = 0, endTime = Infinity) {
@@ -426,73 +430,74 @@ export class GazeDataManager {
         return lineNum;
     }
 
-    // --- NEW: ADAPTIVE PEAK-FRACTION LOGIC ---
-    // Algorithm: Threshold = min(-0.4, PeakVelocity * 0.5)
-    // Ensures baseline sensitivity (-0.4) for slow users, 
-    // but scales up (e.g. -1.0) for fast users to avoid false positives.
-    detectRealtimeReturnSweep(lookbackMs = 2000) { // Look back 2 seconds for peak
+    // --- NEW: MAX-MIN CASCADE TRIGGER ---
+    // Rule:
+    // 1. Detect Position Peak (SmoothX Rising -> Falling)
+    // 2. Detect Velocity Valley (VelX Falling -> Rising & Deeper than -0.4)
+    // 3. Trigger IF Valley happens within 200ms of Peak
+    detectRealtimeReturnSweep(lookbackMs = 2000) {
         try {
             const len = this.data.length;
-            if (len < 10) return false;
+            if (len < 5) return false;
 
-            const d0 = this.data[len - 1]; // Current
+            const d0 = this.data[len - 1]; // Current (t)
+            const d1 = this.data[len - 2]; // Previous (t-1)
+            const d2 = this.data[len - 3]; // Prev-Prev (t-2)
             const now = d0.t;
-            const cutoff = now - lookbackMs;
 
-            // 1. Instant Velocity Check & Repair
-            if (d0.vx === null || d0.vx === undefined || isNaN(d0.vx)) {
-                const prev = this.data[len - 2];
-                if (prev && prev.t < d0.t) {
-                    const dt = d0.t - prev.t;
-                    d0.vx = (d0.x - prev.x) / dt;
-                } else {
-                    d0.vx = 0;
-                }
+            // 1. Calculate Realtime SMOOTH X (Approximate)
+            // Note: Full Gaussian is expensive, use simple weighted avg for realtime smoothing
+            // Or assume raw x is okay if smoothed offline? No, we need smoothness.
+            // Let's use 3-tap avg for realtime smooth X to detect peaks reliably.
+            const smoothX = (d0.x * 0.5 + d1.x * 0.3 + d2.x * 0.2); // Simple Low Pass
+            d0.gx = smoothX; // Store it (approx)
+            if (d1.gx === null) d1.gx = d1.x; // Fallback
+            if (d2.gx === null) d2.gx = d2.x;
+
+            // -- STEP A: POSITION PEAK DETECTION --
+            // Condition: Prev (d2~d1) was rising, Now (d1~d0) is falling?
+            // Actually, we are at t. Peak happened at t-1 if d2 < d1 > d0.
+            // Let's use smoothed values
+            const sx0 = d0.gx || d0.x;
+            const sx1 = d1.gx || d1.x;
+            const sx2 = d2.gx || d2.x;
+
+            const isPosPeak = (sx1 > sx2) && (sx1 > sx0);
+            if (isPosPeak) {
+                this.lastPosPeakTime = d1.t;
+                // console.log(`[RS] Peak at ${d1.t}`);
             }
-            const currentVX = d0.vx || 0;
 
-            // 2. Find Recent Minimum Velocity (Fastest Leftward Movement)
-            let minVel = 0; // Starts at 0, goes negative
-            for (let i = len - 1; i >= 0; i--) {
-                const d = this.data[i];
-                if (d.t < cutoff) break;
-                if (d.vx !== undefined && !isNaN(d.vx) && d.vx < minVel) {
-                    minVel = d.vx;
-                }
-            }
-            // minVel is e.g. -2.0 (Fast) or -0.6 (Slow)
+            // -- STEP B: VELOCITY VALLEY DETECTION --
+            // Instant Velocity Calculation
+            const repairVX = (d) => { if (d.vx === null || d.vx === undefined || isNaN(d.vx)) return 0; return d.vx; };
+            if (d0.vx === null) { const dt = d0.t - d1.t; d0.vx = dt > 0 ? (d0.x - d1.x) / dt : 0; }
 
-            // 3. Calculate Adaptive Threshold
-            // Base Floor: -0.4 (As requested by user)
-            // Adaptive: 50% of Peak
-            const ADAPTIVE_RATIO = 0.5;
-            const BASE_FLOOR = -0.4;
+            const v0 = repairVX(d0); // t
+            const v1 = repairVX(d1); // t-1 (Possible Valley)
+            const v2 = repairVX(d2); // t-2
 
-            // Formula: threshold is the LOWER of (-0.4) and (Peak * 0.5)
-            // Note: Lower means "More Negative" (Harder to trigger) in negative domain? 
-            // Wait.
-            // If Peak is -2.0, Half is -1.0. We want -1.0. (Strict)
-            // If Peak is -0.6, Half is -0.3. We want -0.4. (Floor)
-            // So we want the MINIMUM (Most negative) of (-0.4, Peak * 0.5)? 
-            // e.g. min(-0.4, -1.0) = -1.0 (Correct)
-            // e.g. min(-0.4, -0.3) = -0.4 (Correct)
+            // Condition: v2 > v1 < v0 (V-Shape) AND v1 < -0.4 (Depth)
+            const isVelValley = (v2 > v1) && (v1 < v0);
+            const isDeepEnough = v1 < -0.4;
 
-            let adaptiveThreshold = Math.min(BASE_FLOOR, minVel * ADAPTIVE_RATIO);
-
-            // Store for Debugging
-            d0.debugThreshold = adaptiveThreshold;
-            d0.debugVX = currentVX;
-
-            // 4. Trigger Check
-            const isOutlier = currentVX < adaptiveThreshold;
-
+            // -- STEP C: CASCADE CHECK --
             if (this.lastTriggerTime && (now - this.lastTriggerTime < 300)) return false;
 
-            if (isOutlier) {
-                this.lastTriggerTime = now;
-                d0.didFire = true;
-                console.log(`[RS] 💥 ADAPTIVE TRIGGER! VX:${currentVX.toFixed(2)} < Thresh:${adaptiveThreshold.toFixed(2)} (Peak:${minVel.toFixed(2)})`);
-                return true;
+            if (isVelValley && isDeepEnough) {
+                const timeSincePeak = d1.t - this.lastPosPeakTime;
+                // Validation: Must occur within 200ms of a Position Peak
+                if (timeSincePeak > 0 && timeSincePeak < 200) {
+                    this.lastTriggerTime = now;
+                    d0.didFire = true;
+                    console.log(`[RS] 💥 CASCADE TRIGGER! Peak->Valley: ${timeSincePeak}ms | VX:${v1.toFixed(2)}`);
+                    // Reset Peak Time to prevent double firing? (Optional, but safe)
+                    this.lastPosPeakTime = 0;
+                    return true;
+                } else {
+                    // Valley detected but no preceding peak? Maybe just noise or non-reading saccade.
+                    // console.log(`[RS] Ignored Valley (No Peak). dt: ${timeSincePeak}ms`);
+                }
             }
             return false;
 
