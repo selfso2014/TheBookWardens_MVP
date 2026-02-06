@@ -408,16 +408,8 @@ export class GazeDataManager {
     }
 
     detectLinesMobile(startTime = 0, endTime = Infinity) {
-        // [Simplified for brevity]
-        // In full deployment, this contains the Offline MAD Logic (detectVelXSpikes).
-        // Since the user is focused on Real-time detection, I will maintain the placeholder
-        // or ensure the offline logic doesn't interfere. 
         if (this.data.length < 10) return 0;
         this.preprocessData();
-        // Just return 0 lines found if not needing full offline logic here, 
-        // BUT better to keep some logic if the user uses Export CSV.
-        // Assuming the previous full implementation is desired for offline.
-        // I will restore the FULL logic here to be safe.
         let startIndex = -1; let endIndex = -1;
         for (let i = 0; i < this.data.length; i++) {
             const t = this.data[i].t;
@@ -431,22 +423,23 @@ export class GazeDataManager {
         const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 1.5, gapMs: 120, expandOneSample: true });
 
         let lineNum = 1;
-        // ... (Offline logic details omitted for clarity, but minimal required presence)
         return lineNum;
     }
 
-    // --- NEW: DYNAMIC MEDIAN COMPARATOR (Simple & Robust) ---
-    detectRealtimeReturnSweep(lookbackMs = 600) {
+    // --- NEW: ADAPTIVE PEAK-FRACTION LOGIC ---
+    // Algorithm: Threshold = min(-0.4, PeakVelocity * 0.5)
+    // Ensures baseline sensitivity (-0.4) for slow users, 
+    // but scales up (e.g. -1.0) for fast users to avoid false positives.
+    detectRealtimeReturnSweep(lookbackMs = 2000) { // Look back 2 seconds for peak
         try {
             const len = this.data.length;
-            if (len < 5) return false;
+            if (len < 10) return false;
 
             const d0 = this.data[len - 1]; // Current
             const now = d0.t;
             const cutoff = now - lookbackMs;
 
             // 1. Instant Velocity Check & Repair
-            // Make sure we have a number to check
             if (d0.vx === null || d0.vx === undefined || isNaN(d0.vx)) {
                 const prev = this.data[len - 2];
                 if (prev && prev.t < d0.t) {
@@ -458,48 +451,47 @@ export class GazeDataManager {
             }
             const currentVX = d0.vx || 0;
 
-            // 2. Collect Samples (ALL Velocities) to find "Baseline" (Median)
-            // Even if user is moving weirdly, Median helps find the "Zero".
-            const samples = [];
+            // 2. Find Recent Minimum Velocity (Fastest Leftward Movement)
+            let minVel = 0; // Starts at 0, goes negative
             for (let i = len - 1; i >= 0; i--) {
                 const d = this.data[i];
                 if (d.t < cutoff) break;
-                if (d.vx !== undefined && !isNaN(d.vx)) {
-                    samples.push(d.vx);
+                if (d.vx !== undefined && !isNaN(d.vx) && d.vx < minVel) {
+                    minVel = d.vx;
                 }
             }
+            // minVel is e.g. -2.0 (Fast) or -0.6 (Slow)
 
-            // If not enough samples, assume Median is 0 (Stationary)
-            let median = 0;
-            if (samples.length >= 5) {
-                samples.sort((a, b) => a - b);
-                const mid = Math.floor(samples.length / 2);
-                median = samples.length % 2 !== 0 ? samples[mid] : (samples[mid - 1] + samples[mid]) / 2;
-            }
+            // 3. Calculate Adaptive Threshold
+            // Base Floor: -0.4 (As requested by user)
+            // Adaptive: 50% of Peak
+            const ADAPTIVE_RATIO = 0.5;
+            const BASE_FLOOR = -0.4;
 
-            // 3. Define Threshold
-            // Logic: "Median - 1.5 px/ms"
-            // If Velocity drops deeper than this => Return Sweep.
-            const SENSITIVITY_OFFSET = 1.2;
-            const dynamicThreshold = median - SENSITIVITY_OFFSET;
+            // Formula: threshold is the LOWER of (-0.4) and (Peak * 0.5)
+            // Note: Lower means "More Negative" (Harder to trigger) in negative domain? 
+            // Wait.
+            // If Peak is -2.0, Half is -1.0. We want -1.0. (Strict)
+            // If Peak is -0.6, Half is -0.3. We want -0.4. (Floor)
+            // So we want the MINIMUM (Most negative) of (-0.4, Peak * 0.5)? 
+            // e.g. min(-0.4, -1.0) = -1.0 (Correct)
+            // e.g. min(-0.4, -0.3) = -0.4 (Correct)
 
-            // Store for Debugging (Appears in Chart 4 as Red Dotted Line)
-            // Note: We reuse 'debugZScore' field to store Deviation (Current - Median) for visualization if needed,
-            // or just use debugThreshold to plot the line.
-            d0.debugMedian = median;
-            d0.debugThreshold = dynamicThreshold;
+            let adaptiveThreshold = Math.min(BASE_FLOOR, minVel * ADAPTIVE_RATIO);
+
+            // Store for Debugging
+            d0.debugThreshold = adaptiveThreshold;
             d0.debugVX = currentVX;
 
             // 4. Trigger Check
-            // Condition: "Am I faster than the threshold?"
-            const isOutlier = currentVX < dynamicThreshold;
+            const isOutlier = currentVX < adaptiveThreshold;
 
             if (this.lastTriggerTime && (now - this.lastTriggerTime < 300)) return false;
 
             if (isOutlier) {
                 this.lastTriggerTime = now;
                 d0.didFire = true;
-                console.log(`[RS] 💥 MEDIAN TRIGGER! VX:${currentVX.toFixed(2)} < Threshold:${dynamicThreshold.toFixed(2)} (Med:${median.toFixed(2)})`);
+                console.log(`[RS] 💥 ADAPTIVE TRIGGER! VX:${currentVX.toFixed(2)} < Thresh:${adaptiveThreshold.toFixed(2)} (Peak:${minVel.toFixed(2)})`);
                 return true;
             }
             return false;
