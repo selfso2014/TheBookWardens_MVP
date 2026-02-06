@@ -395,9 +395,9 @@ class TextRenderer {
         // Force Reflow
         void impact.offsetWidth;
 
-        // Animate: Ultra Fast Flash (0.05s)
-        // The visual effect lasts 100ms based on user request.
-        impact.style.transition = "transform 0.05s ease-out, opacity 0.05s ease-in";
+        // Animate: Visible Flash (0.5s)
+        // Changed from 0.05s to 0.5s to ensure visibility on mobile devices.
+        impact.style.transition = "transform 0.5s ease-out, opacity 0.5s ease-in";
 
         requestAnimationFrame(() => {
             impact.style.transform = "translate(-50%, -50%) scale(4.0)"; // End at 40px
