@@ -346,6 +346,19 @@
                             yAxisID: 'yVel',
                             datalabels: { display: false }
                         },
+                        // NEW: Modified Z-Score Analysis (Right Axis)
+                        {
+                            label: 'Modified Z-Score',
+                            data: data.map(d => d.debugZScore),
+                            type: 'line',
+                            borderColor: '#34495e', // Dark Navy
+                            borderWidth: 1,
+                            borderDash: [2, 2],
+                            pointRadius: 0,
+                            yAxisID: 'yZScore',
+                            hidden: false,
+                            datalabels: { display: false }
+                        },
                         // NEW: Negative Velocity Highlights (Scatter)
                         {
                             label: 'Neg Vel X (<0)',
@@ -423,6 +436,7 @@
                         x: { ticks: { maxTicksLimit: 20 } },
                         yPos: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Position (px)' } },
                         yVel: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Velocity (px/frame)' } },
+                        yZScore: { type: 'linear', display: true, position: 'right', min: -10, max: 5, grid: { drawOnChartArea: false }, title: { display: true, text: 'Z-Score' } },
                         yLine: { type: 'linear', display: true, position: 'right', min: 0, max: 10, grid: { drawOnChartArea: false }, title: { display: true, text: 'Line Index' } }
                     },
                     plugins: {

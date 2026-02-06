@@ -38,9 +38,6 @@ export class GazeDataManager {
 
         // 3. Eye Movement Classification
         // 0: Fixation, 2: Saccade, Others: Unknown
-
-        // 3. Eye Movement Classification
-        // 0: Fixation, 2: Saccade, Others: Unknown
         let type = 'Unknown';
         if (gazeInfo.eyemovementState === 0) type = 'Fixation';
         else if (gazeInfo.eyemovementState === 2) type = 'Saccade';
@@ -78,10 +75,6 @@ export class GazeDataManager {
                 curr.vy = 0;
             }
         }
-
-        // Debug Log (Raw Stream Check)
-        // User Request: "콘솔로 시선좌표 및 fixation saccade인지 띄워라."
-        // console.log(`[GazeRaw] Frame T:${t} | (${x.toFixed(1)}, ${y.toFixed(1)}) | Type: ${type} | State: ${gazeInfo.eyemovementState}`);
 
         // Debug Log (Every ~1 sec aka 60 frames)
         if (this.data.length % 60 === 0) console.log("[GazeData] Count:", this.data.length, "Latest VX:", entry.vx ? entry.vx.toFixed(2) : "null");
@@ -148,9 +141,6 @@ export class GazeDataManager {
         for (let i = 0; i < kernelSize; i++) kernel[i] /= sumK;
 
         // Apply Smoothing to X and Y
-        // We can write directly to data[i].gx, data[i].gy
-        // But need to read from raw x/y.
-        // To avoid boundary issues, handle edges carefully or just clamp.
         for (let i = 0; i < this.data.length; i++) {
             let sumX = 0, sumY = 0, wSum = 0;
             for (let k = 0; k < kernelSize; k++) {
@@ -166,7 +156,6 @@ export class GazeDataManager {
         }
 
         // 3. Velocity Calculation (Based on Smoothed Data)
-        // Simple finite difference: v[i] = (p[i] - p[i-1]) /dt
         for (let i = 0; i < this.data.length; i++) {
             if (i === 0) {
                 this.data[i].vx = 0;
@@ -174,7 +163,6 @@ export class GazeDataManager {
             } else {
                 const dt = this.data[i].t - this.data[i - 1].t;
                 if (dt > 0) {
-                    // User Request: Use Raw X/Y (Interpolated) for Velocity Calculation
                     this.data[i].vx = (this.data[i].x - this.data[i - 1].x) / dt; // px/ms
                     this.data[i].vy = (this.data[i].y - this.data[i - 1].y) / dt;
                 } else {
@@ -189,11 +177,6 @@ export class GazeDataManager {
         this.context = { ...this.context, ...ctx };
     }
 
-    /**
-     * Store metadata for a specific line (e.g., Ink success status)
-     * @param {number} lineIndex 
-     * @param {Object} metadata 
-     */
     setLineMetadata(lineIndex, metadata) {
         if (!this.lineMetadata[lineIndex]) {
             this.lineMetadata[lineIndex] = {};
@@ -223,8 +206,6 @@ export class GazeDataManager {
 
         for (let i = 0; i < this.data.length; i++) {
             const d = this.data[i];
-            // Check if charIndex is valid (not null/undefined)
-            // Note: charIndex 0 is valid.
             if (d.charIndex !== undefined && d.charIndex !== null) {
                 if (startTime === null) startTime = d.t;
                 endTime = d.t;
@@ -241,14 +222,9 @@ export class GazeDataManager {
             return;
         }
 
-        // Ensure data is preprocessed (Interpolated, Smoothed, Velocity) before export
         this.preprocessData();
-
-        // RUN ADVANCED LINE DETECTION (MAD Algorithm) automatically
-        // This populates 'detectedLineIndex' and 'isReturnSweep' fields
         this.detectLinesMobile(startTime, endTime);
 
-        // Create Map for Target Y (Ref Y) from Game.typewriter
         const targetYMap = {};
         if (window.Game && window.Game.typewriter && window.Game.typewriter.lineYData) {
             window.Game.typewriter.lineYData.forEach(item => {
@@ -256,7 +232,6 @@ export class GazeDataManager {
             });
         }
 
-        // Calculate Average SmoothY (gy) per LineIndex
         const lineYSum = {};
         const lineYCount = {};
         const lineYAvg = {};
@@ -279,28 +254,20 @@ export class GazeDataManager {
             }
         });
 
-        // CSV Header
-        // CSV Header
-        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,Extrema,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,InkCoverage_Px,isLagFix,IsArmed,DidFire,Debug_Samples,Debug_Median,Debug_Threshold,Debug_RealtimeVX\n";
+        let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,Extrema,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,InkCoverage_Px,isLagFix,IsArmed,DidFire,Debug_Samples,Debug_Median,Debug_ZScore,Debug_RealtimeVX\n";
 
-        // Rows
         this.data.forEach(d => {
             if (d.t < startTime || d.t > endTime) return;
 
-            // Get Metadata
             const lIdx = d.lineIndex;
             let targetY = "";
             let avgY = "";
 
             if (lIdx !== undefined && lIdx !== null) {
-                // Store in Data Structure Permanently
                 d.targetY = targetYMap[lIdx] !== undefined ? targetYMap[lIdx] : null;
-
-                // V18 Fix: Preserve pre-calculated avgY from Game.js if available
                 if (d.avgY === undefined || d.avgY === null) {
                     d.avgY = lineYAvg[lIdx] !== undefined ? parseFloat(lineYAvg[lIdx].toFixed(2)) : null;
                 }
-
                 targetY = d.targetY !== null ? d.targetY : "";
                 avgY = d.avgY !== null ? d.avgY : "";
             }
@@ -330,13 +297,12 @@ export class GazeDataManager {
                 (d.didFire ? "TRUE" : ""),
                 (d.debugSamples !== undefined) ? d.debugSamples : "",
                 (d.debugMedian !== undefined) ? d.debugMedian.toFixed(3) : "",
-                (d.debugThreshold !== undefined) ? d.debugThreshold.toFixed(3) : "",
+                (d.debugZScore !== undefined) ? d.debugZScore.toFixed(3) : "",
                 (d.debugVX !== undefined) ? d.debugVX.toFixed(3) : ""
             ];
             csv += row.join(",") + "\n";
         });
 
-        // Detect Device Type for Filename
         const ua = navigator.userAgent.toLowerCase();
         let deviceType = "desktop";
         if (/mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(ua)) {
@@ -345,7 +311,6 @@ export class GazeDataManager {
             deviceType = "tablet";
         }
 
-        // Download
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
@@ -356,66 +321,7 @@ export class GazeDataManager {
         link.click();
         document.body.removeChild(link);
 
-        // Also export chart image with same range
         this.exportChartImage(deviceType, startTime, endTime);
-    }
-
-    /**
-     * Upload current session data to Firebase Realtime Database
-     * @param {string} sessionId - Unique session ID (e.g. from URL or random)
-     */
-    async uploadToCloud(sessionId) {
-        if (!window.firebase || !window.FIREBASE_CONFIG) {
-            console.error("[Firebase] SDK or Config not loaded. Check index.html and firebase-config.js");
-            // alert("Firebase not configured. Cannot upload."); // DISABLE ALERT STORM
-            return;
-        }
-
-        console.log(`[Firebase] Uploading session [${sessionId}]...`);
-
-        try {
-            // 1. Ensure App Initialized
-            if (!firebase.apps.length) {
-                firebase.initializeApp(window.FIREBASE_CONFIG);
-            }
-
-            // 2. Preprocess Data before upload
-            this.preprocessData();
-
-            // 3. Prepare Payload (Minimize data size if possible, but raw is fine for debug)
-            const rawPayload = {
-                meta: {
-                    timestamp: Date.now(),
-                    userAgent: navigator.userAgent,
-                    lineMetadata: this.lineMetadata,
-                    totalSamples: this.data.length
-                },
-                data: this.data
-            };
-
-            // SANITIZE: Firebase cannot store NaN. Convert all NaN -> null
-            const payload = JSON.parse(JSON.stringify(rawPayload, (key, value) => {
-                if (typeof value === 'number' && isNaN(value)) return null;
-                return value;
-            }));
-
-            // 4. Write to DB
-            const db = firebase.database();
-            await db.ref('sessions/' + sessionId).set(payload);
-
-            console.log("[Firebase] Upload Complete! ✅");
-
-            // Visual Feedback
-            const toast = document.createElement("div");
-            toast.innerText = `☁️ Cloud Upload Done: ${sessionId}`;
-            toast.style.cssText = "position:fixed; bottom:50px; left:50%; transform:translateX(-50%); background:#0d47a1; color:white; padding:10px 20px; border-radius:20px; z-index:99999;";
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 4000);
-
-        } catch (e) {
-            console.error("[Firebase] Upload Failed", e);
-            // alert(`Upload Failed: ${e.message}`); // DISABLE ALERT STORM
-        }
     }
 
     async exportChartImage(deviceType, startTime = 0, endTime = Infinity) {
@@ -424,29 +330,22 @@ export class GazeDataManager {
             return;
         }
 
-        // Filter Data for Chart
         const chartData = this.data.filter(d => d.t >= startTime && d.t <= endTime);
         if (chartData.length === 0) {
             console.warn("No data for chart export in range.");
             return;
         }
 
-        // Configuration: 4 Charts (Raw, Smooth, Vel, LineIndex)
-        // 1. Raw X/Y + Events
-        // 2. Smooth X/Y
-        // 3. Velocity X/Y
-        // 4. Line Index / Algo Index
         const cols = 1;
         const rows = 4;
         const chartWidth = 1000;
-        const chartHeight = 350; // Increased height to prevent overlap
-        const padding = 20; // Padding between charts
+        const chartHeight = 350;
+        const padding = 20;
         const totalWidth = chartWidth * cols;
         const totalHeight = (chartHeight + padding) * rows;
 
         const chartTypes = ['RawData', 'SmoothedData', 'Velocity', 'LineIndices'];
 
-        // Create a single large canvas to draw everything on
         const mainCanvas = document.createElement('canvas');
         mainCanvas.width = totalWidth;
         mainCanvas.height = totalHeight;
@@ -454,7 +353,6 @@ export class GazeDataManager {
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-        // Prepare Data Arrays
         const times = chartData.map(d => d.t);
         const datasets = {
             RawX: chartData.map(d => d.x),
@@ -467,7 +365,6 @@ export class GazeDataManager {
             AlgoLineIndex: chartData.map(d => d.detectedLineIndex || null)
         };
 
-        // Identify Return Sweep Intervals for Shading
         const returnSweepIntervals = [];
         let rStart = null;
         for (let i = 0; i < chartData.length; i++) {
@@ -482,7 +379,6 @@ export class GazeDataManager {
         }
         if (rStart !== null) returnSweepIntervals.push({ start: rStart, end: chartData[chartData.length - 1].t });
 
-        // Helper for intervals
         const intervalPlugin = {
             id: 'intervalShading',
             beforeDatasetsDraw(chart) {
@@ -490,8 +386,7 @@ export class GazeDataManager {
                 if (!chartArea) return;
                 const x = scales.x;
                 ctx.save();
-                ctx.fillStyle = 'rgba(255, 0, 255, 0.15)'; // Magenta tint for Return Sweeps
-
+                ctx.fillStyle = 'rgba(255, 0, 255, 0.15)';
                 for (const it of returnSweepIntervals) {
                     const x0 = x.getPixelForValue(it.start);
                     const x1 = x.getPixelForValue(it.end);
@@ -505,28 +400,22 @@ export class GazeDataManager {
             }
         };
 
-        // Extrema Points (Filtered)
         const lineStarts = [];
         const posMaxs = [];
-        const ignValleys = [];
-        const ignPeaks = [];
 
         chartData.forEach(d => {
             if (d.extrema === 'LineStart') lineStarts.push({ x: d.t, y: d.gx });
             if (d.extrema === 'PosMax') posMaxs.push({ x: d.t, y: d.gx });
-            // Assuming ignored are still relevant? If not, skip.
         });
 
-        // Loop through each chart type
         for (let i = 0; i < chartTypes.length; i++) {
             const chartName = chartTypes[i];
-            const yOffset = i * (chartHeight + padding); // Include padding
+            const yOffset = i * (chartHeight + padding);
 
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = chartWidth;
             tempCanvas.height = chartHeight;
 
-            // Explicitly Fill White Background on Temp Canvas
             const tCtx = tempCanvas.getContext('2d');
             tCtx.fillStyle = 'white';
             tCtx.fillRect(0, 0, chartWidth, chartHeight);
@@ -548,13 +437,11 @@ export class GazeDataManager {
                 }
             };
 
-            // Build Datasets per Chart Type
             if (chartName === 'RawData') {
                 configData.datasets.push(
                     { label: 'RawX', data: datasets.RawX, borderColor: 'blue', borderWidth: 1, pointRadius: 0 },
                     { label: 'RawY', data: datasets.RawY, borderColor: 'orange', borderWidth: 1, pointRadius: 0 }
                 );
-                // Add Extrema Markers
                 configData.datasets.push(
                     { label: 'LineStart', data: lineStarts, type: 'scatter', backgroundColor: 'green', pointRadius: 5, pointStyle: 'triangle', rotation: 180 },
                     { label: 'PosMax', data: posMaxs, type: 'scatter', backgroundColor: 'red', pointRadius: 5, pointStyle: 'triangle' }
@@ -580,10 +467,9 @@ export class GazeDataManager {
                 type: 'line',
                 data: configData,
                 options: options,
-                plugins: [intervalPlugin] // Apply shading to all charts
+                plugins: [intervalPlugin]
             };
 
-            // Render
             await new Promise(resolve => {
                 const chart = new Chart(tempCanvas, chartConfig);
                 setTimeout(() => {
@@ -594,7 +480,6 @@ export class GazeDataManager {
             });
         }
 
-        // Download Main Canvas
         const link = document.createElement('a');
         link.download = `${deviceType}_gaze_chart_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
         link.href = mainCanvas.toDataURL('image/png');
@@ -603,12 +488,10 @@ export class GazeDataManager {
         document.body.removeChild(link);
     }
 
-    // --- Line Detection Algorithm (MAD-based) ---
     detectLinesMobile(startTime = 0, endTime = Infinity) {
         if (this.data.length < 10) return 0;
-        this.preprocessData(); // Ensure velX is calculated
+        this.preprocessData();
 
-        // 1. Find the index range in the global array
         let startIndex = -1;
         let endIndex = -1;
 
@@ -626,29 +509,19 @@ export class GazeDataManager {
         const validDataSlice = this.data.slice(startIndex, endIndex + 1);
         if (validDataSlice.length < 10) return 0;
 
-        // 2. Prepare samples using NEGATIVE VELOCITY ONLY
-        // High WPM creates high positive velocity, which inflates MAD and hides return sweeps.
-        // By zeroing out positive velocity, we treat reading as "silence" and return sweeps as "signal".
         const samples = validDataSlice.map(d => ({
             ts_ms: d.t,
             velX: d.vx < 0 ? d.vx : 0
         }));
 
-        // 3. Detect Spikes using MAD (Sensitivity k=1.5)
-        // With positive velocities removed, the baseline noise is low. Revert k to 3.0 to avoid noise.
         const { threshold, spikeIntervals } = detectVelXSpikes(samples, { k: 1.5, gapMs: 120, expandOneSample: true });
         console.log(`[GazeDataManager] Running MAD with k=1.5 on ${samples.length} samples.`);
 
-        // 4. Identify Potential Return Sweeps (First Pass: Displacement & Basic Validity)
         const candidates = spikeIntervals.filter(interval => {
-            // Check Displacement (Distinguish Return Sweep from Regression)
-            // interval.startIndex/endIndex are relative to validDataSlice
             if (validDataSlice[interval.startIndex] && validDataSlice[interval.endIndex]) {
                 const startX = validDataSlice[interval.startIndex].gx;
                 const endX = validDataSlice[interval.endIndex].gx;
-                const displacement = startX - endX; // Moving Left: Start > End, so Disp > 0
-
-                // Threshold: 100px (Assumes Return Sweep covers significant screen width)
+                const displacement = startX - endX;
                 if (displacement < 100) return false;
             } else {
                 return false;
@@ -656,26 +529,19 @@ export class GazeDataManager {
             return true;
         });
 
-        // Sort by time
         candidates.sort((a, b) => a.start_ms - b.start_ms);
 
-        // --- Advanced Validation (Algorithm 1 & 2) ---
-        // 0. Dynamic Threshold Calculation (Algorithm 2)
-        // Calculate MIN_LINE_DURATION based on the shortest observed line reading duration (50% of min).
         let observedMinLineDur = Infinity;
         let curLineIdxForDur = -1;
         let curLineStartTForDur = -1;
 
         for (let i = 0; i < validDataSlice.length; i++) {
             const d = validDataSlice[i];
-            // Check for valid LineIndex
             if (d.lineIndex !== null && d.lineIndex !== undefined && d.lineIndex !== "") {
                 const idx = Number(d.lineIndex);
                 if (idx !== curLineIdxForDur) {
-                    // Line Change Detected
                     if (curLineIdxForDur !== -1) {
                         const duration = d.t - curLineStartTForDur;
-                        // Filter out noise/glitches (e.g. < 50ms) to avoid setting threshold too low
                         if (duration > 50 && duration < observedMinLineDur) {
                             observedMinLineDur = duration;
                         }
@@ -686,9 +552,7 @@ export class GazeDataManager {
             }
         }
 
-        // Fallback default if no multi-line data found
         if (observedMinLineDur === Infinity) observedMinLineDur = 300;
-
         const MIN_LINE_DURATION = observedMinLineDur * 0.5;
         console.log(`[GazeDataManager] Dynamic Threshold: MinObserved=${observedMinLineDur}ms -> Threshold=${MIN_LINE_DURATION}ms`);
 
@@ -696,33 +560,25 @@ export class GazeDataManager {
         let currentLineNum = 1;
         let lastSweepEndTime = -Infinity;
 
-        // Ensure LineIndex integrity (Carry-Forward) for validation
-        // We do this locally on the slice to avoid mutating global state permanently if not desired, 
-        // but for 'detectLines', we want best best effort.
         let lastKnownLineIndex = null;
         for (let i = 0; i < validDataSlice.length; i++) {
             const d = validDataSlice[i];
             if (d.lineIndex !== null && d.lineIndex !== undefined && d.lineIndex !== "") {
                 lastKnownLineIndex = d.lineIndex;
             } else if (lastKnownLineIndex !== null) {
-                // Determine if we should fill in? For validation purposes, yes.
-                // But we just need it during the sweep check.
             }
         }
 
         for (const sweep of candidates) {
-            // Get Data Point at Sweep Start (for Context Check)
             const sweepData = validDataSlice[sweep.startIndex];
             const sweepTime = sweepData.t;
 
-            // --- Algorithm 2: Time Gap Validation ---
             const timeSinceLast = sweepData.t - lastSweepEndTime;
             if (validSweeps.length > 0 && timeSinceLast < MIN_LINE_DURATION) {
                 console.log(`[Reject Sweep] Rapid Fire: dt=${timeSinceLast}ms < ${MIN_LINE_DURATION}ms at T=${sweepTime}`);
                 continue;
             }
 
-            // --- Algorithm 1: LineNum Constraint with Strong Sweep Override ---
             let currentLineIndex = sweepData.lineIndex;
             if (currentLineIndex === null || currentLineIndex === undefined) {
                 for (let k = sweep.startIndex; k >= 0; k--) {
@@ -733,7 +589,6 @@ export class GazeDataManager {
                 }
             }
 
-            // Calculate Displacement (Just for logging/debug, NOT for filtering)
             const startX = validDataSlice[sweep.startIndex].gx;
             const endX = validDataSlice[sweep.endIndex].gx;
             const displacement = startX - endX;
@@ -742,7 +597,6 @@ export class GazeDataManager {
                 const startLineVal = Number(currentLineIndex);
                 let lineIncreased = false;
                 let lineDecreased = false;
-                // Look ahead 500ms for LineIndex update
                 const toleranceWindow = 500;
                 const searchUntil = sweep.end_ms + toleranceWindow;
 
@@ -752,49 +606,37 @@ export class GazeDataManager {
                     if (d.lineIndex !== null && d.lineIndex !== undefined) {
                         const val = Number(d.lineIndex);
                         if (val > startLineVal) {
-                            lineIncreased = true; // Confirmed Next Line
+                            lineIncreased = true;
                             break;
                         }
                         if (val < startLineVal) {
-                            lineDecreased = true; // Confirmed Regression (Previous Line)
+                            lineDecreased = true;
                         }
                     }
                 }
 
-                // V25 Logic: Removed Displacement Threshold per User Request.
-                // Rely on k=1.5 MAD + Metadata Logic.
-
                 if (lineDecreased) {
-                    // Explicit Regression in Metadata -> NOW ACCEPTED (As per User Request to match Chart 11)
-                    // The physical eye movement is trusted more than the metadata lag.
                     console.warn(`[Accept Sweep] Metadata Regression (${startLineVal} -> Decreased). Accepted to match Chart 11 logic. Disp=${displacement.toFixed(0)}`);
-                    // continue; // REMOVED REJECTION
                 }
 
                 if (lineIncreased) {
-                    // Explicit Increase -> ACCEPT
                     console.log(`[Accept Sweep] Valid Line Increase (${startLineVal} -> Increased). Disp=${displacement.toFixed(0)}`);
                 } else {
-                    // LineIndex Unchanged (0 -> 0)
-                    // We accept it as Valid Sweep (Game Lag Case) since it was detected by MAD.
                     console.warn(`[Accept Sweep] LineIndex Unchanged (${startLineVal}). Accepted as Valid Sweep (Non-Regression). Disp=${displacement.toFixed(0)}`);
                 }
             }
 
-            // If passed all checks
             validSweeps.push(sweep);
-            lastSweepEndTime = sweep.end_ms; // Update Last Time
+            lastSweepEndTime = sweep.end_ms;
             currentLineNum++;
         }
 
-        // 5. Reset detections
         for (let i = 0; i < this.data.length; i++) {
             delete this.data[i].detectedLineIndex;
             delete this.data[i].extrema;
             delete this.data[i].isReturnSweep;
         }
 
-        // 6. Apply Valid Lines
         let lineNum = 1;
         let lastEndRelIdx = 0;
 
@@ -813,11 +655,10 @@ export class GazeDataManager {
         for (const sweep of validSweeps) {
             const lineEndRelIdx = sweep.startIndex;
 
-            // V22 Fix: Mark segment if data exists, but ALWAYS increment lineNum for a valid sweep
             if (lineEndRelIdx > lastEndRelIdx) {
                 markLine(lastEndRelIdx, lineEndRelIdx, lineNum);
             }
-            lineNum++; // Increment unconditionally
+            lineNum++;
 
             lastEndRelIdx = sweep.endIndex + 1;
 
@@ -837,54 +678,42 @@ export class GazeDataManager {
     }
 
     /**
-     * Real-time Check for Return Sweep (K=1.5 equivalent logic)
-     * Look back 'lookbackMs' and see if a strong negative velocity spike exists.
+     * Real-time Check for Return Sweep using Modified Z-Score (Robust MAD)
+     * Detects outliers based on statistical deviation, resistant to jitter.
      * @param {number} lookbackMs 
      * @returns {boolean}
      */
     detectRealtimeReturnSweep(lookbackMs = 600) {
         if (this.data.length < 5) return false;
 
-        const now = this.data[this.data.length - 1].t;
+        const d0 = this.data[this.data.length - 1]; // Current
+        const now = d0.t;
         const cutoff = now - lookbackMs;
 
-        // 1. Get recent samples (smoothed velocity needed)
-        // We assume vx is already calculated for recent frames via preprocessData or on-the-fly?
-        // preprocessData is usually offline. For real-time, we must calc VX for the latest point here.
-
-        // Quick Calc for latest point if missing
-        const latestInfo = this.data[this.data.length - 1];
-        if (latestInfo.vx === null || latestInfo.vx === undefined) {
-            // Calculate on the fly for the tail
+        // 1. Calculate Velocity if missing (Instant Calculation)
+        if (d0.vx === null || d0.vx === undefined) {
             const prev = this.data[this.data.length - 2];
-            if (prev) {
-                const dt = latestInfo.t - prev.t;
-                if (dt > 0) {
-                    latestInfo.vx = (latestInfo.x - prev.x) / dt;
-                }
+            if (prev && prev.t < d0.t) {
+                const dt = d0.t - prev.t;
+                d0.vx = (d0.x - prev.x) / dt;
+            } else {
+                d0.vx = 0;
             }
         }
 
-        // 2. MAD Algorithm (The Clean & Robust Way)
-        // ---------------------------------------------------------
-        // Instead of heuristic "reading speeds", we use the statistical
-        // distribution of the user's recent negative velocities.
-        // Return Sweeps are "Outliers" (Spikes) in this distribution.
-
+        // 2. Collect Samples for MAD (Negative Velocity Context)
         const samples = [];
         for (let i = this.data.length - 1; i >= 0; i--) {
             const d = this.data[i];
             if (d.t < cutoff) break;
-            // Only consider NEGATIVE velocity (Moving Left)
             if (d.vx !== undefined && d.vx < 0) {
                 samples.push(d.vx);
             }
         }
 
-        // Need enough samples to form a statistical baseline
         if (samples.length < 5) return false;
 
-        // A. Calculate Median & MAD
+        // 3. Calculate Robust Statistics (Median & MAD)
         samples.sort((a, b) => a - b);
         const mid = Math.floor(samples.length / 2);
         const median = samples.length % 2 !== 0 ? samples[mid] : (samples[mid - 1] + samples[mid]) / 2;
@@ -894,52 +723,44 @@ export class GazeDataManager {
         const madMid = Math.floor(deviations.length / 2);
         const mad = deviations.length % 2 !== 0 ? deviations[madMid] : (deviations[madMid - 1] + deviations[madMid]) / 2;
 
-        // B. Determine Threshold (Median - K * MAD)
-        // K=1.0 is more lenient than 1.5 (raises threshold), easier to trigger.
-        // We use K=1.0 as requested by user to fix "missing triggers".
-        const threshold = median + (mad * -1.0);
+        // 4. Calculate Modified Z-Score
+        // Formula: M_Z = 0.6745 * (Value - Median) / MAD
+        const currentVX = d0.vx;
+        const safeMAD = mad === 0 ? 0.001 : mad; // Prevent division by zero
 
-        // C. TRIGGER LOGIC: Falling Edge (The "Breakthrough" Check)
-        // ---------------------------------------------------------
-        // Instead of waiting for a "Peak" (inflection point), we trigger 
-        // as soon as the velocity breaks through the threshold. 
-        // A cooldown prevents multiple triggers for the same sweep.
-
-        const d0 = this.data[this.data.length - 1]; // Current
-        // const now = d0.t; // Already defined above
+        const zScore = (0.6745 * (currentVX - median)) / safeMAD;
 
         // Debug Data Injection
         d0.debugMedian = median;
-        d0.debugThreshold = threshold;
-        d0.debugVX = d0.vx !== undefined ? d0.vx : 0;
+        d0.debugZScore = zScore;
+        d0.debugVX = currentVX;
+        d0.debugThreshold = 0; // Legacy field
 
-        // 1. Cooldown Check (300ms)
-        // Ensures we only trigger ONCE per sweep event.
+        // 5. TRIGGER LOGIC: Z-Score Threshold
+        // Standard is |Z| > 3.5. We use Z < -3.5 (Negative Outlier)
+        // Adjust to -3.0 for better responsiveness if needed.
+        const Z_THRESHOLD = -3.0;
+
+        // Cooldown Check (300ms)
         if (this.lastTriggerTime && (now - this.lastTriggerTime < 300)) {
             return false;
         }
 
-        // 2. Breakthrough Check
-        // If current velocity is BELOW the threshold (a deep negative spike),
-        // we trigger IMMEDIATELY.
-        if (d0.vx !== undefined && d0.vx < threshold) {
+        if (zScore < Z_THRESHOLD) {
             // --- TRIGGER CONFIRMED ---
             this.lastTriggerTime = now;
-
             d0.didFire = true;
-            console.log(`[RS] 💥 CLEAN TRIGGER (Falling Edge)! VX:${d0.vx.toFixed(2)} < Thresh:${threshold.toFixed(2)}`);
+            console.log(`[RS] 💥 Z-SCORE TRIGGER! Z:${zScore.toFixed(2)} (Limit:${Z_THRESHOLD}) | VX:${currentVX.toFixed(2)}`);
             return true;
         }
 
         return false;
     }
 
-
     /**
      * Helper to update context for debugging
      */
     logDebugEvent(key, val) {
-        // Find latest data point and inject
         if (this.data.length > 0) {
             this.data[this.data.length - 1][key] = val;
         }
