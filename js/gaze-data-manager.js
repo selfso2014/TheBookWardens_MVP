@@ -475,8 +475,10 @@ export class GazeDataManager {
                     console.log(`[RS] 💥 CASCADE TRIGGER! Peak->Valley: ${timeSincePeak}ms | VX:${v1.toFixed(2)}`);
 
                     // --- NEW: Immediately Fire Visual Effect ---
-                    if (window.Game && window.Game.typewriter && typeof window.Game.typewriter.triggerReturnEffect === 'function') {
-                        window.Game.typewriter.triggerReturnEffect();
+                    // FIX: Visual effect is on the renderer instance, not the typewriter wrapper!
+                    if (window.Game && window.Game.typewriter && window.Game.typewriter.renderer &&
+                        typeof window.Game.typewriter.renderer.triggerReturnEffect === 'function') {
+                        window.Game.typewriter.renderer.triggerReturnEffect();
                     }
 
                     // Reset Peak Time to prevent double firing? (Optional, but safe)
