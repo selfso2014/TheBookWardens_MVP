@@ -63,8 +63,6 @@ export class GazeDataManager {
                 curr.vy = 0;
             }
         }
-
-        if (this.data.length % 60 === 0) console.log("[GazeData] Count:", this.data.length);
     }
 
     /**
@@ -99,54 +97,34 @@ export class GazeDataManager {
                     const ratio = (curr.t - p.t) / (n.t - p.t);
                     curr.x = p.x + (n.x - p.x) * ratio;
                     curr.y = p.y + (n.y - p.y) * ratio;
-                } else if (prevIdx >= 0) {
-                    curr.x = this.data[prevIdx].x;
-                    curr.y = this.data[prevIdx].y;
-                } else if (nextIdx < this.data.length) {
-                    curr.x = this.data[nextIdx].x;
-                    curr.y = this.data[nextIdx].y;
                 }
             }
         }
 
-        // 2. Gaussian Smoothing (Sigma=3)
-        const sigma = 3;
-        const radius = Math.ceil(3 * sigma);
-        const kernelSize = 2 * radius + 1;
-        const kernel = new Float32Array(kernelSize);
-        let sumK = 0;
-        for (let i = 0; i < kernelSize; i++) {
-            const x = i - radius;
-            const val = Math.exp(-(x * x) / (2 * sigma * sigma));
-            kernel[i] = val;
-            sumK += val;
-        }
-        for (let i = 0; i < kernelSize; i++) kernel[i] /= sumK;
+        // 2. Gaussian Smoothing & Velocity
+        const kernel = [0.0545, 0.2442, 0.4026, 0.2442, 0.0545]; // Sigma=1.0
+        const half = Math.floor(kernel.length / 2);
 
         for (let i = 0; i < this.data.length; i++) {
-            let sumX = 0, sumY = 0, wSum = 0;
-            for (let k = 0; k < kernelSize; k++) {
-                const idx = i + (k - radius);
+            let sumX = 0, sumY = 0, sumK = 0;
+            for (let k = -half; k <= half; k++) {
+                const idx = i + k;
                 if (idx >= 0 && idx < this.data.length) {
-                    sumX += this.data[idx].x * kernel[k];
-                    sumY += this.data[idx].y * kernel[k];
-                    wSum += kernel[k];
+                    sumX += this.data[idx].x * kernel[k + half];
+                    sumY += this.data[idx].y * kernel[k + half];
+                    sumK += kernel[k + half];
                 }
             }
-            this.data[i].gx = sumX / wSum;
-            this.data[i].gy = sumY / wSum;
-        }
+            this.data[i].gx = sumX / sumK;
+            this.data[i].gy = sumY / sumK;
 
-        // 3. Velocity Calculation
-        for (let i = 0; i < this.data.length; i++) {
-            if (i === 0) {
-                this.data[i].vx = 0;
-                this.data[i].vy = 0;
-            } else {
-                const dt = this.data[i].t - this.data[i - 1].t;
+            // Recalculate Velocity with Smoothed Data
+            if (i > 0) {
+                const prev = this.data[i - 1];
+                const dt = this.data[i].t - prev.t;
                 if (dt > 0) {
-                    this.data[i].vx = (this.data[i].x - this.data[i - 1].x) / dt;
-                    this.data[i].vy = (this.data[i].y - this.data[i - 1].y) / dt;
+                    this.data[i].vx = (this.data[i].gx - prev.gx) / dt;
+                    this.data[i].vy = (this.data[i].gy - prev.gy) / dt;
                 } else {
                     this.data[i].vx = 0;
                     this.data[i].vy = 0;
@@ -462,7 +440,8 @@ export class GazeDataManager {
             const sx1 = d1.gx || d1.x;
             const sx2 = d2.gx || d2.x;
 
-            const isPosPeak = (sx1 > sx2) && (sx1 > sx0);
+            // FIXED: Relaxed condition to catch rounded peaks/plateaus (>=)
+            const isPosPeak = (sx1 >= sx2) && (sx1 > sx0);
             if (isPosPeak) {
                 this.lastPosPeakTime = d1.t;
                 // console.log(`[RS] Peak at ${d1.t}`);
@@ -486,8 +465,8 @@ export class GazeDataManager {
 
             if (isVelValley && isDeepEnough) {
                 const timeSincePeak = d1.t - this.lastPosPeakTime;
-                // Validation: Must occur within 200ms of a Position Peak
-                if (timeSincePeak > 0 && timeSincePeak < 200) {
+                // Validation: Must occur within 500ms of a Position Peak (Relaxed from 200ms)
+                if (timeSincePeak > 0 && timeSincePeak < 500) {
                     this.lastTriggerTime = now;
                     d0.didFire = true;
                     console.log(`[RS] 💥 CASCADE TRIGGER! Peak->Valley: ${timeSincePeak}ms | VX:${v1.toFixed(2)}`);
@@ -500,16 +479,9 @@ export class GazeDataManager {
                 }
             }
             return false;
-
         } catch (e) {
-            console.error("[ReturnSweep Error]", e);
+            console.error(e);
             return false;
-        }
-    }
-
-    logDebugEvent(key, val) {
-        if (this.data.length > 0) {
-            this.data[this.data.length - 1][key] = val;
         }
     }
 }
