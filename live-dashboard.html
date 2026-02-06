@@ -292,6 +292,36 @@
                 }
             }
 
+            // 2. SIMULATION: V-Shape Valley Detector (Local Minima)
+            data.forEach(d => d.simValley = null);
+            for (let i = 1; i < data.length - 1; i++) {
+                const prev = data[i - 1].vx;
+                const curr = data[i].vx;
+                const next = data[i + 1].vx;
+
+                if (typeof prev === 'number' && typeof curr === 'number' && typeof next === 'number') {
+                    // Condition: Valley shape (prev > curr < next) AND Depth < -0.4
+                    if (prev > curr && curr < next && curr < -0.4) {
+                        data[i].simValley = curr;
+                    }
+                }
+            }
+
+            // 3. SIMULATION: Top-Hat Peak Detector (SmoothX)
+            data.forEach(d => d.simPeak = null);
+            for (let i = 1; i < data.length - 1; i++) {
+                const prev = data[i - 1].gx; // gx is SmoothX
+                const curr = data[i].gx;
+                const next = data[i + 1].gx;
+
+                if (typeof prev === 'number' && typeof curr === 'number' && typeof next === 'number') {
+                    // Condition: Peak (prev < curr > next)
+                    if (prev < curr && curr > next) {
+                        data[i].simPeak = curr;
+                    }
+                }
+            }
+
             // Register Plugin globally but DISABLE it by default
             if (window.ChartDataLabels) {
                 Chart.register(ChartDataLabels);
@@ -327,106 +357,69 @@
                 data: {
                     labels: labels,
                     datasets: [
-                        // Disable datalabels for normal lines
-                        { label: 'Raw X', data: data.map(d => d.x), borderColor: '#28a745', borderWidth: 1.5, pointRadius: 0, yAxisID: 'yPos', datalabels: { display: false } },
-                        { label: 'Line Index', data: data.map(d => d.lineIndex), borderColor: '#fd7e14', borderWidth: 2, pointRadius: 0, stepped: true, yAxisID: 'yLine', datalabels: { display: false } },
-                        { label: 'Raw Y', data: data.map(d => d.y), borderColor: '#6f42c1', borderWidth: 1, pointRadius: 0, borderDash: [2, 2], yAxisID: 'yPos', hidden: true, datalabels: { display: false } },
+                        // 1. Smooth X (Position)
+                        { label: 'Smooth X', data: data.map(d => d.gx), borderColor: '#007bff', borderWidth: 2, pointRadius: 0, yAxisID: 'yPos', datalabels: { display: false } },
+
+                        // 2. Velocity X (Speed)
                         { label: 'Velocity X', data: data.map(d => d.vx), borderColor: 'rgba(54, 162, 235, 0.5)', backgroundColor: 'rgba(54, 162, 235, 0.1)', borderWidth: 1, pointRadius: 0, fill: true, yAxisID: 'yVel', datalabels: { display: false } },
 
-                        // NEW: Delta Negative Velocity (Acceleration)
+                        // 3. Peak Detect (Smooth X)
                         {
-                            label: 'Delta Neg VX (Accel)',
-                            data: data.map(d => d.deltaNegVX),
-                            type: 'line',
-                            borderColor: '#8e44ad', // Purple
-                            backgroundColor: 'rgba(142, 68, 173, 0.2)',
-                            borderWidth: 1.5,
-                            pointRadius: 1,
-                            fill: false,
-                            yAxisID: 'yVel',
-                            datalabels: { display: false }
-                        },
-                        // NEW: Modified Z-Score Analysis (Right Axis)
-                        {
-                            label: 'Modified Z-Score',
-                            data: data.map(d => d.debugZScore),
-                            type: 'line',
-                            borderColor: '#34495e', // Dark Navy
-                            borderWidth: 1,
-                            borderDash: [2, 2],
-                            pointRadius: 0,
-                            yAxisID: 'yZScore',
-                            hidden: false,
-                            datalabels: { display: false }
-                        },
-                        // NEW: Negative Velocity Highlights (Scatter)
-                        {
-                            label: 'Neg Vel X (<0)',
-                            data: data.map(d => (d.vx < 0 ? d.vx : null)),
+                            label: 'Simulated Peak (Smooth X)',
+                            data: data.map(d => d.simPeak),
                             type: 'scatter',
-                            pointStyle: 'cross',
-                            radius: 2,
-                            borderColor: 'rgba(255, 99, 132, 1)', // Red
-                            backgroundColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 1,
-                            yAxisID: 'yVel',
+                            pointStyle: 'triangle',
+                            radius: 6,
+                            borderColor: '#ff8800', // Orange
+                            backgroundColor: 'rgba(255, 136, 0, 0.8)',
+                            yAxisID: 'yPos',
                             datalabels: { display: false }
                         },
-                        // NEW: MAD Threshold Line (Connects debug points)
+
+                        // 4. Valley Detect (Velocity)
                         {
-                            label: 'MAD Threshold (K=1.5)',
-                            data: data.map(d => d.dbgThresh),
-                            type: 'line',
-                            borderColor: '#ff0000',
-                            borderDash: [4, 4],
-                            borderWidth: 1.5,
-                            pointRadius: 0,
-                            spanGaps: true, // Connect gaps between checks
+                            label: 'Simulated Valley (V-Shape)',
+                            data: data.map(d => d.simValley),
+                            type: 'scatter',
+                            pointStyle: 'triangle',
+                            rotation: 180, // Pointing down
+                            radius: 6,
+                            borderColor: '#00cc00', // Green
+                            backgroundColor: 'rgba(0, 204, 0, 0.8)',
                             yAxisID: 'yVel',
                             datalabels: { display: false }
                         },
 
+                        // 5. Trigger Event (Result)
                         {
                             label: 'Trigger Event',
                             data: data.map(d => d.didFire ? d.x : null),
-
                             type: 'scatter',
-                            pointStyle: 'circle',
-                            radius: 3,
+                            pointStyle: 'star',
+                            radius: 8,
                             backgroundColor: 'red',
                             borderColor: 'red',
-                            borderWidth: 0,
+                            borderWidth: 1,
                             yAxisID: 'yPos',
-                            // Enable datalabels ONLY for this dataset
                             datalabels: {
                                 display: function (context) {
-                                    // Logic: Show label only on the FIRST point of a continuous trigger burst
                                     const idx = context.dataIndex;
-                                    if (idx === 0) return true; // Start of data
+                                    if (idx === 0) return true;
                                     const curr = data[idx];
                                     const prev = data[idx - 1];
-
-                                    // If previous frame did NOT fire, this is a start of a new event -> Show
                                     if (!prev.didFire && curr.didFire) return true;
-
-                                    // Or if time gap is large (> 200ms)
                                     if ((curr.t - prev.t) > 200) return true;
-
                                     return false;
                                 },
                                 formatter: function (value, context) {
                                     return Math.round(data[context.dataIndex].t);
                                 },
-                                align: 'top',
-                                anchor: 'center',
-                                color: 'red',
-                                font: {
-                                    weight: 'bold',
-                                    size: 10
-                                },
-                                offset: 4
+                                align: 'top', anchor: 'center', color: 'red', font: { weight: 'bold', size: 10 }, offset: 4
                             }
-                        }
+                        },
+
+                        // 6. Line Index (Reference)
+                        { label: 'Line Index', data: data.map(d => d.lineIndex), borderColor: '#fd7e14', borderWidth: 2, pointRadius: 0, stepped: true, yAxisID: 'yLine', borderDash: [5, 5], datalabels: { display: false } }
                     ]
                 },
                 options: {
