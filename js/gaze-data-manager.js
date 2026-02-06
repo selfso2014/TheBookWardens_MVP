@@ -865,139 +865,96 @@ export class GazeDataManager {
             }
         }
 
-        // 2. Scan recent buffer
-        // --- 🧠 ADAPTIVE LOGIC: Relative Velocity Ratio ---
-        // Instead of a heuristic constant (e.g. -1.5), we compare current velocity
-        // against the user's "Average Reading Speed" (positive velocity).
-        // Rationale: Return sweeps are biologically much faster than reading saccades.
+        // 2. MAD Algorithm (The Clean & Robust Way)
+        // ---------------------------------------------------------
+        // Instead of heuristic "reading speeds", we use the statistical
+        // distribution of the user's recent negative velocities.
+        // Return Sweeps are "Outliers" (Spikes) in this distribution.
 
-        let sumReadVel = 0;
-        let countReadVel = 0;
-
-        // Analyze recent reading behavior (looking for positive movement)
-        for (let i = this.data.length - 1; i >= 0; i--) {
-            const d = this.data[i];
-            if (d.t < cutoff) break;
-            if (d.vx !== undefined && d.vx > 0) { // Moving Right (Reading)
-                sumReadVel += d.vx;
-                countReadVel++;
-            }
-        }
-
-        // Default fallback if no reading data yet (e.g. 0.3 px/ms is typical)
-        const avgReadVel = countReadVel > 0 ? (sumReadVel / countReadVel) : 0.3;
-
-        // Base Dynamic Threshold: 5x faster than reading speed (Standard Mode)
-        // Clamp: At least -1.0 to avoid noise triggering when idle
-        const baseMultiplier = 5.0;
-        const baseThreshold = Math.min(-1.0, -(avgReadVel * baseMultiplier));
-
-        // --- 🌊 ADAPTIVE SURGE LOGIC (Heuristic-Free) ---
-        // Instead of fixed magic numbers, we derive acceleration limits from 'avgReadVel'.
-        // Logic: If acceleration (leftward) exceeds 2x the user's reading velocity per frame,
-        // it indicates a powerful ballistic checking movement (Return Sweep).
-
-        let activeThreshold = baseThreshold;
-        const prev = this.data[this.data.length - 2];
-
-        if (prev && prev.vx !== undefined) {
-            const acceleration = latestInfo.vx - prev.vx;
-            // Surge Limit: Acceleration magnitude > 2x Reading Velocity
-            const surgeLimit = -(avgReadVel * 2.0);
-
-            if (acceleration < surgeLimit) {
-                // Relax Threshold: If surging, we accept a lower velocity (60% of base)
-                // because we caught the movement in its early acceleration phase.
-                activeThreshold = baseThreshold * 0.6;
-                // console.log(`[RS] 🚀 Surge! Acc:${acceleration.toFixed(2)} < ${surgeLimit.toFixed(2)} -> Relaxed Thresh:${activeThreshold.toFixed(2)}`);
-            }
-        }
-
-        // Final Trigger Check with Adaptive Threshold
-        if (latestInfo.vx !== null && latestInfo.vx < activeThreshold) {
-            // Consistency Check: Ensure it's not a single-frame glitch
-            if (prev && (prev.vx || 0) < 0) {
-                latestInfo.debugThreshold = activeThreshold;
-                latestInfo.didFire = true;
-                console.log(`[RS] Trigger! VX:${latestInfo.vx.toFixed(2)} < Thresh:${activeThreshold.toFixed(2)} (ReadVel:${avgReadVel.toFixed(2)})`);
-                return true;
-            }
-        }
-
-        // MAD Fallback (for slower/complex sweeps)
-        let foundSpike = false;
-        let minVel = 0;
-
-        // MAD Algorithm Implementation (K=1.5)
-        // 1. Collect Neg Velocity Samples from buffer
         const samples = [];
         for (let i = this.data.length - 1; i >= 0; i--) {
             const d = this.data[i];
             if (d.t < cutoff) break;
-            // Use only negative velocities for Return Sweep Analysis (like detectLinesMobile)
+            // Only consider NEGATIVE velocity (Moving Left)
             if (d.vx !== undefined && d.vx < 0) {
                 samples.push(d.vx);
             }
         }
 
+        // Need enough samples to form a statistical baseline
         if (samples.length < 5) return false;
 
-        // 2. Calculate Median
+        // A. Calculate Median & MAD
         samples.sort((a, b) => a - b);
         const mid = Math.floor(samples.length / 2);
         const median = samples.length % 2 !== 0 ? samples[mid] : (samples[mid - 1] + samples[mid]) / 2;
 
-        // 3. Calculate MAD (Median Absolute Deviation)
         const deviations = samples.map(v => Math.abs(v - median));
         deviations.sort((a, b) => a - b);
         const madMid = Math.floor(deviations.length / 2);
         const mad = deviations.length % 2 !== 0 ? deviations[madMid] : (deviations[madMid - 1] + deviations[madMid]) / 2;
 
-        // 4. Determine Dynamic Threshold (K=0.8 for Mobile Sensitivity)
-        const k = 0.8;
-        const dynamicThresholdRaw = median - (k * mad);
+        // B. Determine Threshold (Median - K * MAD)
+        // K=1.5 is standard for outlier detection.
+        // We use K=1.5 as requested by user.
+        const threshold = median + (mad * -1.5);
 
-        // Safety Clamps:
-        let dynamicThreshold = dynamicThresholdRaw;
-        const ABS_MIN_SPEED = -0.05; // Noise filter (at least this fast)
-        const ABS_MAX_SPEED = -2.0;  // Sensitivity floor (don't require faster than this)
+        // C. Check Current Frame against Threshold
+        // We check a small window (3 frames) to catch the peak
+        const checkWindow = 3;
+        let foundSpike = false;
+        let minVel = 0;
 
-        // If calculated is closer to 0 than MIN, force to MIN (don't be too sensitive to noise)
-        if (dynamicThreshold > ABS_MIN_SPEED) dynamicThreshold = ABS_MIN_SPEED;
-
-        // If calculated is further from 0 than MAX, force to MAX (don't be impossible to hit)
-        if (dynamicThreshold < ABS_MAX_SPEED) dynamicThreshold = ABS_MAX_SPEED;
-
-        // Safety Fallback: Ensure threshold is at least somewhat negative to avoid noise triggering
-        // e.g. if median is -0.01 and MAD is 0.01, threshold is -0.025 which is too sensitive.
-        // Let's rely on the K=1.5 primarily but maybe check if it's statistically significant?
-        // Actually, if K=1.5 works in your experiments, let's trust it.
-
-        // Scan Again for Spike AND Log Debug Info to Data Stream
-        for (let i = this.data.length - 1; i >= 0; i--) {
-            const d = this.data[i];
+        for (let i = 0; i < checkWindow; i++) {
+            const idx = this.data.length - 1 - i;
+            if (idx < 0) break;
+            const d = this.data[idx];
             if (d.t < cutoff) break;
 
-            // INJECT DEBUG INFO (For all checking points)
-            if (d.vx !== undefined && d.vx !== null) {
-                d.debugSamples = samples.length;
-                d.debugMedian = median;
-                d.debugThreshold = dynamicThreshold;
-                d.debugVX = d.vx;
-            }
+            // Debug Data Injection
+            d.debugMedian = median;
+            d.debugThreshold = threshold;
+            d.debugVX = d.vx;
 
-            if (d.vx && d.vx < dynamicThreshold) { // More negative than threshold
+            if (d.vx !== undefined && d.vx < threshold) {
                 foundSpike = true;
                 minVel = d.vx;
-
-                d.realtimeRS = true;
-                console.log(`[RS-DETECT] MAD HIT! VX=${d.vx.toFixed(2)} < Thresh=${dynamicThreshold.toFixed(2)} (Med=${median.toFixed(2)}, MAD=${mad.toFixed(2)})`);
-                break;
             }
         }
 
-        return foundSpike;
+        if (!foundSpike) return false;
+
+        // 3. Displacement Verification (The Physical Check)
+        // ---------------------------------------------------------
+        // Even if statistically it's a spike (velocity is high),
+        // physically it must move the eye a significant distance.
+        // 80px = ~2cm on screen = clear line change.
+
+        let startX = this.data[this.data.length - 1].x;
+        let endX = startX;
+
+        // Find movement range in the lookback window
+        for (let i = this.data.length - 1; i >= 0; i--) {
+            const d = this.data[i];
+            if (d.t < cutoff) break;
+            if (d.x > startX) startX = d.x;
+            if (d.x < endX) endX = d.x;
+        }
+
+        const displacement = startX - endX;
+        const MIN_DISPLACEMENT = 80;
+
+        if (displacement < MIN_DISPLACEMENT) return false;
+
+        // --- TRIGGER CONFIRMED ---
+        latestInfo.didFire = true;
+        latestInfo.debugThreshold = threshold;
+        console.log(`[RS] 💥 CLEAN TRIGGER! VX:${minVel.toFixed(2)} < Thresh:${threshold.toFixed(2)} | Disp:${displacement.toFixed(0)}px`);
+
+        return true;
     }
+
+
 
     /**
      * Helper to update context for debugging
