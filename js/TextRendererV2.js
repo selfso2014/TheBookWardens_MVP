@@ -400,11 +400,22 @@ class TextRenderer {
         // 1. Calculate Target Y
         // Priority: Explicit Line Index (from GazeDataManager)
         if (lineIndex !== null && typeof lineIndex === 'number' && this.lines[lineIndex]) {
-            // FIX: Use 0.52 to ALLIGN EXACTLY with the purple cursor's logic.
-            // AND apply the -10px offset because Return Sweeps happen before the word is revealed.
             const l = this.lines[lineIndex];
-            const VERTICAL_ALIGN_FACTOR = 0.52;
-            targetY = (l.rect.top + (l.rect.height * VERTICAL_ALIGN_FACTOR)) - 10;
+            // Find the first word of this line
+            const firstWordIdx = l.wordIndices[0];
+            const firstWord = this.words[firstWordIdx];
+
+            if (firstWord && firstWord.element) {
+                // Ultimate Truth: The DOM Rect of the word itself
+                const rect = firstWord.element.getBoundingClientRect();
+                const VERTICAL_ALIGN_FACTOR = 0.52;
+                // Apply -10px to match cursor's pre-reveal offset
+                targetY = (rect.top + (rect.height * VERTICAL_ALIGN_FACTOR)) - 10;
+            } else {
+                // Fallback
+                const VERTICAL_ALIGN_FACTOR = 0.52;
+                targetY = (l.rect.top + (l.rect.height * VERTICAL_ALIGN_FACTOR)) - 10;
+            }
         } else {
             // Fallback: Current Cursor Position
             const rect = this.cursor.getBoundingClientRect();
