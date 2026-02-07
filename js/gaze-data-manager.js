@@ -86,7 +86,11 @@ export class GazeDataManager {
 
                 // --- NEW: Pending Sweep Resolution (Null -> Valid Line) ---
                 // If we have a pending trigger waiting for context, check if context arrived.
-                if (this.pendingReturnSweep && entry.lineIndex !== undefined && entry.lineIndex !== null) {
+                // RISING EDGE CHECK: Only fire if we transitioned from "No Line" (or different line) to "Valid Line".
+                // We use this.prevLineIndex which holds the state from the PREVIOUS frame loop.
+                const isContextRestored = (this.prevLineIndex === null || this.prevLineIndex === undefined || this.prevLineIndex === -1);
+
+                if (this.pendingReturnSweep && entry.lineIndex !== undefined && entry.lineIndex !== null && isContextRestored) {
                     // Check if the pending sweep is still fresh (< 1000ms)
                     if ((t - this.pendingReturnSweep.t) < 1000) {
                         this._fireEffect("Delayed", this.pendingReturnSweep.vx);

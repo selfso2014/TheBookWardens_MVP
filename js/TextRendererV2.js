@@ -400,10 +400,11 @@ class TextRenderer {
         // 1. Calculate Target Y
         // Priority: Explicit Line Index (from GazeDataManager)
         if (lineIndex !== null && typeof lineIndex === 'number' && this.lines[lineIndex]) {
-            // FIX: Use geometric center instead of visualY (which is top-biased 0.25)
-            // This ensures the bang always happens in the middle of the line height.
+            // FIX: Use 0.52 to ALLIGN EXACTLY with the purple cursor's logic.
+            // Single Source of Truth for visual vertical alignment.
             const l = this.lines[lineIndex];
-            targetY = l.rect.top + (l.rect.height * 0.5);
+            const VERTICAL_ALIGN_FACTOR = 0.52;
+            targetY = l.rect.top + (l.rect.height * VERTICAL_ALIGN_FACTOR);
         } else {
             // Fallback: Current Cursor Position
             const rect = this.cursor.getBoundingClientRect();
