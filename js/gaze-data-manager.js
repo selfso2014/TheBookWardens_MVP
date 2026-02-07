@@ -35,8 +35,16 @@ export class GazeDataManager {
         }
 
         try {
-            // Initialize start time
-            if (this.firstTimestamp === null) {
+            // Validity Check
+            if (typeof gazeInfo.timestamp !== 'number' || isNaN(gazeInfo.timestamp)) {
+                // If timestamp is invalid, use Date.now() fallback or just log warning
+                // But let's assume we proceed with Date.now() to uphold the "Insert Always" constitution
+                gazeInfo.timestamp = Date.now();
+            }
+
+            // Initialize start time OR Reset if timestamp went backwards (Session Reset)
+            if (this.firstTimestamp === null || gazeInfo.timestamp < this.firstTimestamp) {
+                console.warn("[GazeDataManager] Timeline Start/Reset detected.", gazeInfo.timestamp);
                 this.firstTimestamp = gazeInfo.timestamp;
             }
 
