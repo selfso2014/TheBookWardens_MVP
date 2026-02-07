@@ -383,7 +383,7 @@ class TextRenderer {
         return { type: 'line', line: line };
     }
 
-    triggerReturnEffect() {
+    triggerReturnEffect(lineIndex = null) {
         if (!this.cursor) return false;
 
         // --- Faster Animation (50ms) ---
@@ -393,11 +393,19 @@ class TextRenderer {
         if (this.lastRenderTime && (now - this.lastRenderTime < 50)) return false;
         this.lastRenderTime = now;
 
-        console.log("[TextRenderer] 🔥 Return Visual Triggered!");
+        console.log("[TextRenderer] 🔥 Return Visual Triggered! Line:", lineIndex);
 
-        // 1. Calculate Position based on CURRENT CURSOR Y
-        const rect = this.cursor.getBoundingClientRect();
-        const targetY = rect.top + (rect.height / 2);
+        let targetY;
+
+        // 1. Calculate Target Y
+        // Priority: Explicit Line Index (from GazeDataManager)
+        if (lineIndex !== null && typeof lineIndex === 'number' && this.lines[lineIndex]) {
+            targetY = this.lines[lineIndex].visualY;
+        } else {
+            // Fallback: Current Cursor Position
+            const rect = this.cursor.getBoundingClientRect();
+            targetY = rect.top + (rect.height / 2);
+        }
 
         // SAFETY: Lazy-create if missing
         if (!this.impactElement || !document.contains(this.impactElement)) {
