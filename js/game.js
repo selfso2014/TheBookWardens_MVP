@@ -171,19 +171,19 @@ const Game = {
         const target = document.getElementById(screenId);
         if (target) target.classList.add("active");
 
+        // [FIX] Hide Cursor when not reading
+        if (screenId !== "screen-read") {
+            if (this.typewriter && this.typewriter.renderer && this.typewriter.renderer.cursor) {
+                this.typewriter.renderer.cursor.style.opacity = "0";
+            }
+        }
+
         if (screenId === "screen-read") {
             // Reset Context Latching for new session to avoid carrying over old data
             this.lastValidContext = null;
 
-            // Wait for display:flex to apply layout, then start engine
-            // Using double RAF to ensure paint
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (this.typewriter && typeof this.typewriter.start === 'function') {
-                        this.typewriter.start();
-                    }
-                });
-            });
+            // [FIX] REMOVED typewriter.start() here to prevent resetting paragraph index.
+            // Screen transition handles layout, but game logic flows independently.
         }
     },
 
@@ -395,7 +395,11 @@ const Game = {
         // Stop owl tracking and start reading
         this.state.isOwlTracker = false;
         this.switchScreen("screen-read");
-        // this.startReadingSession(); // Removed duplicate call, switchScreen handles it
+
+        // [FIX] Explicitly START the game engine here mostly ONCE.
+        if (this.typewriter && typeof this.typewriter.start === 'function') {
+            this.typewriter.start();
+        }
     },
 
     // --- 2. Reading Rift (Original Logic kept for reference, overlaid below) ---
