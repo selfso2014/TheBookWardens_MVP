@@ -534,21 +534,30 @@ export class GazeDataManager {
             if (d1.gx === null) d1.gx = d1.x;
             if (d2.gx === null) d2.gx = d2.x;
 
-            // -- STEP A: POSITION PEAK DETECTION --
-            const sx0 = d0.gx || d0.x;
-            const sx1 = d1.gx || d1.x;
-            const sx2 = d2.gx || d2.x;
-            const isPosPeak = (sx1 >= sx2) && (sx1 > sx0);
-            if (isPosPeak) {
-                this.lastPosPeakTime = d1.t;
-            }
-
-            // -- STEP B: VELOCITY VALLEY DETECTION --
+            // -- STEP 0: PREPARE VELOCITY DATA --
             const repairVX = (d) => { if (d.vx === null || d.vx === undefined || isNaN(d.vx)) return 0; return d.vx; };
             if (d0.vx === null) { const dt = d0.t - d1.t; d0.vx = dt > 0 ? (d0.x - d1.x) / dt : 0; }
             const v0 = repairVX(d0);
             const v1 = repairVX(d1);
             const v2 = repairVX(d2);
+
+            // -- STEP A: POSITION PEAK DETECTION --
+            const sx0 = d0.gx || d0.x;
+            const sx1 = d1.gx || d1.x;
+            const sx2 = d2.gx || d2.x;
+
+            // 1. Geometric Peak (3-point)
+            const isPosPeak = (sx1 >= sx2) && (sx1 > sx0);
+
+            // 2. Velocity Zero-Crossing (Plateau Peak)
+            // If velocity goes from positive/zero to negative, we just passed a local maximum.
+            const isVelZeroCrossDown = (v1 >= 0 && v0 < 0);
+
+            if (isPosPeak || isVelZeroCrossDown) {
+                this.lastPosPeakTime = d1.t;
+            }
+
+            // -- STEP B: VELOCITY VALLEY DETECTION --
             // Condition: v2 > v1 < v0 (V-Shape) AND v1 < -0.4 (Depth)
             const isVelValley = (v2 > v1) && (v1 < v0);
             const isDeepEnough = v1 < -0.4;
