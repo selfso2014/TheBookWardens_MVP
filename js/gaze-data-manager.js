@@ -428,7 +428,7 @@ export class GazeDataManager {
     // 1. Position Peak (Rising -> Falling)
     // 2. Velocity Valley (Deep Negative V)
     // 3. Cascade Check (Valley within 500ms of Peak)
-    // 4. Rhythm Check (Line Change within ±300ms of Valley)
+    // 4. Rhythm Check (Line Change within ±600ms of Valley) [UPDATED: 300 -> 600]
     detectRealtimeReturnSweep(lookbackMs = 2000) {
         try {
             const len = this.data.length;
@@ -451,7 +451,7 @@ export class GazeDataManager {
                     // If we were waiting for a line change, here it is!
                     if (this.pendingReturnSweep) {
                         const diff = now - this.pendingReturnSweep.t;
-                        if (diff <= 300) { // Within 300ms window
+                        if (diff <= 600) { // Within 600ms window (Increased from 300)
                             this._fireEffect("Delayed", this.pendingReturnSweep.vx);
                             d0.rsState = "Delayed_Success"; // Mark current frame
                         } else {
@@ -468,7 +468,7 @@ export class GazeDataManager {
 
             // --- 0.5. Check Pending Timeout ---
             if (this.pendingReturnSweep) {
-                if ((now - this.pendingReturnSweep.t) > 300) {
+                if ((now - this.pendingReturnSweep.t) > 600) { // Timeout after 600ms
                     this.pendingReturnSweep = null;
                     d0.rsState = "Timeout";
                     // console.log(`[RS] ❌ Pending Trigger Timeout`);
@@ -504,7 +504,7 @@ export class GazeDataManager {
             const isDeepEnough = v1 < -0.4;
 
             // -- STEP C: CASCADE CHECK --
-            // Global cooldown check (300ms since last FIRE)
+            // Global cooldown check (300ms since last FIRE) - KEEP AS IS
             if (this.lastTriggerTime && (now - this.lastTriggerTime < 300)) return false;
 
             if (isVelValley && isDeepEnough) {
@@ -513,12 +513,13 @@ export class GazeDataManager {
                 // 1. Is it a valid potential return sweep? (Peak check)
                 if (timeSincePeak > 0 && timeSincePeak < 500) {
 
-                    // -- STEP D: RHYTHM CHECK (±300ms Line Change) --
+                    // -- STEP D: RHYTHM CHECK (±600ms Line Change) --
+                    // Increased from 300ms to 600ms for broader tolerance
 
                     // Case 1: Past Check (Line Changed Recently?)
                     const timeSinceLineChange = now - this.lastLineChangeTime;
                     // Note: lastLineChangeTime init is -9999, so check sanity
-                    if (timeSinceLineChange >= 0 && timeSinceLineChange <= 300) {
+                    if (timeSinceLineChange >= 0 && timeSinceLineChange <= 600) {
                         this._fireEffect("Immediate", v1);
                         d0.rsState = "Immediate_Success";
                         this.lastPosPeakTime = 0; // Reset peak
