@@ -60,6 +60,10 @@ class TextRenderer {
         const rawChunks = rawText.split("/");
         let globalWordIndex = 0;
 
+        // Reset Pagination State
+        this.pages = [];
+        this.currentPageIndex = 0;
+
         rawChunks.forEach((chunkText, chunkIndex) => {
             const cleanChunk = chunkText.trim();
             if (!cleanChunk) return;
@@ -139,6 +143,84 @@ class TextRenderer {
 
         // FIX: Prevent immediate "false positive" return effect on game start
         this.lastReturnTime = Date.now() + 2000;
+
+        // 5. Automatic Pagination
+        // We need to wait for layout to settle (rendering) before calculating height overflow.
+        // But since we want to hide overflow immediately, let's do it next frame.
+        // However, `prepare` is synchronous. Let's assume the caller will handle `showPage(0)`.
+        this.paginate();
+    }
+
+    paginate() {
+        if (!this.container || this.words.length === 0) return;
+
+        const containerHeight = this.container.clientHeight;
+        const paddingBottom = 40; // Safety margin
+        const maxHeight = containerHeight - paddingBottom;
+
+        let currentPage = [];
+        this.pages = [currentPage];
+
+        // Temporarily ensure all words are visible to measure properly
+        this.words.forEach(w => w.element.style.display = "inline-block");
+
+        // Simple Greedy Pagination by Top coordinate
+        // WE MUST MEASURE. Forcing a reflow here is necessary.
+        let currentY = -9999;
+        let pageStartY = this.words[0].element.offsetTop;
+
+        // Strategy: Iterate words. If a word's bottom exceeds (pageStart + maxHeight), start new page.
+        this.words.forEach((w, i) => {
+            const el = w.element;
+            const top = el.offsetTop;
+            const bottom = top + el.offsetHeight;
+
+            // Check if this word fits in current page
+            // Relative Top from current page start
+            const relTop = top - pageStartY;
+            const relBottom = bottom - pageStartY;
+
+            if (relBottom > maxHeight && currentPage.length > 0) {
+                // Overflow! Start new page.
+                currentPage = [];
+                this.pages.push(currentPage);
+                pageStartY = top; // New page starts here roughly
+            }
+
+            currentPage.push(w);
+            w.pageIndex = this.pages.length - 1;
+        });
+
+        console.log(`[TextRenderer] Paginated into ${this.pages.length} pages.`);
+    }
+
+    showPage(pageIndex) {
+        if (pageIndex < 0 || pageIndex >= this.pages.length) return false;
+
+        this.currentPageIndex = pageIndex;
+
+        // Hide ALL words first
+        this.words.forEach(w => {
+            w.element.style.display = "none";
+            w.element.style.opacity = "0"; // Reset opacity for animation
+            w.element.classList.remove("revealed");
+        });
+
+        // Show words in current page
+        const pageWords = this.pages[pageIndex];
+        pageWords.forEach(w => {
+            w.element.style.display = "inline-block";
+        });
+
+        // Important: Re-lock Layout for this page's content
+        // This ensures hit-testing words on THIS page works correctly.
+        // We delay slightly to allow display:block to reflow.
+        return new Promise(resolve => {
+            requestAnimationFrame(() => {
+                this.lockLayout(); // Recalculate lines for current page
+                resolve();
+            });
+        });
     }
 
     lockLayout() {

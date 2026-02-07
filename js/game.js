@@ -613,19 +613,23 @@ Game.typewriter = {
             // If we show the cursor immediately, it looks like it's floating/misaligned.
             if (this.renderer.cursor) this.renderer.cursor.style.opacity = "0";
 
-            // Wait for screen animation (approx 500ms) to finish before showing cursor.
+            // Wait for measurement and pagination
             setTimeout(() => {
                 if (this.renderer) {
-                    this.renderer.resetToStart(); // Aligns correctly and sets opacity: 1
-                    console.log("[Typewriter] Cursor appeared aligned.");
+                    // Start from Page 0
+                    this.renderer.showPage(0).then(() => {
+                        this.renderer.resetToStart(); // Aligns correctly
+                        if (this.renderer.cursor) this.renderer.cursor.style.opacity = "1";
+                        console.log("[Typewriter] Page 0 Ready.");
+
+                        // Start Text after full delay
+                        setTimeout(() => {
+                            this.startTime = Date.now();
+                            this.tick();
+                        }, 1000); // Reduced from 3000 to 1000 for snappier page loads
+                    });
                 }
             }, 600);
-
-            // Start Text after full 3s delay
-            setTimeout(() => {
-                this.startTime = Date.now();
-                this.tick();
-            }, 3000);
         });
     },
 
@@ -664,7 +668,32 @@ Game.typewriter = {
             });
 
         } else {
-            console.log("Paragraph Fully Revealed. Clearing tail...");
+            console.log("Chunk Sequence Finished for current Page/Flow.");
+
+            // Check if there are more pages in this paragraph!
+            const renderer = this.renderer;
+            if (renderer && renderer.currentPageIndex < renderer.pages.length - 1) {
+                console.log("[Typewriter] Moving to Next Page...");
+
+                // Fade out current page words? Or just switch?
+                // Let's just switch cleanly.
+                setTimeout(() => {
+                    const nextPage = renderer.currentPageIndex + 1;
+                    renderer.showPage(nextPage).then(() => {
+                        // Reset chunk index to the first chunk of the new page?
+                        // Actually, this.chunkIndex is global for the whole text. 
+                        // It continues naturally. We just need to ensure the words are visible.
+                        // Wait... The words ON the new page are currently opacity:0.
+                        // tick() will reveal them.
+
+                        renderer.resetToStart(); // Move cursor to top of new page
+                        this.tick(); // Continue ticking
+                    });
+                }, 2000); // Wait 2s before flipping page
+                return;
+            }
+
+            console.log("Paragraph Fully Revealed (All Pages). Clearing tail...");
 
             // CLEANUP TAIL: Fade out any remaining visible chunks
             // We need to fade out from (chunkIndex - 3) up to (chunkIndex - 1)
@@ -676,8 +705,6 @@ Game.typewriter = {
 
             // Schedule cleanups for remaining tail
             for (let i = startCleanupIdx; i < this.renderer.chunks.length; i++) {
-                // Use the same staggered delay logic? or just sequence them
-                // Let's sequence them every 600ms to be safe and pretty
                 this.renderer.scheduleFadeOut(i, cleanupDelay + 600);
                 cleanupDelay += 600;
             }
