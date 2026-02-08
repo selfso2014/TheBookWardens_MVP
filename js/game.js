@@ -26,6 +26,97 @@ const Game = {
         this.updateUI();
     },
 
+    // --- Rift Intro Sequence ---
+    startRiftIntro() {
+        console.log("Starting Rift Intro Sequence...");
+        this.switchScreen("screen-rift-intro");
+
+        const villainContainer = document.getElementById("rift-villain-container");
+        const textContainer = document.getElementById("rift-text-container");
+        const meteorLayer = document.getElementById("meteor-layer");
+        const riftText = document.getElementById("rift-intro-text");
+
+        // Reset State
+        textContainer.classList.remove("rift-damaged");
+        document.getElementById("screen-rift-intro").classList.remove("screen-shake");
+        meteorLayer.innerHTML = "";
+
+        // Restore original text in case of restart
+        if (riftText) {
+            riftText.innerText = "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, 'and what is the use of a book,' thought Alice 'without pictures or conversation?'";
+        }
+
+        // 1. Villain Appears (CSS Animation handles hover)
+        // 2. Wait 1s, then Meteors!
+        setTimeout(() => {
+            // Spawn Meteors loop
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    this.spawnMeteor(meteorLayer);
+                }, i * 100); // 20 meteors over 2s
+            }
+
+            // Screen Shake starts a bit later
+            setTimeout(() => {
+                const screen = document.getElementById("screen-rift-intro");
+                if (screen) screen.classList.add("screen-shake");
+            }, 1000);
+
+            // 3. Impact & Damage Text (at 2.5s)
+            setTimeout(() => {
+                textContainer.classList.add("rift-damaged");
+                // Corrupt Text Content completely
+                if (riftText) {
+                    const originalText = riftText.innerText;
+                    riftText.innerText = this.corruptText(originalText);
+                }
+
+                // Audio Cue: Glitch Sound (if available)
+            }, 2500);
+
+            // 4. Transition to Word Forge (at 5.0s)
+            setTimeout(() => {
+                console.log("Rift Intro Done. Moving to Word Forge.");
+                this.state.vocabIndex = 0;
+                this.loadVocab(0);
+                this.switchScreen("screen-word");
+            }, 5000); // 5s total duration
+
+        }, 500); // Initial 0.5s wait
+    },
+
+    spawnMeteor(layer) {
+        if (!layer) return;
+        const m = document.createElement("div");
+        m.className = "meteor";
+
+        // Random start X (from right side mainly)
+        // Let's spawn them from top-right corner area
+        const startX = window.innerWidth * 0.5 + Math.random() * window.innerWidth * 0.5;
+        const startY = -Math.random() * 200;
+
+        m.style.left = startX + "px";
+        m.style.top = startY + "px";
+
+        // Random size/speed
+        m.style.animationDuration = (0.5 + Math.random() * 0.5) + "s"; // 0.5~1.0s
+        m.style.width = (100 + Math.random() * 200) + "px";
+
+        layer.appendChild(m);
+
+        // Cleanup
+        setTimeout(() => m.remove(), 1000);
+    },
+
+    corruptText(text) {
+        // Replace 50% of characters with glitch symbols
+        const glyphs = "#@!$%&?*-_+|~^";
+        return text.split('').map(char => {
+            if (char === ' ') return ' '; // keep spaces mostly
+            return Math.random() > 0.4 ? glyphs[Math.floor(Math.random() * glyphs.length)] : char;
+        }).join('');
+    },
+
     addRunes(amount) {
         this.state.runes = Math.max(0, (this.state.runes || 0) + amount);
         this.updateUI();
@@ -113,9 +204,13 @@ const Game = {
                 }
 
                 setTimeout(() => {
-                    this.state.vocabIndex = 0; // Reset
-                    this.loadVocab(0);         // Load first word
-                    this.switchScreen("screen-word");
+                    // Start Rift Intro Scene
+                    this.startRiftIntro();
+
+                    // Old Direct Jump:
+                    // this.state.vocabIndex = 0; // Reset
+                    // this.loadVocab(0);         // Load first word
+                    // this.switchScreen("screen-word");
                 }, 800);
 
                 // Initialize in background

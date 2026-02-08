@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="./css/splash.css" />
   <link rel="stylesheet" href="./css/victory.css" />
   <link rel="stylesheet" href="./css/fx.css" />
+  <link rel="stylesheet" href="./css/rift.css" />
 
   <!-- Firebase SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -306,6 +307,24 @@
         <button id="btn-cal-skip" class="btn-primary">Skip</button>
       </div>
     </div>
+
+    <!-- SCREEN 0.5: RIFT INTRO (Villain Attack) -->
+    <section id="screen-rift-intro" class="screen" style="display:none;">
+      <div id="rift-villain-container">
+        <h2 style="color: #ff4444; font-family: 'Creepster', cursive; margin-bottom: 10px; text-shadow: 0 0 10px #f00;">
+          Rift Detected!</h2>
+        <img src="./ink_shadow_boss.png" class="rift-villain-img" alt="Villain">
+      </div>
+      <div id="rift-text-container">
+        <p id="rift-intro-text">
+          Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once
+          or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it,
+          'and what is the use of a book,' thought Alice 'without pictures or conversation?'
+        </p>
+      </div>
+      <div id="meteor-layer" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">
+      </div>
+    </section>
 
     <!-- SCREEN 1: WORD FORGE (Vocab) -->
     <section id="screen-wpm" class="screen">
