@@ -75,10 +75,13 @@ const Game = {
         console.log("Session ID:", this.sessionId);
 
         // Display Session ID permanently
+        // Display Session ID permanently (REMOVED for Production)
+        /*
         const sessionBadge = document.createElement("div");
         sessionBadge.innerText = `ID: ${this.sessionId}`;
         sessionBadge.style.cssText = "position:fixed; bottom:10px; left:10px; background:rgba(0,0,0,0.5); color:lime; padding:5px 10px; font-family:monospace; font-weight:bold; z-index:9999; border:1px solid lime; border-radius:4px; pointer-events:none;";
         document.body.appendChild(sessionBadge);
+        */
 
         // DEBUG: Manual Export Button (Removed per user request)
 

@@ -349,11 +349,15 @@ export class GazeDataManager {
             const db = firebase.database();
             await db.ref('sessions/' + sessionId).set(payload);
             console.log("[Firebase] Upload Complete! ✅");
+            // console.log("[Firebase] Upload Complete! ✅");
+            // Toast removed per user request (Production)
+            /*
             const toast = document.createElement("div");
             toast.innerText = `☁️ Cloud Upload Done: ${sessionId}`;
             toast.style.cssText = "position:fixed; bottom:50px; left:50%; transform:translateX(-50%); background:#0d47a1; color:white; padding:10px 20px; border-radius:20px; z-index:99999;";
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 4000);
+            */
         } catch (e) {
             console.error("[Firebase] Upload Failed", e);
             alert(`Upload Failed: ${e.message}`);
