@@ -698,7 +698,13 @@ Game.typewriter = {
             this.timer = null;
         }
 
-        // Reveal next chunk
+        // [SAFETY] If chunks are not ready (length 0), wait and retry.
+        if (!this.renderer || !this.renderer.chunks || this.renderer.chunks.length === 0) {
+            console.warn("[Typewriter] Chunks not ready. Retrying in 500ms...");
+            this.timer = setTimeout(() => this.tick(), 500);
+            return;
+        }
+
         // Reveal next chunk
         if (this.chunkIndex < this.renderer.chunks.length) {
 
