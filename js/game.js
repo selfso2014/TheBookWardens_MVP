@@ -36,7 +36,7 @@ const Game = {
         const villainContainer = document.getElementById("rift-villain-container");
         const textContainer = document.getElementById("rift-text-container");
         const meteorLayer = document.getElementById("meteor-layer");
-        const riftText = document.getElementById("rift-intro-text");
+        // const riftText = document.getElementById("rift-intro-text"); // Removed for Image Only
 
         // Reset State
         introScreen.className = "screen active scene-peace"; // Start with Peace
@@ -45,9 +45,12 @@ const Game = {
         meteorLayer.innerHTML = "";
 
         // Restore original text
+        // Restore original State (Image is static)
+        /* Removed Text Logic
         if (riftText) {
             riftText.innerText = "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, 'and what is the use of a book,' thought Alice 'without pictures or conversation?'";
         }
+        */
 
         // Helper for delays
         const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -101,9 +104,12 @@ const Game = {
         await wait(2000);
 
         // Corrupt text
+        // Corrupt Image (CSS handles this via classes)
+        /* Removed Text Logic
         if (riftText) {
             riftText.innerText = this.corruptText(riftText.innerText);
         }
+        */
 
         await wait(3000);
         clearInterval(heavyMeteorLoop);

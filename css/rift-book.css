@@ -1,0 +1,60 @@
+/* Image Replacement Styles */
+.rift-book-img {
+    max-width: 100%;
+    max-height: 50vh;
+    /* Keep it reasonable on screen */
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+    transition: all 0.5s ease;
+    animation: bookFloat 4s ease-in-out infinite;
+    /* Default Peace Animation */
+}
+
+/* Float Animation for Peace State */
+@keyframes bookFloat {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-15px);
+    }
+}
+
+/* Scene Integration Updates */
+
+/* Scene 1: Peace - Enhance Glow */
+.scene-peace .rift-book-img {
+    filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.4));
+}
+
+/* Scene 2: Warning - Dimming */
+.scene-warning .rift-book-img {
+    filter: grayscale(0.5) brightness(0.8);
+    animation-play-state: paused;
+    /* Stop floating */
+}
+
+/* Scene 3: Invasion - Shake is handled by container mildShake */
+/* Just add specific image reaction */
+.scene-invasion .rift-book-img {
+    filter: sepia(0.5) hue-rotate(-30deg) drop-shadow(0 0 20px rgba(255, 0, 0, 0.6));
+}
+
+/* Scene 4: Destruction - Corruption */
+.scene-destruction .rift-book-img {
+    /* Container has hardShake, so we add internal glitch effect */
+    filter: contrast(1.5) grayscale(1) drop-shadow(0 0 20px rgba(255, 0, 0, 0.8));
+    opacity: 0.8;
+}
+
+/* Damaged State Override */
+.rift-damaged .rift-book-img {
+    /* Additional specific damage styles if needed, 
+        but Scene 4 covers most. 
+        Maybe add a skew? */
+    transform: skewX(5deg);
+}

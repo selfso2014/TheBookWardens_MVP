@@ -27,9 +27,10 @@
 /* Scene 1: Peace (Golden Light) */
 .scene-peace #rift-text-container {
     opacity: 1;
+    opacity: 1;
     transform: translateY(0);
-    box-shadow: 0 0 50px rgba(255, 215, 0, 0.2);
-    border-color: rgba(255, 215, 0, 0.4);
+    /* box-shadow: 0 0 50px rgba(255, 215, 0, 0.2); handled by image drop-shadow */
+    /* border-color: rgba(255, 215, 0, 0.4); */
 }
 
 .scene-peace .rift-book-title {
@@ -62,7 +63,7 @@
 
 .scene-invasion #rift-text-container {
     animation: mildShake 3s infinite;
-    border-color: #ff4444;
+    /* border-color: #ff4444; */
 }
 
 /* Scene 4: Destruction (Chaos) */
@@ -194,18 +195,20 @@
     font-size: 1.2rem;
     /* Slightly larger text */
     line-height: 1.6;
-    background: rgba(0, 0, 0, 0.7);
-    /* Darker bg */
-    border: 1px solid #555;
+    /* background: rgba(0, 0, 0, 0.7); Remove box background */
+    /* border: 1px solid #555; Remove border */
     border-radius: 8px;
     z-index: 4;
     position: relative;
     transition: all 1s;
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
-    text-align: left;
+    /* box-shadow: 0 0 30px rgba(0, 0, 0, 0.8); Remove box shadow */
+    text-align: center;
     opacity: 0;
     /* Initially hidden */
     transform: translateY(20px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .rift-book-title {
@@ -221,12 +224,10 @@
 
 /* Damaged Text State */
 .rift-damaged {
-    font-family: 'Courier New', monospace !important;
-    color: #ff5555 !important;
-    text-shadow: 3px 0 0 rgba(255, 0, 0, 0.7), -3px 0 0 rgba(0, 0, 255, 0.7);
+    /* Container Shake/Rotation only - Visual damage is on the Image now via rift-book.css */
     transform: rotate(-1deg);
-    border-color: #ff0000 !important;
-    background: rgba(50, 0, 0, 0.8) !important;
+    /* border-color: #ff0000 !important; */
+    /* background: rgba(50, 0, 0, 0.8) !important; */
 }
 
 /* Meteor/Rift Magic Streak */
