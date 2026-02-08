@@ -225,12 +225,22 @@ class TextRenderer {
 
     lockLayout() {
         if (this.words.length === 0) return;
+
+        // [CRITICAL FIX] Reset lines array before recalculating.
+        // Otherwise, lines accumulate across page turns, causing index jumps (e.g., 0 -> 9).
+        this.lines = [];
+
         const containerRect = this.container.getBoundingClientRect();
         let currentLineY = -9999;
         let lineBuffer = [];
 
         this.words.forEach(word => {
             const r = word.element.getBoundingClientRect();
+
+            // [CRITICAL FIX] Skip invisible words (e.g., words from other pages).
+            // They have rect {0,0,0,0} and should not form lines.
+            if (r.width === 0 && r.height === 0) return;
+
             // Typographic Center Correction (Top Quartile)
             const visualCenterY = r.top + (r.height * 0.25);
 
@@ -268,7 +278,7 @@ class TextRenderer {
         // When we lock layout (usually means page start), the index MUST start at 0.
         this.currentVisibleLineIndex = 0;
 
-        console.log(`[TextRenderer] Layout Locked: ${this.words.length} words, ${this.lines.length} lines.`);
+        console.log(`[TextRenderer] Layout Locked: ${this.words.length} words (checked), ${this.lines.length} lines created.`);
     }
 
     _finalizeLine(words) {
