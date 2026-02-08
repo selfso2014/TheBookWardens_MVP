@@ -134,6 +134,48 @@ body {
   white-space: nowrap;
 }
 
+/* Mobile HUD Optimization */
+@media (max-width: 600px) {
+  .game-header {
+    padding: 0 10px;
+    /* Compress padding */
+    justify-content: center;
+    /* Center items */
+  }
+
+  /* Hide Rank text on mobile to save space */
+  .user-level {
+    display: none;
+  }
+
+  /* Make items compact */
+  .resource-item {
+    padding: 4px 8px;
+    font-size: 0.85rem;
+    gap: 3px;
+  }
+
+  .res-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* WPM: Remove Bolt, Keep Text */
+  .wpm-badge span:first-child {
+    display: none;
+    /* Hide Bolt icon */
+  }
+
+  .wpm-badge small {
+    display: inline-block !important;
+    /* Force show WPM text */
+    font-size: 0.7rem;
+    color: #ffd700;
+    /* Gold color for emphasis */
+    margin-left: 2px;
+  }
+}
+
 .resource-item:hover {
   background: rgba(255, 255, 255, 0.1);
   transform: scale(1.02);
