@@ -512,24 +512,8 @@ const Game = {
     },
 
     // --- 3. Boss Battle ---
-    checkBoss(optionIndex) {
-        // Delegate to typewriter logical check if exists, otherwise assume index 1 is correct (legacy)
-        if (this.typewriter && typeof this.typewriter.checkBossAnswer === 'function') {
-            this.typewriter.checkBossAnswer(optionIndex);
-            return;
-        }
+    // checkBoss(optionIndex) - DELETED (Deprecated feature: Direct call to Typewriter checkBossAnswer used instead)
 
-        // ... Legacy Fallback (should not be reached if typewriter is active) ...
-        const isCorrect = (optionIndex === 1);
-        if (isCorrect) {
-            alert("Direct Hit! The Shadow fades...");
-            this.state.gems += 50;
-            this.updateUI();
-            this.switchScreen("screen-win"); // Legacy default
-        } else {
-            alert("The Shadow deflects your attack!");
-        }
-    },
 
     // --- 4. Splash Screen Logic ---
     dismissSplash() {
@@ -829,10 +813,9 @@ Game.typewriter = {
         if (optionsEl) {
             optionsEl.innerHTML = "";
             quiz.o.forEach((optText, i) => {
-                const btn = document.createElement("button");
                 btn.className = "quiz-btn";
                 btn.textContent = optText;
-                btn.onclick = () => Game.checkBoss(i); // Calls Game.checkBoss -> Game.typewriter.checkBossAnswer
+                btn.onclick = () => this.checkBossAnswer(i); // Direct call to avoid Game.checkBoss issues
                 optionsEl.appendChild(btn);
             });
         }
