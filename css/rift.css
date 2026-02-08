@@ -1,4 +1,4 @@
-/* Rift Animation Styles */
+/* Rift Animation Styles: Scene-based */
 #screen-rift-intro {
     background: radial-gradient(circle at center, #1a0a1f 0%, #000 90%);
     overflow: hidden;
@@ -10,36 +10,101 @@
     z-index: 1000;
     display: none;
     color: white;
+    font-family: 'Cinzel', serif;
 }
 
 #screen-rift-intro.active {
     display: flex !important;
     flex-direction: column;
-    justify-content: flex-start;
-    /* Changed from center to prevent clipping */
+    justify-content: center;
     align-items: center;
-    padding-top: 50px;
-    box-sizing: border-box;
 }
 
-/* Villain with ominous glow */
+/* Scene 1: Peace (Golden Light) */
+.scene-peace #rift-text-container {
+    opacity: 1;
+    transform: translateY(0);
+    box-shadow: 0 0 50px rgba(255, 215, 0, 0.2);
+    border-color: rgba(255, 215, 0, 0.4);
+}
+
+.scene-peace .rift-book-title {
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+}
+
+/* Scene 2: Warning (Darkness & Fog) */
+.scene-warning {
+    background: linear-gradient(180deg, #000 0%, #1a0520 100%) !important;
+    transition: background 2s;
+}
+
+.scene-warning #rift-villain-container {
+    opacity: 0.6;
+    transform: scale(1.05);
+}
+
+.scene-warning #rift-text-container {
+    filter: brightness(0.7) blur(1px);
+    border-color: #555;
+}
+
+/* Scene 3: Invasion (Red Alert) */
+.scene-invasion #rift-villain-container {
+    opacity: 1;
+    transform: scale(1.1) translateY(-10px);
+    filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.6));
+}
+
+.scene-invasion #rift-text-container {
+    animation: mildShake 3s infinite;
+    border-color: #ff4444;
+}
+
+/* Scene 4: Destruction (Chaos) */
+.scene-destruction {
+    background: #2a0000 !important;
+    animation: bgFlash 0.5s infinite alternate;
+}
+
+.scene-destruction #rift-text-container {
+    animation: hardShake 0.1s infinite;
+    filter: contrast(1.5) hue-rotate(-20deg);
+}
+
+/* Story Text Overlay */
+#rift-story-overlay {
+    position: absolute;
+    bottom: 20%;
+    width: 100%;
+    text-align: center;
+    font-size: 1.8rem;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    transition: opacity 1s, transform 1s;
+    z-index: 20;
+    pointer-events: none;
+}
+
+#rift-story-overlay.show {
+    opacity: 1;
+    transform: translateY(-10px);
+}
+
+/* Villain Container */
 #rift-villain-container {
     margin-bottom: 20px;
     z-index: 5;
-    animation: villainHover 4s infinite alternate ease-in-out;
+    opacity: 0;
+    /* Initially hidden */
+    transition: all 2s ease-in-out;
 }
 
 .rift-villain-img {
     width: 250px;
     height: auto;
-    filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.4));
-    transition: transform 0.3s, filter 0.3s;
-}
-
-/* Villain preparing magic */
-.rift-villain-charge .rift-villain-img {
-    filter: drop-shadow(0 0 40px rgba(255, 0, 0, 0.9)) brightness(1.2);
-    transform: scale(1.1);
+    filter: drop-shadow(0 0 10px rgba(100, 0, 100, 0.5));
 }
 
 #rift-text-container {
@@ -49,17 +114,18 @@
     color: #eee;
     font-family: 'Crimson Text', serif;
     font-size: 1.1rem;
-    /* Standard reading size */
     line-height: 1.6;
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid #444;
     border-radius: 8px;
     z-index: 4;
     position: relative;
-    transition: all 0.5s;
+    transition: all 1s;
     box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
     text-align: left;
-    /* Ensure left align for readability */
+    opacity: 0;
+    /* Initially hidden */
+    transform: translateY(20px);
 }
 
 .rift-book-title {
@@ -73,44 +139,35 @@
     padding-bottom: 10px;
 }
 
-/* Damaged Text State - Post Meteor */
+/* Damaged Text State */
 .rift-damaged {
     font-family: 'Courier New', monospace !important;
     color: #ff5555 !important;
     text-shadow: 3px 0 0 rgba(255, 0, 0, 0.7), -3px 0 0 rgba(0, 0, 255, 0.7);
-    animation: textFlicker 0.1s infinite !important;
     transform: rotate(-1deg);
     border-color: #ff0000 !important;
     background: rgba(50, 0, 0, 0.8) !important;
 }
 
 /* Meteor/Rift Magic Streak */
-/* Meteor/Rift Magic Streak */
 .meteor {
     position: absolute;
     width: 250px;
-    /* Adjust length */
     height: 4px;
-    /* Thinner but brighter */
     background: linear-gradient(90deg, transparent, #ff4444, #ffffff);
-    /* Bright core at tail */
     border-radius: 5px;
     box-shadow: 0 0 10px #ff0000, 0 0 20px #ffffff;
-    /* Strong glow */
     opacity: 0;
     transform-origin: left center;
     transform: rotate(45deg);
     z-index: 9999;
-    /* Ensure on top */
     pointer-events: none;
     animation: meteorFly 1.5s cubic-bezier(0.2, 0.4, 0.8, 1) forwards;
 }
 
-/* Fly across the screen diagonally */
 @keyframes meteorFly {
     0% {
         transform: translate(-20vw, -20vh) rotate(45deg) scaleX(0.5);
-        /* Start from Top-Left */
         opacity: 0;
     }
 
@@ -120,92 +177,59 @@
 
     100% {
         transform: translate(120vw, 120vh) rotate(45deg) scaleX(1.5);
-        /* End at Bottom-Right */
         opacity: 0;
     }
 }
 
-/* Screen Flash (Impact) */
-.rift-flash {
-    animation: flash 0.2s ease-out;
-}
-
-@keyframes flash {
+/* Animations */
+@keyframes bgFlash {
     0% {
-        background-color: rgba(255, 255, 255, 0);
+        background-color: #2a0000;
     }
 
     50% {
-        background-color: rgba(255, 255, 255, 0.3);
+        background-color: #440000;
     }
 
     100% {
-        background-color: rgba(255, 255, 255, 0);
+        background-color: #1a0000;
     }
 }
 
-/* Screen Shake (Sustained) */
-.screen-shake {
-    animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both infinite;
-}
+@keyframes mildShake {
 
-@keyframes shake {
-
-    10%,
-    90% {
-        transform: translate3d(-2px, 0, 0);
+    0%,
+    100% {
+        transform: translateX(0);
     }
 
-    20%,
-    80% {
-        transform: translate3d(4px, 0, 0);
+    25% {
+        transform: translateX(-2px);
     }
 
-    30%,
-    50%,
-    70% {
-        transform: translate3d(-6px, 0, 0);
-    }
-
-    40%,
-    60% {
-        transform: translate3d(6px, 0, 0);
+    75% {
+        transform: translateX(2px);
     }
 }
 
-@keyframes villainHover {
-    from {
-        transform: translateY(0);
-    }
-
-    to {
-        transform: translateY(-10px);
-    }
-}
-
-@keyframes textFlicker {
+@keyframes hardShake {
     0% {
-        opacity: 1;
-        transform: rotate(-1deg) translateX(0);
+        transform: translate(0, 0) rotate(0);
     }
 
-    20% {
-        opacity: 0.8;
-        transform: rotate(-0.5deg) translateX(2px);
+    25% {
+        transform: translate(-5px, 5px) rotate(-1deg);
     }
 
-    40% {
-        opacity: 1;
-        transform: rotate(-1.5deg) translateX(-2px);
+    50% {
+        transform: translate(5px, -5px) rotate(1deg);
     }
 
-    80% {
-        opacity: 0.9;
-        transform: rotate(-1deg) translateX(1px);
+    75% {
+        transform: translate(-5px, -5px) rotate(-1deg);
     }
 
     100% {
-        opacity: 1;
-        transform: rotate(-1deg) translateX(0);
+        transform: translate(5px, 5px) rotate(1deg);
     }
 }

@@ -27,8 +27,8 @@ const Game = {
     },
 
     // --- Rift Intro Sequence ---
-    // --- Rift Intro Sequence (Updated for Cinematic Feel) ---
-    startRiftIntro() {
+    // --- Rift Intro Sequence (Cinematic 20s) ---
+    async startRiftIntro() {
         console.log("Starting Rift Intro Sequence...");
         this.switchScreen("screen-rift-intro");
 
@@ -39,10 +39,9 @@ const Game = {
         const riftText = document.getElementById("rift-intro-text");
 
         // Reset State
-        textContainer.classList.remove("rift-damaged");
-        introScreen.classList.remove("screen-shake");
-        introScreen.classList.remove("rift-flash");
-        villainContainer.classList.remove("rift-villain-charge");
+        introScreen.className = "screen active scene-peace"; // Start with Peace
+        textContainer.className = ""; // Reset basic
+        villainContainer.className = "";
         meteorLayer.innerHTML = "";
 
         // Restore original text
@@ -50,69 +49,89 @@ const Game = {
             riftText.innerText = "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, 'and what is the use of a book,' thought Alice 'without pictures or conversation?'";
         }
 
-        // --- PHASE 1: Peace (0s - 2s) ---
-        // Just showing the text and villain calmly.
+        // Helper for delays
+        const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // --- PHASE 2: Charge (2s - 3s) ---
-        setTimeout(() => {
-            villainContainer.classList.add("rift-villain-charge");
-            // Audio Cue: Charging Sound
-        }, 2000);
+        // --- SCENE 1: PEACE (0s - 5s) ---
+        // Text fades in smoothly
+        await wait(500);
+        textContainer.style.opacity = 1;
+        textContainer.style.transform = "translateY(0)";
 
-        // --- PHASE 3: Meteor Shower (3s - 6s) ---
-        setTimeout(() => {
-            // Rapid spawn of meteors
-            const meteorCount = 50; // Increased density!
-            const duration = 3000; // 3 seconds of rain
+        this.showStoryText("Once upon a time...");
+        await wait(4000);
 
-            for (let i = 0; i < meteorCount; i++) {
-                setTimeout(() => {
-                    this.spawnMeteor(meteorLayer);
+        // --- SCENE 2: WARNING (5s - 10s) ---
+        introScreen.classList.remove("scene-peace");
+        introScreen.classList.add("scene-warning");
 
-                    // Random small screen shakes on impact
-                    if (Math.random() > 0.7) {
-                        introScreen.classList.remove("rift-flash");
-                        void introScreen.offsetWidth; // trigger reflow
-                        introScreen.classList.add("rift-flash");
-                    }
+        this.showStoryText("But shadows are always watching...");
+        // Villain fades in
+        villainContainer.style.opacity = 0.6;
+        await wait(4000);
 
-                }, Math.random() * duration); // Spread randomly over 3s
-            }
+        // --- SCENE 3: INVASION (10s - 15s) ---
+        introScreen.classList.remove("scene-warning");
+        introScreen.classList.add("scene-invasion");
 
-            // Start Sustained Shake mid-way
-            setTimeout(() => {
-                introScreen.classList.add("screen-shake");
-            }, 500);
+        this.showStoryText("The Rift opens!");
+        villainContainer.style.opacity = 1;
 
-        }, 3000);
+        // Start light meteors
+        const lightMeteorLoop = setInterval(() => {
+            if (Math.random() > 0.7) this.spawnMeteor(meteorLayer);
+        }, 300);
 
-        // --- PHASE 4: Destruction (6s - 8s) ---
-        setTimeout(() => {
-            textContainer.classList.add("rift-damaged");
-            // Heavy Flash
-            introScreen.classList.remove("rift-flash");
-            void introScreen.offsetWidth;
-            introScreen.classList.add("rift-flash");
+        await wait(4000);
+        clearInterval(lightMeteorLoop);
 
-            // Corrupt Text Content
-            if (riftText) {
-                const originalText = riftText.innerText;
-                riftText.innerText = this.corruptText(originalText);
-            }
-            // Stop Shake slowly? or keep it till end? Let's keep it for tension.
-        }, 6000);
+        // --- SCENE 4: DESTRUCTION (15s - 20s) ---
+        introScreen.classList.remove("scene-invasion");
+        introScreen.classList.add("scene-destruction");
 
-        // --- PHASE 5: Transition (8.5s) ---
-        setTimeout(() => {
-            console.log("Rift Intro Done. Moving to Word Forge.");
-            // Stop effects before leaving
-            introScreen.classList.remove("screen-shake");
+        this.showStoryText("The story is collapsing... WARDEN, HELP!");
+        textContainer.classList.add("rift-damaged");
 
-            this.state.vocabIndex = 0;
-            this.loadVocab(0);
-            this.switchScreen("screen-word");
-        }, 8500);
+        // Heavy meteors
+        const heavyMeteorLoop = setInterval(() => {
+            this.spawnMeteor(meteorLayer);
+            this.spawnMeteor(meteorLayer); // Double spawn
+        }, 100);
+
+        await wait(2000);
+
+        // Corrupt text
+        if (riftText) {
+            riftText.innerText = this.corruptText(riftText.innerText);
+        }
+
+        await wait(3000);
+        clearInterval(heavyMeteorLoop);
+
+        // --- SCENE 5: TRANSITION ---
+        this.showStoryText("Initializing Word Forge...");
+        await wait(1500);
+
+        console.log("Rift Intro Done. Moving to Word Forge.");
+        this.state.vocabIndex = 0;
+        this.loadVocab(0);
+        this.switchScreen("screen-word");
     },
+
+    showStoryText(message) {
+        const overlay = document.getElementById("rift-story-overlay");
+        if (!overlay) return;
+
+        overlay.innerText = message;
+        overlay.classList.add("show");
+
+        // Hide after 3s
+        setTimeout(() => {
+            overlay.classList.remove("show");
+        }, 3500);
+    },
+
+
 
     spawnMeteor(layer) {
         if (!layer) return;
