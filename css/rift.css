@@ -15,8 +15,11 @@
 #screen-rift-intro.active {
     display: flex !important;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
+    /* Changed from center to prevent clipping */
     align-items: center;
+    padding-top: 50px;
+    box-sizing: border-box;
 }
 
 /* Villain with ominous glow */
@@ -68,31 +71,31 @@
 }
 
 /* Meteor/Rift Magic Streak */
+/* Meteor/Rift Magic Streak */
 .meteor {
     position: absolute;
-    width: 300px;
-    /* Longer tail */
-    height: 6px;
-    /* Thicker core */
-    background: linear-gradient(90deg,
-            rgba(255, 50, 50, 0),
-            rgba(255, 0, 0, 0.8) 50%,
-            #fff 100%);
-    /* Glowing head at right end */
-    border-radius: 50%;
-    box-shadow: 0 0 15px rgba(255, 0, 0, 0.8), 0 0 30px rgba(255, 100, 100, 0.4);
+    width: 250px;
+    /* Adjust length */
+    height: 4px;
+    /* Thinner but brighter */
+    background: linear-gradient(90deg, transparent, #ff4444, #ffffff);
+    /* Bright core at tail */
+    border-radius: 5px;
+    box-shadow: 0 0 10px #ff0000, 0 0 20px #ffffff;
+    /* Strong glow */
     opacity: 0;
-    transform: rotate(35deg);
-    /* Diagonal angle */
-    z-index: 10;
+    transform-origin: left center;
+    transform: rotate(45deg);
+    z-index: 9999;
+    /* Ensure on top */
     pointer-events: none;
-    animation: meteorFly 1.2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    animation: meteorFly 1.5s cubic-bezier(0.2, 0.4, 0.8, 1) forwards;
 }
 
 /* Fly across the screen diagonally */
 @keyframes meteorFly {
     0% {
-        transform: translate(120vw, -20vh) rotate(35deg) scaleX(0.5);
+        transform: translate(100vw, -20vh) rotate(45deg) scaleX(0.5);
         opacity: 0;
     }
 
@@ -101,7 +104,7 @@
     }
 
     100% {
-        transform: translate(-50vw, 120vh) rotate(35deg) scaleX(1.2);
+        transform: translate(-50vw, 120vh) rotate(45deg) scaleX(1.5);
         opacity: 0;
     }
 }

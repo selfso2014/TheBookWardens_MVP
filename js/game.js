@@ -120,10 +120,10 @@ const Game = {
         m.className = "meteor";
 
         // Spawn Area: Top-Right to Top-Center
-        // X: 50% to 150% of screen width (off-screen right)
-        // Y: -20% to 50% of screen height (top)
-        const startX = window.innerWidth * 0.5 + Math.random() * window.innerWidth;
-        const startY = -Math.random() * window.innerHeight * 0.5;
+        // X: 20% to 120% of screen width (more inwards)
+        // Y: -50px to 100px (top area)
+        const startX = window.innerWidth * 0.2 + Math.random() * window.innerWidth;
+        const startY = -Math.random() * 100;
 
         m.style.left = startX + "px";
         m.style.top = startY + "px";
