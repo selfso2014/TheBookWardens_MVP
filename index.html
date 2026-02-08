@@ -177,6 +177,20 @@
       margin-bottom: 15px;
       filter: drop-shadow(0 0 10px rgba(138, 43, 226, 0.6));
     }
+
+    /* WPM Button Styles */
+    .wpm-btn:active {
+      transform: scale(0.95);
+      background: #555;
+    }
+
+    .wpm-btn.selected {
+      border: 2px solid #00ff00;
+      box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
+      transform: scale(0.95);
+      background: #444;
+      color: #fff;
+    }
   </style>
 </head>
 
@@ -503,20 +517,19 @@
     <!-- SCREEN 3.5: FINAL BOSS (Comprehension Challenge) -->
     <section id="screen-final-boss" class="screen"
       style="background: linear-gradient(135deg, #000 0%, #2a0a38 100%); flex-direction: column;">
-      <h1 style="color: #ff0000; font-size: 2.5rem; text-shadow: 0 0 20px #ff0000; margin-bottom: 10px;">THE
-        ARCH-VILLAIN</h1>
+      <!-- <h1 style="color: #ff0000; font-size: 2.5rem; text-shadow: 0 0 20px #ff0000; margin-bottom: 10px;">THE ARCH-VILLAIN</h1> -->
       <!-- <p style="color: #ccc; margin-bottom: 20px;">"You have gathered the ink, but do you understand the story?"</p> -->
 
       <img src="./ink_shadow_boss.png" class="villain-img" alt="The Arch-Villain"
-        style="width: 250px; filter: hue-rotate(280deg) drop-shadow(0 0 20px red);">
+        style="width: 180px; filter: hue-rotate(280deg) drop-shadow(0 0 20px red);">
 
       <div class="boss-dialogue"
-        style="border: 2px solid #ff4444; background: rgba(50, 0, 0, 0.8); padding: 20px; border-radius: 10px; max-width: 600px;">
-        <h3 style="margin: 0 0 10px 0; color: #ff4444;">Final Challenge:</h3>
-        <p id="final-boss-question" style="font-size: 1.3rem;">...</p>
+        style="border: 2px solid #ff4444; background: rgba(50, 0, 0, 0.8); padding: 5px 10px; border-radius: 10px; max-width: 600px;">
+        <h3 style="margin: 0 0 5px 0; color: #ff4444;">Final Challenge:</h3>
+        <p id="final-boss-question" style="font-size: 1.2rem; margin: 5px 0;">...</p>
       </div>
 
-      <div id="final-boss-options" class="quiz-options" style="width: 100%; max-width: 600px; margin-top: 20px;">
+      <div id="final-boss-options" class="quiz-options" style="width: 100%; max-width: 600px; margin-top: 15px;">
         <!-- Options injected via JS -->
       </div>
     </section>
