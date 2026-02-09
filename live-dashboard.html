@@ -135,11 +135,18 @@
             <h2>⏱️ Chart 3: Position & Line Index</h2>
             <canvas id="chart3"></canvas>
         </div>
+        <div class="card">
+            <h2>🎥 Chart 5: Replay Simulation</h2>
+            <p style="color:#666; font-size:0.9em;">
+                Green: Replay X | Red: Replay Y (Line Index) | Orange: Actual Line Index | Purple: GLI
+            </p>
+            <canvas id="chart5"></canvas>
+        </div>
     </div>
 
     <script>
         // --- Global Chart Instances ---
-        let chart1, chart2, chart3, chart4;
+        let chart1, chart2, chart3, chart4, chart5;
 
         // --- Init ---
         window.onload = function () {
@@ -364,6 +371,7 @@
             if (chart2) chart2.destroy();
             if (chart3) chart3.destroy();
             if (chart4) chart4.destroy();
+            if (chart5) chart5.destroy();
 
             const labels = data.map(d => d.t);
 
@@ -496,6 +504,51 @@
                         x: { min: 0, max: window.innerWidth }
                     },
                     animation: false
+                }
+            });
+
+            // Chart 5: Replay Data Verification
+            // Filter Data exactly like TextRenderer (Start after content, Hold Line Index)
+            let hasStarted = false;
+            let lastValidLine = 0;
+            const replayX = [];
+            const replayY_Index = [];
+
+            data.forEach(d => {
+                if (!hasStarted) {
+                    if (typeof d.lineIndex === 'number' && d.lineIndex >= 0) hasStarted = true;
+                }
+
+                if (hasStarted) {
+                    replayX.push(d.x);
+                    if (typeof d.lineIndex === 'number' && d.lineIndex >= 0) lastValidLine = d.lineIndex;
+                    replayY_Index.push(lastValidLine);
+                } else {
+                    replayX.push(null);
+                    replayY_Index.push(null);
+                }
+            });
+
+            chart5 = new Chart(document.getElementById('chart5'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Replay X', data: replayX, borderColor: 'green', borderWidth: 2, pointRadius: 0, order: 1, yAxisID: 'yPos' },
+                        { label: 'Replay Y (Index)', data: replayY_Index, borderColor: 'red', borderWidth: 2, stepped: true, pointRadius: 0, order: 2, yAxisID: 'yLine' },
+                        { label: 'Actual Index', data: data.map(d => d.lineIndex), borderColor: 'orange', borderDash: [5, 5], stepped: true, pointRadius: 0, order: 3, yAxisID: 'yLine' },
+                        { label: 'GLI (Sim)', data: data.map(d => d.simGazeLineIndex), borderColor: 'purple', borderWidth: 1, stepped: true, pointRadius: 0, order: 4, yAxisID: 'yLine' },
+                        { label: 'Raw X', data: data.map(d => d.x), borderColor: '#eee', borderWidth: 1, pointRadius: 0, order: 10, yAxisID: 'yPos' }
+                    ]
+                },
+                options: {
+                    animation: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        yPos: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'X Position' } },
+                        yLine: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Line Index' }, min: -1, grid: { drawOnChartArea: false } }
+                    },
+                    plugins: { title: { display: true, text: 'Chart 5: Replay Logic Verification' } }
                 }
             });
 
