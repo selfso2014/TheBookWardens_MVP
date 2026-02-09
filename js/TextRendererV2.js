@@ -582,6 +582,22 @@ class TextRenderer {
             return;
         }
 
+        // [NEW] Restore Text Visibility for Context
+        // Ensure all words are fully visible so the user sees the text behind the gaze path.
+        if (this.words && this.words.length > 0) {
+            this.words.forEach(w => {
+                if (w.element) {
+                    // Force immediate visibility, bypassing any CSS transitions or fade-outs
+                    w.element.style.transition = "none";
+                    w.element.style.opacity = "1";
+                    w.element.style.visibility = "visible";
+                    // Remove any fade classes if they exist
+                    w.element.classList.remove("faded-out");
+                    w.element.classList.remove("hidden");
+                }
+            });
+        }
+
         console.log(`[TextRenderer] Starting Direct Line-Locked Replay with ${gazeData.length} points...`);
 
         const visualLines = this.lines || [];
