@@ -226,71 +226,72 @@
             const getSmoothX = (idx) => {
                 if (idx < 0) return rawData[0].x;
                 if (idx >= rawData.length) return rawData[rawData.length - 1].x;
-                // Simple 3-point smoothing if gx missing, else use gx
                 return rawData[idx].gx !== undefined ? rawData[idx].gx : rawData[idx].x;
             };
 
-            const data = rawData.map((d, i) => {
-                const item = {
-                    ...d,
-                    t: Number(d.t),
-                    x: Number(d.x),
-                    y: Number(d.y),
-                    vx: Number(d.vx),
-                    lineIndex: d.lineIndex,
-                    didFire: d.didFire,
-                    simTrigger: false,
-                    simGazeLineIndex: 0
-                };
+            // First pass: Prepare basic structure
+            const data = rawData.map((d) => ({
+                ...d,
+                t: Number(d.t),
+                x: Number(d.x),
+                y: Number(d.y),
+                vx: Number(d.vx),
+                lineIndex: d.lineIndex,
+                didFire: d.didFire,
+                simTrigger: false,
+                simGazeLineIndex: 0,
+                simPeak: null,
+                simValley: null
+            }));
 
-                // --- GLD SIMULATION (Immediate Fire) ---
-                if (i > 2) {
-                    const d0 = rawData[i];
-                    const d1 = rawData[i - 1];
-                    const d2 = rawData[i - 2];
-                    const now = d0.t;
+            // Second pass: Logic Simulation
+            for (let i = 2; i < data.length; i++) {
+                const d0 = data[i];
+                const d1 = data[i - 1];
+                const d2 = data[i - 2];
+                const now = d0.t;
 
-                    // Prep Values
-                    const sx0 = getSmoothX(i);
-                    const sx1 = getSmoothX(i - 1);
-                    const sx2 = getSmoothX(i - 2);
+                // Prep Values
+                const sx0 = getSmoothX(i);
+                const sx1 = getSmoothX(i - 1);
+                const sx2 = getSmoothX(i - 2);
 
-                    const v0 = d0.vx || 0;
-                    const v1 = d1.vx || 0;
-                    const v2 = d2.vx || 0;
+                const v0 = d0.vx || 0;
+                const v1 = d1.vx || 0;
+                const v2 = d2.vx || 0;
 
-                    // 1. Peak Detect
-                    const isPosPeak = (sx1 >= sx2) && (sx1 > sx0);
-                    const isVelZeroCrossDown = (v1 >= 0 && v0 < 0);
+                // 1. Peak Detect
+                const isPosPeak = (sx1 >= sx2) && (sx1 > sx0);
+                const isVelZeroCrossDown = (v1 >= 0 && v0 < 0);
 
-                    if (isPosPeak || isVelZeroCrossDown) {
-                        lastPosPeakTime = d1.t;
-                    }
+                if (isPosPeak || isVelZeroCrossDown) {
+                    lastPosPeakTime = d1.t;
+                    d1.simPeak = sx1; // Mark Peak
+                }
 
-                    // 2. Valley Detect
-                    const isVelValley = (v2 > v1) && (v1 < v0);
-                    const isDeepEnough = v1 < -0.4;
+                // 2. Valley Detect
+                const isVelValley = (v2 > v1) && (v1 < v0);
+                const isDeepEnough = v1 < -0.4;
+
+                if (isVelValley && isDeepEnough) {
+                    d1.simValley = v1; // Mark Valley (Value is Velocity)
 
                     // 3. Trigger Check
-                    if (isVelValley && isDeepEnough) {
-                        const timeSincePeak = d1.t - lastPosPeakTime;
-                        // Cascade Check (600ms)
-                        if (Math.abs(timeSincePeak) < 600) {
-                            // Cooldown Check (300ms)
-                            if (now - lastTriggerTime >= 300) {
-                                // FIRE!
-                                item.simTrigger = true;
-                                simGazeLineIndex++;
-                                lastTriggerTime = now;
-                                lastPosPeakTime = 0; // Reset Peak
-                            }
+                    const timeSincePeak = d1.t - lastPosPeakTime;
+                    // Cascade Check (600ms)
+                    if (Math.abs(timeSincePeak) < 600) {
+                        // Cooldown Check (300ms)
+                        if (now - lastTriggerTime >= 300) {
+                            // FIRE!
+                            d0.simTrigger = true;
+                            simGazeLineIndex++;
+                            lastTriggerTime = now;
+                            lastPosPeakTime = 0; // Reset Peak
                         }
                     }
                 }
-
-                item.simGazeLineIndex = simGazeLineIndex;
-                return item;
-            });
+                d0.simGazeLineIndex = simGazeLineIndex;
+            }
 
             analyzeDataHealth(data);
             renderCharts(data);
@@ -353,29 +354,42 @@
                 options: { animation: false }
             });
 
-            // Chart 4: Comprehensive Trigger Analysis (Modified)
-            // Purple Gaze Line Index (Simulated)
+            // Chart 4: Comprehensive Trigger Analysis (Fully Updated)
             chart4 = new Chart(document.getElementById('chart4'), {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [
                         // 1. Raw X (Reference) - Light Green
-                        { label: 'Raw X', data: data.map(d => d.x), borderColor: 'rgba(75, 192, 192, 0.3)', borderWidth: 1, pointRadius: 0, yAxisID: 'yPos' },
+                        { label: 'Raw X', data: data.map(d => d.x), borderColor: 'rgba(75, 192, 192, 0.3)', borderWidth: 1, pointRadius: 0, yAxisID: 'yPos', order: 10 },
 
-                        // 2. Simulated GLD Index - PURPLE LINE (Main Focus)
+                        // 2. Simulated GLD Index - PURPLE LINE (Solid)
                         {
                             label: 'Gaze Line Index (Sim)',
                             data: data.map(d => d.simGazeLineIndex),
                             borderColor: '#800080', // Purple
                             backgroundColor: 'rgba(128, 0, 128, 0.1)',
                             borderWidth: 3,
-                            stepped: true, // Step-line
+                            stepped: true,
                             pointRadius: 0,
-                            yAxisID: 'yLine'
+                            yAxisID: 'yLine',
+                            order: 2
                         },
 
-                        // 3. Trigger Event - RED STAR
+                        // 3. Actual Line Index - ORANGE DASHED
+                        {
+                            label: 'Actual Line Index',
+                            data: data.map(d => d.lineIndex),
+                            borderColor: '#fd7e14', // Orange
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            stepped: true,
+                            pointRadius: 0,
+                            yAxisID: 'yLine',
+                            order: 3
+                        },
+
+                        // 4. Trigger Event - RED STAR
                         {
                             label: 'Simulated Trigger',
                             data: data.map(d => d.simTrigger ? d.simGazeLineIndex : null),
@@ -384,11 +398,39 @@
                             radius: 10,
                             backgroundColor: 'red',
                             borderColor: 'red',
-                            yAxisID: 'yLine'
+                            yAxisID: 'yLine',
+                            order: 1
                         },
 
-                        // 4. Velocity X - Light Blue Fill (Background Context)
-                        { label: 'Velocity X', data: data.map(d => d.vx), borderColor: 'rgba(54, 162, 235, 0.3)', backgroundColor: 'rgba(54, 162, 235, 0.1)', borderWidth: 1, pointRadius: 0, fill: true, yAxisID: 'yVel' }
+                        // 5. Simulated Peak - ORANGE TRIANGLE (on SmoothX)
+                        {
+                            label: 'Peak (SmoothX)',
+                            data: data.map(d => d.simPeak),
+                            type: 'scatter',
+                            pointStyle: 'triangle',
+                            radius: 6,
+                            backgroundColor: 'rgba(255, 165, 0, 1)',
+                            borderColor: 'rgba(255, 165, 0, 1)',
+                            yAxisID: 'yPos',
+                            order: 4
+                        },
+
+                        // 6. Simulated Valley - GREEN INVERTED TRIANGLE (on Velocity)
+                        {
+                            label: 'Valley (VelX < -0.4)',
+                            data: data.map(d => d.simValley),
+                            type: 'scatter',
+                            pointStyle: 'triangle',
+                            rotation: 180,
+                            radius: 6,
+                            backgroundColor: 'rgba(0, 200, 0, 1)',
+                            borderColor: 'rgba(0, 200, 0, 1)',
+                            yAxisID: 'yVel',
+                            order: 5
+                        },
+
+                        // 7. Velocity X - Light Blue Fill (Background)
+                        { label: 'Velocity X', data: data.map(d => d.vx), borderColor: 'rgba(54, 162, 235, 0.3)', backgroundColor: 'rgba(54, 162, 235, 0.1)', borderWidth: 1, pointRadius: 0, fill: true, yAxisID: 'yVel', order: 20 }
                     ]
                 },
                 options: {
@@ -397,8 +439,8 @@
                     scales: {
                         x: { ticks: { maxTicksLimit: 20 } },
                         yPos: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Position (px)' } },
-                        yLine: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Gaze Line Index' }, min: 0 },
-                        yVel: { type: 'linear', display: false, position: 'right' } // Hide velocity axis text to reduce clutter
+                        yLine: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Line Index' }, min: 0 },
+                        yVel: { type: 'linear', display: false, position: 'right' } // Hide velocity axis text
                     },
                     plugins: {
                         tooltip: {
