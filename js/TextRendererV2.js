@@ -528,15 +528,37 @@ class TextRenderer {
 
         let targetY;
 
-        // 1. Calculate Target Y
-        // "Single Source of Truth": Reuse the cursor's last known Y position.
-        // This guarantees 100% visual match.
-        if (this.latestCursorY !== undefined && this.latestCursorY !== null) {
-            targetY = this.latestCursorY;
+        // 1. Calculate Target Y (NEXT LINE Logic)
+        // User Request: Pang should appear on the LEFT of the NEXT LINE where gaze lands.
+        // Current cursor is likely at the END of the PREVIOUS line.
+
+        let nextLineIndex = -1;
+
+        // Try to determine Next Line Index
+        if (typeof lineIndex === 'number' && lineIndex >= 0) {
+            // If caller provided lineIndex (often current reading line), next is +1
+            nextLineIndex = lineIndex + 1;
+        } else if (this.currentVisibleLineIndex !== undefined) {
+            // Fallback to internal tracker
+            nextLineIndex = this.currentVisibleLineIndex + 1;
+        }
+
+        // Attempt to get exact Visual Y from Line Objects
+        if (this.lines && this.lines[nextLineIndex]) {
+            targetY = this.lines[nextLineIndex].visualY;
         } else {
-            // Fallback: Current Cursor Position (Read from DOM)
-            const rect = this.cursor.getBoundingClientRect();
-            targetY = rect.top + (rect.height * 0.52);
+            // Fallback: Estimate Next Line Position based on current cursor
+            // Add approximate Line Height (e.g. 60px or derived from font size)
+            // Default font size 1.5rem * 2.5 line-height ~= 3.75rem ~= 60px
+            const estimatedLineHeight = 60;
+
+            if (this.latestCursorY !== undefined && this.latestCursorY !== null) {
+                targetY = this.latestCursorY + estimatedLineHeight;
+            } else {
+                // Last Resort: Current DOM Cursor + Line Height
+                const rect = this.cursor.getBoundingClientRect();
+                targetY = rect.top + (rect.height * 0.52) + estimatedLineHeight;
+            }
         }
 
         // SAFETY: Lazy-create if missing
@@ -560,7 +582,7 @@ class TextRenderer {
         impact.style.width = "10px";
         impact.style.height = "10px";
         impact.style.opacity = "1";
-        impact.style.left = "20px"; // Fixed Left Margin
+        impact.style.left = "40px"; // Fixed Left Margin (Start of Line)
         impact.style.top = targetY + "px";
         impact.style.transform = "translate(-50%, -50%) scale(2.0)"; // Start Medium (20px)
 
