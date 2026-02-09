@@ -574,7 +574,7 @@ class TextRenderer {
         return true;
     }
 
-    // --- NEW: Gaze Replay Visualization ---
+    // --- NEW: Gaze Replay Visualization (Line-Locked) ---
     playGazeReplay(gazeData, onComplete) {
         if (!gazeData || gazeData.length < 2) {
             console.warn("[TextRenderer] No gaze data for replay.");
@@ -582,9 +582,105 @@ class TextRenderer {
             return;
         }
 
-        console.log(`[TextRenderer] Starting Replay with ${gazeData.length} points...`);
+        console.log(`[TextRenderer] Starting Line-Locked Replay with ${gazeData.length} points...`);
 
-        // 1. Setup Canvas Overlay
+        // 1. Calculate Line Indices (Simulation Logic)
+        // mimics simple "Return Sweep Detection" to increment line index.
+        const visualLines = this.lines || [];
+        if (visualLines.length === 0) {
+            console.warn("[TextRenderer] No visual lines available for mapping.");
+            if (onComplete) onComplete();
+            return;
+        }
+
+        const processedPath = [];
+
+        // Start at the first line of the current screen
+        let simGazeLineIndex = 0;
+        let lastValleyTime = -9999;
+        let lastPeakTime = -9999;
+        let contentStarted = false; // [NEW] Wait for actual line detection
+
+        // Ensure sorted
+        // gazeData.sort((a, b) => a.t - b.t);
+
+        for (let i = 2; i < gazeData.length; i++) {
+            const d2 = gazeData[i - 2];
+            const d1 = gazeData[i - 1];
+            const d0 = gazeData[i];
+
+            if (!d1 || !d2) continue;
+
+            // [NEW] Check if content reading has actually started
+            if (!contentStarted) {
+                if (typeof d1.lineIndex === 'number' && d1.lineIndex >= 0) {
+                    contentStarted = true;
+                    // Reset simIndex to the first detected line to sync
+                    simGazeLineIndex = d1.lineIndex;
+                } else {
+                    // Skip data before content start (Noise filter)
+                    continue;
+                }
+            }
+
+            const t = d1.t;
+            // Use Raw X for Replay X
+            const rawX = d1.x;
+
+            // Stats for Detection
+            const smoothX = (d1.gx !== undefined) ? d1.gx : d1.x;
+            const velX = (d1.vx !== undefined) ? d1.vx : 0;
+
+            // --- Logic from Live-Dashboard (Chart 4) ---
+
+            // 1. Peak (SmoothX Local Max)
+            const isPeak = (d1.gx > d2.gx && d1.gx > d0.gx);
+
+            // 2. Valley (Velocity X < -0.4 is a strong leftward sweep)
+            const isValley = (velX < -0.4);
+
+            if (isValley) {
+                lastValleyTime = t;
+            }
+
+            // 3. Trigger (Peak shortly after Valley)
+            // Window: 500ms
+            if (isPeak && (t - lastValleyTime < 500)) {
+                // Debounce: Don't trigger multiple lines instantly
+                if (t - lastPeakTime > 500) {
+                    simGazeLineIndex++;
+                    lastPeakTime = t;
+                    // console.log(`[Replay] Line Jump detected at ${t}ms -> Line ${simGazeLineIndex}`);
+                }
+            }
+
+            // Clamp index to available lines in this paragraph
+            // If simGazeLineIndex exceeds visualLines, stay at last line.
+            // If user read partially, it stays at current.
+            const safeLineIndex = Math.min(Math.max(0, simGazeLineIndex), visualLines.length - 1);
+
+            const lineObj = visualLines[safeLineIndex];
+            const lineY = lineObj ? lineObj.visualY : 0;
+
+            // Validation: Skip if RawX is garbage (e.g. 0 or NaN)
+            if (isNaN(rawX) || rawX === 0) continue;
+
+            // Push to path
+            processedPath.push({
+                x: rawX,
+                y: lineY, // LOCKED visual Y
+                t: t
+            });
+        }
+
+        // Fallback: If logic found no points (rare), just force raw plot?
+        // But likely we have points.
+        if (processedPath.length < 2) {
+            console.warn("[TextRenderer] Processed path too short.");
+            if (onComplete) onComplete(); return;
+        }
+
+        // 2. Setup Canvas
         const canvas = document.createElement('canvas');
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -594,96 +690,54 @@ class TextRenderer {
         canvas.style.pointerEvents = 'none';
         canvas.style.zIndex = '999999';
         document.body.appendChild(canvas);
-
         const ctx = canvas.getContext('2d');
 
-        // 2. Process Path (Raw Gaze -> Word Centers)
-        const path = [];
-        let lastWordIndex = -1;
-
-        gazeData.forEach(p => {
-            // Use hitTest to snap to words
-            // Note: Use smooth coordinates (gx, gy) if available, else raw (x, y)
-            const tx = (p.gx !== undefined) ? p.gx : p.x;
-            const ty = (p.gy !== undefined) ? p.gy : p.y;
-
-            const hit = this.hitTest(tx, ty);
-
-            if (hit && hit.type === 'word') {
-                const w = hit.word;
-                if (w.index !== lastWordIndex) {
-                    path.push({ x: w.rect.centerX, y: w.rect.centerY });
-                    lastWordIndex = w.index;
-                }
-            } else {
-                // Optional: Include non-word points for continuity?
-                // For now, let's keep it semantic-focused.
-            }
-        });
-
-        // Fallback: If semantic path is too sparse, use raw smoothed path
-        if (path.length < 5) {
-            console.log("[TextRenderer] Semantic path too short, using raw smoothed data.");
-            path.length = 0; // clear
-            gazeData.forEach(p => {
-                const tx = (p.gx !== undefined) ? p.gx : p.x;
-                const ty = (p.gy !== undefined) ? p.gy : p.y;
-                path.push({ x: tx, y: ty });
-            });
-        }
-
         // 3. Animate
+        const path = processedPath;
         let startTime = null;
-        const duration = 2500; // 2.5 seconds replay
+        const duration = 2500;
 
         const animate = (timestamp) => {
             if (!startTime) startTime = timestamp;
             const progress = (timestamp - startTime) / duration;
-
             if (progress >= 1) {
-                // Fade out canvas then remove
                 canvas.style.transition = "opacity 0.5s";
                 canvas.style.opacity = "0";
-                setTimeout(() => {
-                    canvas.remove();
-                    if (onComplete) onComplete();
-                }, 500);
+                setTimeout(() => { canvas.remove(); if (onComplete) onComplete(); }, 500);
                 return;
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Path up to current progress
-            const drawIndex = Math.floor(path.length * progress);
-
-            if (drawIndex > 0) {
-                // Draw Trace
+            const maxIdx = Math.floor(path.length * progress);
+            if (maxIdx > 1) {
                 ctx.beginPath();
                 ctx.lineWidth = 4;
-                ctx.strokeStyle = 'rgba(255, 0, 255, 0.4)'; // Magenta trace
+                ctx.strokeStyle = 'rgba(255, 0, 255, 0.6)'; // Magenta
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
 
                 ctx.moveTo(path[0].x, path[0].y);
-                for (let i = 1; i < drawIndex; i++) {
+                for (let i = 1; i < maxIdx; i++) {
+                    // Check for Line Jump? 
+                    // If visualY changed, it means jump.
+                    // Just connect them -> Diagonal line.
                     ctx.lineTo(path[i].x, path[i].y);
                 }
                 ctx.stroke();
 
-                // Draw Head (Current Position)
-                const head = path[drawIndex - 1];
+                // Head
+                const head = path[maxIdx - 1];
                 ctx.beginPath();
-                ctx.fillStyle = '#ff00ff'; // Bright Magenta
+                ctx.fillStyle = '#ff00ff';
                 ctx.shadowColor = '#ff00ff';
                 ctx.shadowBlur = 10;
-                ctx.arc(head.x, head.y, 6, 0, Math.PI * 2);
+                ctx.arc(head.x, head.y, 8, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
-
             requestAnimationFrame(animate);
         };
-
         requestAnimationFrame(animate);
     }
 }
