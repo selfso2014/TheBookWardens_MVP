@@ -297,8 +297,17 @@
                     const timeSincePeak = d1.t - lastPosPeakTime;
                     // Cascade Check (600ms)
                     if (Math.abs(timeSincePeak) < 600) {
-                        // Cooldown Check (300ms)
-                        if (now - lastTriggerTime >= 300) {
+                        // Cooldown Check (Increased to 800ms to prevent double triggers)
+                        if (now - lastTriggerTime >= 800) {
+                            // Constraint: Cannot exceed Actual Line Index
+                            // "Cursor hasn't shown next line yet" -> Impossible to read ahead.
+                            if (typeof d0.lineIndex === 'number' && d0.lineIndex >= 0) {
+                                if (simGazeLineIndex >= d0.lineIndex) {
+                                    // Block overshoot
+                                    continue;
+                                }
+                            }
+
                             // FIRE!
                             d0.simTrigger = true;
                             simGazeLineIndex++;
