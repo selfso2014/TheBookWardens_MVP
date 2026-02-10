@@ -604,27 +604,27 @@ export class GazeDataManager {
                 // 4. Time Window Check (±600ms)
                 if (Math.abs(timeSincePeak) < 600) {
 
-                    // -- STEP D: LOGIC GUARD (V9.5 - MAX REACH GUARANTEE) --
-                    // We only fire if the user has advanced to a NEW line index
-                    // that is STRICTLY greater than the maximum line index ever reached in this section.
+                    // -- STEP D: LOGIC GUARD (V10.0 - SMART & SIMPLE) --
 
                     if (d0.lineIndex !== undefined && d0.lineIndex !== null) {
 
-                        // Rule 1: Max Reach Check
+                        // Rule 1: START LINE BLOCK
+                        // We do not fire on Line 0. Starting to read is not a "Return Sweep".
+                        // Also prevents double-marking Line 0 (once at start, once at transition to Line 1).
+                        if (d0.lineIndex === 0) {
+                            return false;
+                        }
+
+                        // Rule 2: Max Reach Check (Monotonic)
+                        // If we are looking at a line we already reached/passed, don't fire.
+                        // This prevents duplicates when looking back (Regression) or lingering.
                         if (d0.lineIndex <= this.maxLineIndexReached) {
                             return false;
                         }
 
-                        // Rule 2: Last Line Guard
-                        if (window.Game && window.Game.typewriter && window.Game.typewriter.renderer) {
-                            const renderer = window.Game.typewriter.renderer;
-                            if (renderer.lines && renderer.lines.length > 0) {
-                                const totalLines = renderer.lines.length;
-                                if (d0.lineIndex >= totalLines - 1) {
-                                    return false;
-                                }
-                            }
-                        }
+                        // Rule 3: Last Line Guard REMOVED (V10.0)
+                        // Transition to the Last Line IS a valid Sweep (signals completion of N-1).
+                        // 'maxReached' handles the "don't fire repeatedly on last line" case.
 
                     } else {
                         // If lineIndex is null (transition), we act conservatively and DO NOT fire.
