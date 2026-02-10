@@ -434,13 +434,14 @@
                             order: 3
                         },
 
-                        // 4. Trigger Event - RED STAR
+                        // 4. Trigger Event - RED STAR (ACTUAL TRUTH)
                         {
-                            label: 'Simulated Trigger (Target Line)',
-                            data: data.map(d => d.simTrigger ? (d.simGazeLineIndex > 0 ? d.simGazeLineIndex - 1 : 0) : null),
+                            label: 'Actual Trigger (Recorded)',
+                            // Check 'didFire' (True/False from Game) or 'rsState' (String)
+                            data: data.map(d => (d.didFire || d.rsState) ? (d.lineIndex > 0 ? d.lineIndex - 1 : 0) : null),
                             type: 'scatter',
                             pointStyle: 'star',
-                            radius: 10,
+                            radius: 12, // Slightly larger to emphasize TRUTH
                             backgroundColor: 'red',
                             borderColor: 'red',
                             yAxisID: 'yLine',
