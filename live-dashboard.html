@@ -436,8 +436,8 @@
 
                         // 4. Trigger Event - RED STAR
                         {
-                            label: 'Simulated Trigger',
-                            data: data.map(d => d.simTrigger ? d.simGazeLineIndex : null),
+                            label: 'Simulated Trigger (Target Line)',
+                            data: data.map(d => d.simTrigger ? (d.simGazeLineIndex > 0 ? d.simGazeLineIndex - 1 : 0) : null),
                             type: 'scatter',
                             pointStyle: 'star',
                             radius: 10,

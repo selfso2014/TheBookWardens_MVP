@@ -585,7 +585,7 @@ class TextRenderer {
         impact.style.opacity = "1";
         impact.style.left = (window.innerWidth - 20) + "px"; // [FIX] Right Edge
         impact.style.top = targetY + "px";
-        impact.style.transform = "translate(-50%, -50%) scale(2.0)"; // Start Medium (20px)
+        impact.style.transform = "translate(-50%, -50%) scale(1.0)"; // Start Small (10px)
 
         // Force Reflow
         void impact.offsetWidth;
@@ -595,7 +595,7 @@ class TextRenderer {
         impact.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-in";
 
         requestAnimationFrame(() => {
-            impact.style.transform = "translate(-50%, -50%) scale(4.0)"; // End at 40px
+            impact.style.transform = "translate(-50%, -50%) scale(2.0)"; // End at 20px
             impact.style.opacity = "0";
         });
 
