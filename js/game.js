@@ -826,6 +826,12 @@ Game.typewriter = {
     },
 
     playNextParagraph() {
+        // [SAFETY FIX] Reset Scroll Position to (0,0) BEFORE rendering new content.
+        // This prevents lingering scroll from previous paragraphs from affecting lockLayout coordinates.
+        window.scrollTo(0, 0);
+        const screenRead = document.getElementById('screen-read');
+        if (screenRead) screenRead.scrollTop = 0;
+
         if (this.currentParaIndex >= this.paragraphs.length) {
             // All paragraphs done. Trigger FINAL BOSS.
             this.triggerFinalBossBattle();

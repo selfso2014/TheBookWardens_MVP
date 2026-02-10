@@ -79,6 +79,13 @@ class TextRenderer {
         this.pages = [];
         this.currentPageIndex = 0;
 
+        // [NEW] Track Validated Lines for Replay
+        this.validatedLines = new Set();
+
+        // Remove old marker layer if exists
+        const oldLayer = document.getElementById("pang-marker-layer");
+        if (oldLayer) oldLayer.remove();
+
         rawChunks.forEach((chunkText, chunkIndex) => {
             const cleanChunk = chunkText.trim();
             if (!cleanChunk) return;
@@ -576,7 +583,7 @@ class TextRenderer {
         impact.style.width = "10px";
         impact.style.height = "10px";
         impact.style.opacity = "1";
-        impact.style.left = "40px"; // Fixed Left Margin (Start of Line)
+        impact.style.left = (window.innerWidth - 20) + "px"; // [FIX] Right Edge
         impact.style.top = targetY + "px";
         impact.style.transform = "translate(-50%, -50%) scale(2.0)"; // Start Medium (20px)
 
@@ -592,11 +599,66 @@ class TextRenderer {
             impact.style.opacity = "0";
         });
 
+        // [NEW] Record Validated Line for Replay
+        if (this.validatedLines && typeof lineIndex === 'number' && lineIndex >= 0) {
+            this.validatedLines.add(lineIndex);
+        }
+
         return true;
+    }
+
+    // [NEW] Sync View from Data (Global Layer Version)
+    syncPangMarkers() {
+        // 1. Ensure Global Layer Exists on Body (Fixed Overlay)
+        let layer = document.getElementById("pang-marker-layer");
+        if (!layer) {
+            layer = document.createElement("div");
+            layer.id = "pang-marker-layer";
+            layer.style.position = "fixed"; // Global Fixed Overlay
+            layer.style.top = "0";
+            layer.style.left = "0";
+            layer.style.width = "100%";
+            layer.style.height = "100%";
+            layer.style.pointerEvents = "none";
+            layer.style.zIndex = "999000";
+            document.body.appendChild(layer);
+        }
+
+        // 2. Clear & Repopulate
+        layer.innerHTML = "";
+
+        if (!this.validatedLines) return;
+
+        this.validatedLines.forEach(lineIdx => {
+            const line = this.lines[lineIdx];
+            if (!line) return;
+
+            // Coordinates are Fixed Viewport Relative
+            // Use same logic as triggerReturnEffect (Right Edge)
+            const targetX = window.innerWidth - 20;
+            const targetY = line.visualY;
+
+            const marker = document.createElement("div");
+            marker.className = "pang-marker";
+            marker.style.position = "absolute";
+            marker.style.left = targetX + "px";
+            marker.style.top = targetY + "px";
+            marker.style.width = "10px";
+            marker.style.height = "10px";
+            marker.style.backgroundColor = "magenta";
+            marker.style.borderRadius = "50%";
+            marker.style.boxShadow = "0 0 5px magenta";
+            marker.style.transform = "translate(-50%, -50%) scale(2.0)"; // Slightly prominent
+
+            layer.appendChild(marker);
+        });
     }
 
     // --- NEW: Gaze Replay Visualization (GLI-based Segmentation & Scaling) ---
     playGazeReplay(gazeData, onComplete) {
+        // [ROBUST] Sync Markers before starting replay to ensure visibility
+        this.syncPangMarkers();
+
         if (!gazeData || gazeData.length < 2) {
             console.warn("[TextRenderer] No gaze data for replay.");
             if (onComplete) onComplete();
