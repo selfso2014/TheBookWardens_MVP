@@ -659,6 +659,7 @@ class TextRenderer {
     }
 
     // --- NEW: Gaze Replay Visualization (GLI-based Segmentation & Scaling) ---
+    // --- NEW: Gaze Replay Visualization (Pang Event Driven) ---
     playGazeReplay(gazeData, onComplete) {
         // [ROBUST] Sync Markers before starting replay to ensure visibility
         this.syncPangMarkers();
@@ -709,166 +710,94 @@ class TextRenderer {
                 return;
             }
 
-            console.log(`[TextRenderer] Starting GLI-based Segmented Replay (v2.0)...`);
+            console.log(`[TextRenderer] Starting Pang-Log Driven Replay...`);
 
-            // ---------------------------------------------------------
-            // PHASE 1: Recalculate GLI (Offline Simulation)
-            // ---------------------------------------------------------
-            let simGLI = 0;
-            let hasContentStarted = false;
-            let lastTriggerTime = 0;
-            let lastPosPeakTime = 0;
+            // [NEW] Source of Truth: Pang Logs
+            // We ONLY replay lines that successfully triggered a Pang Event.
+            const gm = (window.Game && window.Game.gazeManager) || window.gazeDataManager;
+            const pangLogs = (gm && typeof gm.getPangLogs === 'function') ? gm.getPangLogs() : [];
 
-            // Helper to get Smooth X (Simple 3-tap or use existing if avail)
-            const getSmoothX = (arr, i) => {
-                if (typeof arr[i].gx === 'number') return arr[i].gx;
-                let sum = arr[i].x;
-                let count = 1;
-                if (i > 0) { sum += arr[i - 1].x; count++; }
-                if (i < arr.length - 1) { sum += arr[i + 1].x; count++; }
-                return sum / count;
-            };
-
-            // Pre-calculate derived data
-            for (let i = 0; i < gazeData.length; i++) {
-                const d = gazeData[i];
-                d.t = Number(d.t);
-                d.x = Number(d.x);
-                if (i > 0) {
-                    const dt = d.t - gazeData[i - 1].t;
-                    if (dt > 0) d.vx = (d.x - gazeData[i - 1].x) / dt;
-                    else d.vx = 0;
-                } else {
-                    d.vx = 0;
-                }
-                d.gx = getSmoothX(gazeData, i); // Ensure smooth X
-                d.refinedGLI = -1; // Init
-            }
-
-            // SIMULATION LOOP
-            for (let i = 2; i < gazeData.length; i++) {
-                const d0 = gazeData[i];
-                const d1 = gazeData[i - 1];
-                const d2 = gazeData[i - 2];
-                const now = d0.t;
-
-                // [NEW] Context Reset (Sync Down)
-                // If actual line index resets (e.g. New Level), force GLI down.
-                if (typeof d0.lineIndex === 'number' && d0.lineIndex >= 0) {
-                    if (simGLI > d0.lineIndex) {
-                        simGLI = d0.lineIndex;
-                    }
-                }
-
-                // 1. Wait for Content
-                if (!hasContentStarted) {
-                    if (typeof d0.lineIndex === 'number' && d0.lineIndex >= 0) {
-                        hasContentStarted = true;
-                        simGLI = d0.lineIndex; // Sync Start
-                    }
-                    d0.refinedGLI = hasContentStarted ? simGLI : -1;
-                    continue; // Skip detection until started
-                }
-
-                // 2. Detect Logic
-                const sx0 = d0.gx;
-                const sx1 = d1.gx;
-                const sx2 = d2.gx;
-                const v0 = d0.vx;
-                const v1 = d1.vx;
-
-                // Peak
-                const isPosPeak = (sx1 >= sx2) && (sx1 > sx0);
-                if (isPosPeak) lastPosPeakTime = d1.t;
-
-                // Valley
-                const isVelValley = (d2.vx > v1) && (v1 < v0);
-                const isDeepEnough = v1 < -0.4;
-
-                if (isVelValley && isDeepEnough) {
-                    const timeSincePeak = d1.t - lastPosPeakTime;
-                    if (Math.abs(timeSincePeak) < 600) {
-                        if (now - lastTriggerTime >= 800) {
-                            // Constraint: Cannot exceed Actual Line Index
-                            if (typeof d0.lineIndex === 'number' && d0.lineIndex >= 0) {
-                                if (simGLI >= d0.lineIndex) {
-                                    // Block overshoot
-                                    d0.refinedGLI = simGLI;
-                                    continue;
-                                }
-                            }
-                            // Trigger!
-                            simGLI++;
-                            lastTriggerTime = now;
-                            lastPosPeakTime = 0;
-                        }
-                    }
-                }
-                d0.refinedGLI = simGLI;
-            }
-
-            // ---------------------------------------------------------
-            // PHASE 2 & 3: Segmentation & Mapping
-            // ---------------------------------------------------------
+            console.log(`[TextRenderer] Found ${pangLogs.length} Pang Events for Replay.`);
 
             const processedPath = [];
-            // Group by GLI
-            const segments = {};
 
-            gazeData.forEach(d => {
-                if (typeof d.refinedGLI !== 'number' || d.refinedGLI < 0) return;
-                const gli = d.refinedGLI;
+            // ---------------------------------------------------------
+            // LOGIC: Filter data based on Pang Logs
+            // ---------------------------------------------------------
+            // For each Successful Pang Event (Line N finished at Time T_end):
+            // 1. Identify Start Time T_start for this line.
+            //    - T_start is roughly when the gaze FIRST entered Line N.
+            // 2. Extract Data in [T_start, T_end].
+            // 3. Map Y to Line N's fixed Visual Y.
+            // 4. Map X to SmoothX.
+            // 5. Ignore lines without Pang Events.
 
-                // Only consider valid lines that actually exist in visualLines
-                if (gli >= visualLines.length) return;
+            if (pangLogs.length === 0) {
+                console.log("[TextRenderer] No Pang Events recorded. Skipping Replay.");
+                if (onComplete) onComplete();
+                return;
+            }
 
-                if (!segments[gli]) {
-                    segments[gli] = { points: [], minX: Infinity, maxX: -Infinity };
-                }
-                const seg = segments[gli];
-                seg.points.push(d);
-                if (d.x < seg.minX) seg.minX = d.x;
-                if (d.x > seg.maxX) seg.maxX = d.x;
-            });
+            // Sort Logs by Time (just in case)
+            pangLogs.sort((a, b) => a.t - b.t);
 
-            // Process each segment to path
-            const sortedGLIs = Object.keys(segments).map(Number).sort((a, b) => a - b);
+            // Iterate Logs
+            let lastLogEndTime = 0; // To prevent overlap if needed, or track gaps
 
-            sortedGLIs.forEach((gli, idx) => {
-                const seg = segments[gli];
-                const lineObj = visualLines[gli];
+            pangLogs.forEach((log, idx) => {
+                const targetLineIndex = log.lineIndex;
+                const endTime = log.t;
 
-                const targetLeft = lineObj.rect.left;
-                const targetWidth = lineObj.rect.width;
+                // Safety: Check if line exists
+                if (!visualLines[targetLineIndex]) return;
+                const targetLineObj = visualLines[targetLineIndex];
+                const fixedY = targetLineObj.visualY;
 
-                const sourceWidth = seg.maxX - seg.minX;
+                // Find Start Time for this Line
+                // We scan gazeData backwards from endTime until we find a different lineIndex
+                // OR we can just grab all data with (lineIndex == targetLineIndex) that is BEFORE endTime
+                // and AFTER the previous log's time.
 
-                // Push a "JUMP" marker if not first segment
-                if (idx > 0) {
-                    // Jump time is roughly between end of prev segment and start of this one
-                    processedPath.push({ isJump: true });
-                }
+                // Let's use the GazeData's own timestamps.
+                // Filter condition:
+                // 1. lineIndex === targetLineIndex (Strict content match)
+                // 2. t <= endTime (Before the Pang happened)
+                // 3. t > lastLogEndTime (After previous event finished) - Optional but good for hygiene
 
-                seg.points.forEach(p => {
-                    let mappedX = targetLeft;
-                    if (sourceWidth > 20) {
-                        let ratio = (p.x - seg.minX) / sourceWidth;
-                        // Avoid extreme jitter - clamp 0..1
-                        ratio = Math.max(0, Math.min(1, ratio));
-                        mappedX = targetLeft + (ratio * targetWidth);
-                    } else {
-                        // Tiny segment (e.g. single word/point)
-                        // Just place at start + minimal offset
-                        mappedX = targetLeft + 10;
+                const segmentData = gazeData.filter(d => {
+                    return (
+                        d.t <= endTime &&
+                        d.t > lastLogEndTime &&
+                        typeof d.lineIndex === 'number' &&
+                        d.lineIndex === targetLineIndex
+                    );
+                });
+
+                if (segmentData.length < 5) {
+                    // Too short segment, maybe skip?
+                    // console.warn(`[Replay] Line ${targetLineIndex} segment too short (${segmentData.length} pts).`);
+                } else {
+                    // console.log(`[Replay] Adding Line ${targetLineIndex}: ${segmentData.length} pts.`);
+
+                    // Add Jump Marker if this is not the first segment
+                    if (processedPath.length > 0) {
+                        processedPath.push({ isJump: true });
                     }
 
-                    processedPath.push({
-                        x: mappedX,
-                        y: lineObj.rect.top + (lineObj.rect.height / 2), // Mathematically Centered Y
-                        t: p.t,
-                        isJump: false
+                    segmentData.forEach(d => {
+                        // Use SmoothX if available, else RawX
+                        const gx = (typeof d.gx === 'number') ? d.gx : d.x;
+
+                        processedPath.push({
+                            x: gx,
+                            y: fixedY, // FORCE Y to Center of Line
+                            t: d.t,
+                            isJump: false
+                        });
                     });
-                });
+                }
+
+                lastLogEndTime = endTime;
             });
 
             // [DEBUG] Expose Replay Path for Dashboard
@@ -888,7 +817,7 @@ class TextRenderer {
             // VALIDATION & RENDER
             // ---------------------------------------------------------
             if (processedPath.length < 2) {
-                console.warn("[TextRenderer] No processed path generated.");
+                console.warn("[TextRenderer] No processed path generated (maybe no data matched Pang Logs).");
                 if (onComplete) onComplete();
                 return;
             }
@@ -906,7 +835,7 @@ class TextRenderer {
 
             const path = processedPath;
             let startTime = null;
-            const duration = 5000; // Slowed down by 2x (was 2500)
+            const duration = 5000; // Fixed 5s Replay
 
             const animate = (timestamp) => {
                 // Safety enforcement
@@ -924,11 +853,13 @@ class TextRenderer {
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // Draw Head Only (No Trail)
+                // Calculate current frame index based on progress
+                // Since path contains jumps, we traverse it strictly by index ratio
                 const maxIdx = Math.floor(path.length * progress);
 
-                if (maxIdx > 1) {
-                    const head = path[maxIdx - 1];
+                // Draw Head (No Trail)
+                if (maxIdx >= 0 && maxIdx < path.length) {
+                    const head = path[maxIdx];
                     if (head && !head.isJump) {
                         ctx.beginPath();
                         ctx.fillStyle = '#00ff00'; // Green

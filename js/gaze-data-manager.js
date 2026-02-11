@@ -24,6 +24,7 @@ export class GazeDataManager {
 
         // NEW: Max Reach Line Guard (V9.5) - Tracks highest line index triggered
         this.maxLineIndexReached = -1; // Initialize to -1 so line 0 can fire (0 > -1)
+        this.pangLog = []; // NEW: Log of successful Pang events
     }
 
     /**
@@ -250,8 +251,13 @@ export class GazeDataManager {
         this.lastPosPeakTime = 0;
         this.pendingReturnSweep = null;
         this.maxLineIndexReached = -1; // Reset max reach guard
-        // Also reset visual context if needed, but context comes from TextRenderer updates.
+        this.pangLog = []; // NEW: Reset Pang Logs
         console.log("[GazeDataManager] Triggers Reset (New Content Started).");
+    }
+
+    // NEW: Retrieve Pang Logs for Replay
+    getPangLogs() {
+        return this.pangLog || [];
     }
 
     exportCSV(startTime = 0, endTime = Infinity) {
@@ -662,7 +668,20 @@ export class GazeDataManager {
 
         console.log(`[RS] 💥 TRIGGER! (${type}) VX:${vx.toFixed(2)} at ${d0.t}ms`);
 
-        // 1. Visual Effect (Existing)
+        // Determine Target Line (The line just finished)
+        // Return Sweep means we moved FROM line N TO line N+1. We want to mark line N.
+        const targetLine = (d0.lineIndex > 0) ? d0.lineIndex - 1 : 0;
+
+        // [NEW] Log for Replay
+        if (this.pangLog) {
+            this.pangLog.push({
+                t: d0.t,
+                lineIndex: targetLine,
+                type: type,
+                vx: vx
+            });
+        }
+
         // 1. Visual Effect (Existing)
         if (window.Game && window.Game.typewriter && window.Game.typewriter.renderer &&
             typeof window.Game.typewriter.renderer.triggerReturnEffect === 'function') {
@@ -671,9 +690,6 @@ export class GazeDataManager {
             // This prevents Pang effects during Boss Battles or Transitions.
             const readScreen = document.getElementById('screen-read');
             if (readScreen && readScreen.classList.contains('active')) {
-                // [Fix 2] Target the PREVIOUS line (the one just finished), not the current one.
-                // Return Sweep means we moved FROM line N TO line N+1. We want to mark line N.
-                const targetLine = (d0.lineIndex > 0) ? d0.lineIndex - 1 : 0;
                 window.Game.typewriter.renderer.triggerReturnEffect(targetLine);
             }
         }
