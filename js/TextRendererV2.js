@@ -784,12 +784,48 @@ class TextRenderer {
                         processedPath.push({ isJump: true });
                     }
 
+                    // --- [NEW] X-Axis Scaling Logic ---
+                    // 1. Calculate Source Range (MinX, MaxX) from actual gaze data
+                    let sourceMinX = Infinity;
+                    let sourceMaxX = -Infinity;
+
+                    segmentData.forEach(d => {
+                        const gx = (typeof d.gx === 'number') ? d.gx : d.x;
+                        if (gx < sourceMinX) sourceMinX = gx;
+                        if (gx > sourceMaxX) sourceMaxX = gx;
+                    });
+
+                    const sourceWidth = sourceMaxX - sourceMinX;
+
+                    // Target Visual Range (Text Line Width)
+                    const targetLeft = targetLineObj.rect.left;
+                    const targetWidth = targetLineObj.rect.width; // Should be full width
+
                     segmentData.forEach(d => {
                         // Use SmoothX if available, else RawX
                         const gx = (typeof d.gx === 'number') ? d.gx : d.x;
 
+                        let scaledX = gx;
+
+                        // Apply Scaling only if we have a valid width to map
+                        if (sourceWidth > 10 && targetWidth > 0) {
+                            // Normalize (0.0 ~ 1.0)
+                            let ratio = (gx - sourceMinX) / sourceWidth;
+
+                            // Clamp (Optional but recommended to stay within bounds)
+                            ratio = Math.max(0, Math.min(1, ratio));
+
+                            // Map to Target
+                            scaledX = targetLeft + (ratio * targetWidth);
+                        } else {
+                            // Fallback for single points or zero-width checks
+                            // Just center it or place at start?
+                            // Let's place it relative to start
+                            scaledX = targetLeft + (gx - sourceMinX);
+                        }
+
                         processedPath.push({
-                            x: gx,
+                            x: scaledX, // SCALED X
                             y: fixedY, // FORCE Y to Center of Line
                             t: d.t,
                             isJump: false
