@@ -752,7 +752,12 @@ const Game = {
     // --- NEW: Enriched Game Flow (Debug / Implementation) ---
     debugFinalVillain() {
         console.log("Debug: Starting Final Villain Sequence");
-        this.switchScreen("screen-new-villain");
+        if (this.typewriter && typeof this.typewriter.triggerFinalBossBattle === "function") {
+            this.typewriter.triggerFinalBossBattle();
+        } else {
+            console.error("Game.typewriter.triggerFinalBossBattle is missing!");
+            this.switchScreen("screen-final-boss"); // Fallback
+        }
     },
 
     goToNewScore() {
@@ -1339,10 +1344,23 @@ Game.typewriter = {
     checkFinalBossAnswer(index) {
         if (index === this.finalQuiz.a) {
             // TRUE VICTORY
-            alert("ARCH-VILLAIN DEFEATED! The Rift is sealed forever.");
+            // alert("ARCH-VILLAIN DEFEATED! The Rift is sealed forever."); // Removed per request
             Game.addGems(30); // +30 Gem (Final Boss)
 
-            Game.switchScreen("screen-win");
+            // Animation
+            const villainImg = document.querySelector("#screen-final-boss .villain-img");
+            if (villainImg) {
+                villainImg.classList.add("villain-defeated");
+            }
+            if (typeof Game.spawnFloatingText === "function") {
+                Game.spawnFloatingText(document.querySelector("#screen-final-boss h3"), "RIFT SEALED!", "bonus");
+            }
+
+            // Delay and Switch to New Sequence (Final Villain Screen -> Score -> etc)
+            setTimeout(() => {
+                Game.switchScreen("screen-new-villain");
+            }, 2500);
+
         } else {
             Game.addGems(-30); // -30 Gem (Penalty)
             const btn = document.querySelectorAll("#final-boss-options .quiz-btn")[index];

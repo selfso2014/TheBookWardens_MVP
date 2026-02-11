@@ -747,3 +747,40 @@ span.tr-word.chunk-fade-out {
   transform: translateY(0) !important;
   transition: opacity 1.0s ease-out, visibility 1.0s linear;
 }
+
+/* --- Villain Defeat Animation --- */
+@keyframes villain-defeat {
+  0% {
+    transform: scale(1) rotate(0deg);
+    filter: hue-rotate(280deg) drop-shadow(0 0 20px red);
+  }
+
+  20% {
+    transform: scale(1.1) rotate(-10deg);
+    filter: hue-rotate(0deg) invert(0.2);
+  }
+
+  40% {
+    transform: scale(1.1) rotate(10deg);
+    filter: hue-rotate(90deg) invert(0.5);
+  }
+
+  60% {
+    transform: scale(0.8) rotate(-10deg);
+    filter: hue-rotate(180deg) invert(0.8);
+  }
+
+  80% {
+    transform: scale(0.4) rotate(10deg);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+.villain-defeated {
+  animation: villain-defeat 2.5s forwards ease-in-out;
+}
