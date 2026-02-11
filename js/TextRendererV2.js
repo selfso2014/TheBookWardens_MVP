@@ -855,32 +855,17 @@ class TextRenderer {
 
             const path = processedPath;
 
-            // --- 2. Combo System Setup (NEW) ---
-            // Sort Pang Logs relative to start time of the path
-            // The path might start later than 0 if first segment was filtered.
-            // But we used 'processedPath' which has 't'.
-            // Let's use the 't' inside processedPath for timing.
+            // --- 2. Combo System Setup ---
             const pathStartTime = path[0].t;
             const pathEndTime = path[path.length - 1].t;
-            const duration = 5000; // Fixed 5s Replay Scaling? Or use real time?
 
-            // The original code used a fixed 5s duration and mapped progress (0..1).
-            // We should stick to that visual pacing for consistency.
+            // [SPEED UP] Make replay very fast (2.0s fixed)
+            const duration = 2000;
 
             let startTime = null;
 
-            // Prepare Combo Events:
-            // We need to map real 'pangLog.t' to the normalized duration (0..5000ms).
-            // This is tricky. 
-            // Better strategy: The CANVA LOOP uses 'progress' (0..1).
-            // We can match pang events based on their chronological order relative to the path.
-
             // Remap logs to Progress (0..1)
             const replayEvents = rawPangLogs.map(log => {
-                // Find where this log fits in terms of time relative to path start/end
-                // log.t is absolute timestamp.
-
-                // Clamp to path range
                 let t = log.t;
                 if (t < pathStartTime) t = pathStartTime;
                 if (t > pathEndTime) t = pathEndTime;
@@ -890,7 +875,6 @@ class TextRenderer {
 
                 return {
                     progressTrigger: ratio, // 0.0 ~ 1.0
-                    originalT: t,
                     lineIndex: log.lineIndex,
                     triggered: false
                 };
@@ -902,15 +886,14 @@ class TextRenderer {
                 lastLine: -1,
                 totalScore: 0
             };
-            this._initScoreUI(); // Create UI Container
+
+            // No more giant UI container (_initScoreUI removed)
 
             const animate = (timestamp) => {
-                // Safety enforcement
                 forceVisibility();
 
                 if (!startTime) startTime = timestamp;
 
-                // Normalizing time to fixed duration
                 const elapsed = timestamp - startTime;
                 const progress = elapsed / duration;
 
@@ -923,21 +906,18 @@ class TextRenderer {
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // --- 3. Combo Check (NEW) ---
+                // --- 3. Combo Check ---
                 this._checkReplayCombo(progress, replayEvents, visualLines);
 
-                // --- 4. Draw Path (Existing) ---
-                // Calculate current frame index based on progress
-                // Since path contains jumps, we traverse it strictly by index ratio
+                // --- 4. Draw Path ---
                 const maxIdx = Math.floor(path.length * progress);
 
-                // Draw Head (No Trail)
                 if (maxIdx >= 0 && maxIdx < path.length) {
                     const head = path[maxIdx];
                     if (head && !head.isJump) {
                         ctx.beginPath();
-                        ctx.fillStyle = '#00ff00'; // Green
-                        ctx.shadowColor = '#00ff00'; // Green Glow
+                        ctx.fillStyle = '#00ff00';
+                        ctx.shadowColor = '#00ff00';
                         ctx.shadowBlur = 10;
                         ctx.arc(head.x, head.y, 8, 0, Math.PI * 2);
                         ctx.fill();
@@ -953,109 +933,75 @@ class TextRenderer {
 
     // --- COMBO SYSTEM HELPERS ---
 
-    _initScoreUI() {
-        let container = document.getElementById('replay-score-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'replay-score-container';
-            container.style.position = 'fixed';
-            container.style.top = '0';
-            container.style.left = '0';
-            container.style.width = '100%';
-            container.style.height = '100%';
-            container.style.pointerEvents = 'none';
-            container.style.zIndex = '1000000'; // Above Canvas
-            document.body.appendChild(container);
-        }
-        this.scoreContainer = container;
-        this.scoreContainer.innerHTML = ''; // Start clean
-    }
-
     _checkReplayCombo(progress, events, visualLines) {
-        // Trigger events slightly earlier than exact time for visual snap? 
-        // No, stay accurate. 
-
         events.forEach(ev => {
             if (!ev.triggered && progress >= ev.progressTrigger) {
                 ev.triggered = true;
 
-                // Logic
                 const lineIdx = ev.lineIndex;
                 let score = 10;
-                let isCombo = false;
 
                 // Continuity: line == last + 1
                 if (lineIdx === this.comboState.lastLine + 1) {
                     this.comboState.current++;
-                    isCombo = true;
                 } else {
-                    // Reset, unless straight to 0 (First line)
                     if (this.comboState.lastLine === -1 && lineIdx === 0) {
                         this.comboState.current = 1;
-                        isCombo = true;
                     } else {
                         this.comboState.current = 1;
                     }
                 }
 
-                // Combo Bonus
                 if (this.comboState.current > 1) {
-                    score += (this.comboState.current * 10); // +10, +20, +30...
+                    score += (this.comboState.current * 10);
                 }
 
                 this.comboState.totalScore += score;
                 this.comboState.lastLine = lineIdx;
 
-                // Visual
                 if (visualLines[lineIdx]) {
                     const lineY = visualLines[lineIdx].visualY;
-                    this._showScorePopup(score, lineIdx, this.comboState.current, lineY);
-
-                    // Trigger Pang Marker Flash
-                    // (Reuse renderer's trigger effect logic visually?)
-                    // Let's just spawn a distinct Replay Flash
+                    // Trigger minimal popup & flash
+                    this._showMiniScore(score, lineY);
                     this._spawnReplayPulse(lineY);
                 }
 
-                // Add Ink Real (Optional)
                 if (window.Game && typeof window.Game.addInk === 'function') {
-                    // window.Game.addInk(score); // Uncomment to enable real rewards
+                    // window.Game.addInk(score); 
                 }
             }
         });
     }
 
-    _showScorePopup(score, lineIndex, combo, yPos) {
-        if (!this.scoreContainer) return;
-
+    _showMiniScore(score, yPos) {
+        // Minimalist Score Popup (No "Combo" text, just points)
         const el = document.createElement('div');
-        el.className = 'replay-score-popup';
-        el.innerHTML = `<span style="color:#ffff00; font-weight:bold; font-size:1.5rem;">+${score}</span>`;
-        if (combo > 1) {
-            el.innerHTML += `<br><span style="color:cyan; font-size:1rem; text-shadow:0 0 5px cyan;">COMBO x${combo}</span>`;
-        }
+        el.className = 'replay-mini-score';
+        el.innerHTML = `+${score}`;
 
-        const xPos = window.innerWidth - 80; // Right side
+        const xPos = window.innerWidth - 60;
 
-        el.style.position = 'absolute';
+        el.style.position = 'fixed';
         el.style.left = xPos + 'px';
         el.style.top = yPos + 'px';
         el.style.transform = 'translate(-50%, -50%)';
-        el.style.textAlign = 'center';
-        el.style.transition = 'top 1s ease-out, opacity 1s ease-in';
+        el.style.color = '#ffff00'; // Yellow
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '14px'; // Small
+        el.style.fontFamily = 'monospace';
+        el.style.pointerEvents = 'none';
+        el.style.zIndex = '1000000';
+        el.style.transition = 'top 0.5s ease-out, opacity 0.5s ease-in';
         el.style.opacity = '1';
-        el.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
 
-        this.scoreContainer.appendChild(el);
+        document.body.appendChild(el);
 
-        // Animate
         requestAnimationFrame(() => {
-            el.style.top = (yPos - 50) + 'px'; // Float up
+            el.style.top = (yPos - 30) + 'px'; // Move up slightly
             el.style.opacity = '0';
         });
 
-        // Cleanup
-        setTimeout(() => { if (el.parentNode) el.remove(); }, 1000);
+        setTimeout(() => { if (el.parentNode) el.remove(); }, 500);
     }
 
     _spawnReplayPulse(yPos) {
@@ -1063,23 +1009,23 @@ class TextRenderer {
         pulse.style.position = 'fixed';
         pulse.style.right = '20px';
         pulse.style.top = yPos + 'px';
-        pulse.style.width = '10px';
-        pulse.style.height = '10px';
+        pulse.style.width = '8px';
+        pulse.style.height = '8px';
         pulse.style.borderRadius = '50%';
         pulse.style.backgroundColor = 'magenta';
-        pulse.style.boxShadow = '0 0 20px magenta';
+        pulse.style.boxShadow = '0 0 10px magenta';
         pulse.style.zIndex = '999999';
         pulse.style.transform = 'translate(50%, -50%) scale(1)';
-        pulse.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+        pulse.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
 
         document.body.appendChild(pulse);
 
         requestAnimationFrame(() => {
-            pulse.style.transform = 'translate(50%, -50%) scale(4)';
+            pulse.style.transform = 'translate(50%, -50%) scale(3)';
             pulse.style.opacity = '0';
         });
 
-        setTimeout(() => pulse.remove(), 300);
+        setTimeout(() => pulse.remove(), 200);
     }
 }
 window.TextRenderer = TextRenderer;
