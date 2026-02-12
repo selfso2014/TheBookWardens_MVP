@@ -1004,37 +1004,45 @@ class TextRenderer {
     }
 
     _showMiniScore(score, yPos) {
-        // Minimalist Score Popup (No "Combo" text, just points)
+        // [ENHANCED] Combo Text (150% Scale)
         const el = document.createElement('div');
         el.className = 'replay-mini-score';
-        el.innerHTML = `+${score}`;
+        el.innerHTML = `Combo! <br>+${score}`; // Combo text + Score
 
         const xPos = window.innerWidth - 60;
 
         el.style.position = 'fixed';
         el.style.left = xPos + 'px';
         el.style.top = yPos + 'px';
-        el.style.transform = 'translate(-50%, -50%)';
-        el.style.color = '#ffff00'; // Yellow
+        el.style.transform = 'translate(-50%, -50%) scale(0)'; // Start scaling from 0
+        el.style.color = '#FFD700'; // Gold Color for Combo
         el.style.fontWeight = 'bold';
-        el.style.fontSize = '14px'; // Small
+        el.style.fontSize = '24px'; // Larger Base Font
         el.style.fontFamily = 'monospace';
         el.style.pointerEvents = 'none';
         el.style.zIndex = '1000000';
-        el.style.transition = 'top 0.5s ease-out, opacity 0.5s ease-in';
+        el.style.textAlign = 'center';
+        el.style.textShadow = '0 0 10px orange'; // Glow
+        // Apply Transition for Scale & Opacity
+        el.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s 0.5s';
         el.style.opacity = '1';
 
         document.body.appendChild(el);
 
+        // Pop Up Animation (Scale 1.5)
         requestAnimationFrame(() => {
-            el.style.top = (yPos - 30) + 'px'; // Move up slightly
-            el.style.opacity = '0';
+            el.style.transform = 'translate(-50%, -50%) scale(1.5)';
+            el.style.opacity = '1';
         });
 
-        // [NEW] Trigger Flying Ink Animation
+        // Trigger Flying Ink Animation
         this._animateScoreToHud(xPos, yPos, score);
 
-        setTimeout(() => { if (el.parentNode) el.remove(); }, 500);
+        // Remove after delay
+        setTimeout(() => {
+            el.style.opacity = '0';
+            setTimeout(() => { if (el.parentNode) el.remove(); }, 500);
+        }, 800);
     }
 
     _animateScoreToHud(startX, startY, score) {
