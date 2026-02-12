@@ -692,30 +692,62 @@ const Game = {
             p.style.backgroundColor = color;
             p.style.boxShadow = "0 0 10px " + color;
 
+            // Bezier Control Point (Random curve direction)
+            // Midpoint between start and target
+            const midX = (startX + targetX) / 2;
+            const midY = (startY + targetY) / 2;
+            // Offset for curve
+            const curveStrength = 150 + Math.random() * 200; // Strong curve
+            const curveAngle = Math.random() * Math.PI * 2;
+            const cpX = midX + Math.cos(curveAngle) * curveStrength;
+            const cpY = midY + Math.sin(curveAngle) * curveStrength;
+
+            // Generate Keyframes for Bezier Curve
+            const keyframes = [];
+            const steps = 30; // Smoothness
+            for (let s = 0; s <= steps; s++) {
+                const t = s / steps;
+                // Quadratic Bezier Formula: B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
+                const xx = (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * cpX + t * t * targetX;
+                const yy = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * cpY + t * t * targetY;
+
+                // Scale & Opacity Logic for Impact
+                let scale = 1;
+                let opacity = 1;
+
+                // 1. Burst Start (t: 0 -> 0.2)
+                if (t < 0.2) {
+                    scale = 0.5 + (t * 5); // 0.5 -> 1.5 (Pop out)
+                }
+                // 2. Flight (t: 0.2 -> 0.8)
+                else if (t < 0.8) {
+                    scale = 1.5 - ((t - 0.2) * 0.5); // 1.5 -> 1.2 (Slight shrink)
+                }
+                // 3. Arrival Impact (t: 0.8 -> 1.0)
+                else {
+                    // Do NOT fade out. Accelerate into target.
+                    scale = 1.2 - ((t - 0.8) * 4); // 1.2 -> 0.4 (Collapse into icon)
+                    opacity = 1; // Keep fully visible until impact
+                }
+
+                // Append to keyframes
+                keyframes.push({
+                    left: `${xx}px`,
+                    top: `${yy}px`,
+                    transform: `scale(${scale})`,
+                    opacity: opacity,
+                    offset: t
+                });
+            }
+
             document.body.appendChild(p);
 
-            // Calculate Burst Vector
-            const angle = Math.random() * Math.PI * 2;
-            const velocity = 40 + Math.random() * 60; // Explosion radius (stronger burst)
-            const burstX = Math.cos(angle) * velocity;
-            const burstY = Math.sin(angle) * velocity;
-
-            // Delta to Target
-            const deltaX = targetX - startX;
-            const deltaY = targetY - startY;
-
-            // Animation: Burst -> Curve -> Target
-            // Increased duration by ~150% (was 800-1200, now 1200-1800)
+            // Animation: Bezier Curve
             const duration = 1200 + Math.random() * 600;
 
-            const anim = p.animate([
-                { transform: 'translate(0,0) scale(0.5)', opacity: 1, offset: 0 },
-                { transform: `translate(${burstX}px, ${burstY}px) scale(1.5)`, opacity: 1, offset: 0.15 }, // Quick Burst
-                { transform: `translate(${burstX * 0.8}px, ${burstY * 0.8}px) scale(1.2)`, offset: 0.3 }, // Hover slightly
-                { transform: `translate(${deltaX}px, ${deltaY}px) scale(0.2)`, opacity: 0, offset: 1 } // Fly to target
-            ], {
+            const anim = p.animate(keyframes, {
                 duration: duration,
-                easing: "cubic-bezier(0.25, 0.1, 0.25, 1)", // Ease out cubic
+                easing: "linear", // Keyframes handle easing via spacing if needed, but linear t allows consistent curve
                 fill: "forwards"
             });
 
@@ -723,13 +755,15 @@ const Game = {
                 p.remove();
                 // Pump Effect on Target (Trigger on first few for impact)
                 if (i === 0) {
-                    targetEl.style.transition = "transform 0.2s, filter 0.2s";
-                    targetEl.style.transform = "scale(1.6)";
-                    targetEl.style.filter = "brightness(2) drop-shadow(0 0 15px gold)";
+                    targetEl.style.transition = "transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                    targetEl.style.transform = "scale(1.8)";
+                    targetEl.style.filter = "brightness(2.5) drop-shadow(0 0 20px gold)";
+
+                    // Reset quickly
                     setTimeout(() => {
                         targetEl.style.transform = "scale(1)";
                         targetEl.style.filter = "brightness(1)";
-                    }, 300);
+                    }, 200);
                 }
             };
         }
