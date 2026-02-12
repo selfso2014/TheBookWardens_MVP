@@ -352,22 +352,24 @@ const Game = {
     runWPMPreview(container, wpm, text) {
         container.innerHTML = "";
         container.style.position = "relative";
-        container.style.whiteSpace = "normal"; // Allow wrap if needed, but usually single line
+        container.style.whiteSpace = "normal"; // Allow word wrap
         container.style.overflow = "hidden";
-        container.style.display = "block"; // Ensure block layout for words
-        container.style.height = "2.5em"; // Fixed height
+        container.style.display = "block";
+        container.style.height = "auto";
+        container.style.minHeight = "2.5em";
 
-        // chunk logic: split by space
+        // Split into words
         const words = text.split(" ");
         let wordSpans = [];
 
-        // Pre-create generic spans (mimicking TextRenderer structure)
+        // Pre-create spans (Word-Based)
         words.forEach(w => {
             const span = document.createElement("span");
             span.textContent = w;
             span.style.opacity = "0";
             span.style.marginRight = "0.3em";
             span.style.display = "inline-block";
+            // Game-like Fade In + Slide Up
             span.style.transition = "opacity 0.4s ease-out, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
             span.style.transform = "translateY(10px)";
             span.style.color = "#ccc"; // Preview color
@@ -381,23 +383,34 @@ const Game = {
         let timer = null;
         let chunkCount = 0;
 
-        // Game Logic Factors
-        const WORD_INTERVAL = 150; // Fixed 150ms per word (Game Logic)
+        // --- SPECIFICATION ---
+        // Word Interval: Fixed 150ms (Matches Game)
+        const WORD_INTERVAL = 150;
 
-        // Pause Calculation: Mimic Game.selectWPM logic
-        // Game: targetChunkDelay = (10000 / wpm) * 8
-        // e.g. 100 WPM -> 100ms * 8 = 800ms
-        // e.g. 300 WPM -> 33ms * 8 = ~260ms
+        // Target Chunk Size (Variable by WPM)
+        let targetChunkSize = 4; // Default (200 WPM)
+        if (wpm <= 100) targetChunkSize = 3; // Short (2-3)
+        if (wpm >= 300) targetChunkSize = 6; // Long (5-6)
+
+        // Pause Calibration (Calculated to approximate WPM)
+        // Formula: Pause = (ChunkSize * 60000 / WPM) - (ChunkSize * 150)
+        // We use a simplified multiplier based on the spec analysis.
+        let pauseMultiplier = 1.0;
+        if (wpm <= 100) pauseMultiplier = 1.4; // Need longer pause
+        if (wpm === 200) pauseMultiplier = 1.5; // Correction
+        if (wpm >= 300) pauseMultiplier = 1.0; // Close enough
+
+        // Base Calculation from Game Logic
         const baseDelay = Math.floor(10000 / wpm);
-        const chunkPause = Math.max(200, baseDelay * 8);
+        // Apply calibration
+        const calibratedPause = Math.max(200, (baseDelay * 8) * pauseMultiplier);
 
         const tick = () => {
             if (!isRunning) return;
 
+            // Check Reset
             if (currentIndex >= wordSpans.length) {
-                // Determine restart
                 setTimeout(() => {
-                    // Reset all
                     wordSpans.forEach(s => {
                         s.style.opacity = "0";
                         s.style.transform = "translateY(10px)";
@@ -405,45 +418,41 @@ const Game = {
                     currentIndex = 0;
                     chunkCount = 0;
                     tick();
-                }, 2000); // 2s wait before loop
+                }, 2000);
                 return;
             }
 
             const span = wordSpans[currentIndex];
             const wordText = words[currentIndex];
 
-            // Reveal Word (Animation)
+            // Reveal Word
             span.style.opacity = "1";
             span.style.transform = "translateY(0)";
 
-            // Logic: Move to next
             currentIndex++;
             chunkCount++;
 
             // Fade Out Scheduling (Tail Effect)
-            // In game: 3000ms. Here: quick fade to keep box clean
             setTimeout(() => {
                 if (isRunning && span) {
-                    span.style.opacity = "0.3"; // Dim instead of hide for preview
+                    span.style.opacity = "0.3";
                 }
             }, 2000);
 
             // Determine Next Delay
-            let nextDelay = WORD_INTERVAL; // Default speed between words
+            let nextDelay = WORD_INTERVAL;
 
-            // Check for Pause Condition (Punctuation or Chunk Size)
+            // Check Chunk/Pause Condition
             const isEnd = wordText.includes('.') || wordText.includes('?') || wordText.includes('!');
             const isComma = wordText.includes(',');
 
-            if (isEnd || isComma || chunkCount >= 4) {
-                nextDelay = chunkPause;
-                chunkCount = 0; // Reset chunk
-            }
+            // Logic: Pause if Punctuation OR Chunk Size Reached
+            if (isEnd || isComma || chunkCount >= targetChunkSize) {
+                nextDelay = calibratedPause;
 
-            // Correction for 100 WPM to make it distinctly slower in FEEL
-            // Since WordInterval is fixed, slower WPM must have MUCH longer pauses.
-            if (wpm <= 100 && (isEnd || chunkCount === 0)) {
-                nextDelay *= 1.5;
+                // Reset chunk count. 
+                // For 100 WPM, maybe randomize 2 or 3? Let's stick to 3 for consistency.
+                chunkCount = 0;
             }
 
             timer = setTimeout(tick, nextDelay);
@@ -452,7 +461,7 @@ const Game = {
         // Start
         tick();
 
-        // Cleanup Hook
+        // Cleanup
         container._previewCleanup = () => {
             isRunning = false;
             if (timer) clearTimeout(timer);
