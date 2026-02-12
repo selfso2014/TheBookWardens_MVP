@@ -339,23 +339,18 @@ const Game = {
         const fullText = sentences.join(" ");
         const words = fullText.split(" ");
 
-        // Tuning Table for Natural Reading Feel
-        const TIMING_CONFIG = {
-            100: { char: 90, word: 100, chunk: 600, sentence: 1200 }, // Slow, Deliberate
-            200: { char: 45, word: 50, chunk: 300, sentence: 800 },  // Standard
-            300: { char: 25, word: 30, chunk: 150, sentence: 500 }   // Fast
-        };
-
         boxes.forEach(box => {
-            // Clear existing content
+            // Clear existing content (Remove placeholder spans)
             box.innerHTML = "";
 
             const wpm = parseInt(box.getAttribute('data-wpm'), 10) || 100;
-            const config = TIMING_CONFIG[wpm] || TIMING_CONFIG[100];
+
+            // Formula: Word Interval = 60000 / WPM
+            // Character Interval = Word Interval / 5 (Avg length)
+            const baseCharInterval = (60000 / wpm) / 5;
 
             let currentWordIndex = 0;
             let currentText = "";
-            let chunkWordCount = 0;
 
             // Container for dynamic text
             const textSpan = document.createElement("span");
@@ -375,14 +370,16 @@ const Game = {
                     currentWordIndex = 0;
                     currentText = "";
                     textSpan.textContent = "";
-                    chunkWordCount = 0;
-                    setTimeout(typeNextWord, config.sentence); // Pause before restart
+                    setTimeout(typeNextWord, 1000); // Pause before restart
                     return;
                 }
 
                 const word = words[currentWordIndex];
                 const isEndOfSentence = word.includes('.') || word.includes('?') || word.includes('!');
                 const isComma = word.includes(',');
+
+                // Chunk Logic: Pause every 3-4 words OR at punctuation
+                // Simple heuristic: If punctuation, long pause. Else short pause.
 
                 let charIndex = 0;
 
@@ -391,32 +388,31 @@ const Game = {
                         currentText += word[charIndex];
                         textSpan.textContent = currentText;
                         charIndex++;
-                        setTimeout(typeChar, config.char); // Typing speed
+                        setTimeout(typeChar, baseCharInterval); // Typing speed
                     } else {
                         // Word Finished. Add Space.
                         currentText += " ";
                         textSpan.textContent = currentText;
                         currentWordIndex++;
-                        chunkWordCount++;
 
                         // Calculate Pause to next word
-                        let pause = config.word; // Default word spacing
+                        // Standard Gap: 0 (Continuous typing) vs Chunk Pause?
+                        // User wants "Chunk Concept". Let's pause after words.
 
-                        // Priority: Sentence > Comma > Chunk
+                        let pause = baseCharInterval * 2; // Default word spacing
+
                         if (isEndOfSentence) {
-                            pause = config.sentence;
-                            chunkWordCount = 0; // Reset chunk count
+                            pause = baseCharInterval * 15; // Long pause (~3 words)
                         } else if (isComma) {
-                            pause = config.chunk;
-                            chunkWordCount = 0;
-                        } else if (chunkWordCount >= 4) { // Every 4 words
-                            pause = config.chunk;
-                            chunkWordCount = 0;
+                            pause = baseCharInterval * 8; // Medium pause
+                        } else if (currentWordIndex % 4 === 0) {
+                            pause = baseCharInterval * 6; // Chunk pause every 4 words
                         }
 
-                        // Auto-scroll: Keep last ~30 chars visible
-                        if (currentText.length > 35) {
-                            currentText = "..." + currentText.substring(currentText.length - 32);
+                        // Auto-scroll logic (Keep view fresh)
+                        // If text gets too long, trim start
+                        if (currentText.length > 25) {
+                            currentText = currentText.substring(currentText.indexOf(" ") + 1);
                             textSpan.textContent = currentText;
                         }
 
