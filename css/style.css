@@ -949,3 +949,12 @@ span.tr-word.chunk-fade-out {
          t r a n s f o r m :   t r a n s l a t e X ( - 5 0 % )   t r a n s l a t e Y ( 1 0 p x ) ;  
  }  
  
+/* --- 120% Scale Override for HUD --- */
+@media (max-width: 600px) {
+  .resource-item { padding: 6px 10px !important; font-size: 1.0rem !important; gap: 5px !important; }
+  .res-icon { width: 28px !important; height: 28px !important; }
+  .wpm-badge small { font-size: 0.85rem !important; }
+}
+.res-icon { width: 32px; height: 32px; }
+.wpm-badge span#wpm-display { font-size: 1.2rem; }
+
