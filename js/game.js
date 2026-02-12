@@ -55,25 +55,25 @@ const Game = {
         // Helper for delays
         const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // --- SCENE 1: PEACE (0s - 1.2s) ---
+        // --- SCENE 1: PEACE (0s - 2.2s) ---
         // Text fades in smoothly
-        await wait(200); // Faster start
+        await wait(200);
         textContainer.style.opacity = 1;
         textContainer.style.transform = "translateY(0)";
 
         this.showStoryText("Every story holds a world within.");
-        await wait(1200); // Shortened buildup
+        await wait(2000); // 1.5s reading time + 0.5s fade
 
-        // --- SCENE 2: WARNING (1.2s - 2.4s) ---
+        // --- SCENE 2: WARNING (2.2s - 4.2s) ---
         introScreen.classList.remove("scene-peace");
         introScreen.classList.add("scene-warning");
 
         this.showStoryText("But chaos seeks to consume it.");
         // Villain fades in
         villainContainer.style.opacity = 0.6;
-        await wait(1200); // Shortened buildup
+        await wait(2000); // 1.5s reading time + 0.5s fade
 
-        // --- SCENE 3: INVASION (2.4s - 3.8s) ---
+        // --- SCENE 3: INVASION (4.2s - 5.7s) ---
         introScreen.classList.remove("scene-warning");
         introScreen.classList.add("scene-invasion");
 
@@ -85,10 +85,10 @@ const Game = {
             if (Math.random() > 0.7) this.spawnMeteor(meteorLayer);
         }, 300);
 
-        await wait(1400); // Slightly faster invasion
+        await wait(1500); // 1.0s reading time (Short sentence)
         clearInterval(lightMeteorLoop);
 
-        // --- SCENE 4: DESTRUCTION (3.8s - 6.6s) ---
+        // --- SCENE 4: DESTRUCTION (5.7s - 9.5s) ---
         introScreen.classList.remove("scene-invasion");
         introScreen.classList.add("scene-destruction");
 
@@ -102,7 +102,7 @@ const Game = {
             this.spawnMeteor(meteorLayer); // Double spawn
         }, 100);
 
-        await wait(2000); // Significantly extended for reading time (was 800)
+        await wait(3000); // 2.5s reading time (Essential message)
 
         // Corrupt text
         /* Removed Text Logic */
@@ -112,7 +112,7 @@ const Game = {
 
         // --- SCENE 5: TRANSITION ---
         this.showStoryText("Initializing Word Forge...");
-        await wait(800);
+        await wait(1000);
 
         console.log("Rift Intro Done. Moving to Word Forge.");
         this.state.vocabIndex = 0;
