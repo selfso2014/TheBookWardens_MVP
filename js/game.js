@@ -1335,6 +1335,12 @@ Game.typewriter = {
             // Resume Game Loop safely after layout is ready
             this.isPaused = false;
 
+            // [CRITICAL FIX] Re-enable Tracking!
+            // Tracking is disabled in 'confrontVillain' (Mid-Boss).
+            // We must re-enable it here for the next paragraph.
+            Game.state.isTracking = true;
+            console.log("[Typewriter] Tracking Re-enabled for new paragraph.");
+
             // 3. Start Reading Flow
             // UX IMPROVEMENT: Hide cursor initially. 
             // The screen 'fadeIn' animation shifts the text container. 
