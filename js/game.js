@@ -551,7 +551,19 @@ const Game = {
                 img.style.maxHeight = "100%";
                 img.style.objectFit = "contain";
                 img.style.filter = "drop-shadow(0 0 10px rgba(255, 215, 0, 0.5))";
-                img.onerror = () => { img.style.display = "none"; imgPlaceholder.textContent = "[Magic Art Missing]"; };
+                img.onerror = () => {
+                    img.style.display = "none";
+                    let icon = "📜";
+                    // Fallback Icons based on word context
+                    if (data.word === "Luminous") icon = "✨";
+                    if (data.word === "Peculiar") icon = "🎩";
+                    if (data.word === "Vanish") icon = "💨";
+
+                    imgPlaceholder.style.display = "flex";
+                    imgPlaceholder.style.justifyContent = "center";
+                    imgPlaceholder.style.alignItems = "center";
+                    imgPlaceholder.innerHTML = `<div style="font-size: 80px; text-shadow: 0 0 20px rgba(255,215,0,0.5); animation: float 3s infinite ease-in-out;">${icon}</div>`;
+                };
                 imgPlaceholder.appendChild(img);
             } else {
                 imgPlaceholder.textContent = "[Magic Image Placeholder]";
