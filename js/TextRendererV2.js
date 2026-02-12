@@ -1017,21 +1017,21 @@ class TextRenderer {
         el.style.transform = 'translate(-50%, -50%) scale(0)'; // Start scaling from 0
         el.style.color = '#FFD700'; // Gold Color for Combo
         el.style.fontWeight = 'bold';
-        el.style.fontSize = '16px'; // Reduced Base Font
+        el.style.fontSize = '14px'; // 14px Base Font
         el.style.fontFamily = 'monospace';
         el.style.pointerEvents = 'none';
         el.style.zIndex = '1000000';
         el.style.textAlign = 'center';
-        el.style.textShadow = '0 0 10px orange'; // Glow
+        el.style.textShadow = '0 0 15px #FFD700, 0 0 5px orange'; // Stronger Glow
         // Apply Transition for Scale & Opacity
         el.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s 0.5s';
         el.style.opacity = '1';
 
         document.body.appendChild(el);
 
-        // Pop Up Animation (Scale 1.5)
+        // Pop Up Animation (Scale 1.2)
         requestAnimationFrame(() => {
-            el.style.transform = 'translate(-50%, -50%) scale(1.5)';
+            el.style.transform = 'translate(-50%, -50%) scale(1.2)';
             el.style.opacity = '1';
         });
 
