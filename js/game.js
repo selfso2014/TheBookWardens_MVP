@@ -960,6 +960,82 @@ const Game = {
         }
     },
 
+    // --- [NEW] Flying Resource Effect (Passage 123 Style) ---
+    spawnFlyingResource(startX, startY, amount, type = 'gem') {
+        const targetId = type === 'ink' ? 'ink-count' : 'gem-count';
+        const targetEl = document.getElementById(targetId);
+        if (!targetEl) return;
+
+        const targetRect = (targetEl.parentElement || targetEl).getBoundingClientRect();
+        const targetX = targetRect.left + targetRect.width / 2;
+        const targetY = targetRect.top + targetRect.height / 2;
+
+        // CP Control Point (Arc Upwards)
+        const cpX = startX + (Math.random() * 100 - 50);
+        const cpY = Math.min(startY, targetY) - 150;
+
+        // Create Element
+        const p = document.createElement('div');
+        p.className = 'flying-resource';
+        p.innerText = `+${amount}`;
+        p.style.position = 'fixed';
+        p.style.left = startX + 'px';
+        p.style.top = startY + 'px';
+        p.style.color = type === 'ink' ? '#00ffff' : '#ffd700'; // Cyan or Gold
+        p.style.fontWeight = 'bold';
+        p.style.fontSize = '24px';
+        p.style.pointerEvents = 'none';
+        p.style.zIndex = '1000001';
+        p.style.transform = 'translate(-50%, -50%) scale(1)';
+        p.style.textShadow = `0 0 10px ${p.style.color}`;
+        p.style.transition = 'opacity 0.2s';
+
+        document.body.appendChild(p);
+
+        // Animation Loop (Quadratic Bezier)
+        let startTime = null;
+        const duration = 1000;
+
+        const animate = (timestamp) => {
+            if (!startTime) startTime = timestamp;
+            const progress = (timestamp - startTime) / duration;
+
+            if (progress >= 1) {
+                if (p.parentNode) p.remove();
+
+                // Add Score & Pulse HUD
+                if (type === 'gem') this.addGems(amount);
+                else if (type === 'ink') this.addInk(amount);
+
+                // Pulse UI
+                const hudIcon = targetEl.parentElement || targetEl;
+                hudIcon.style.transition = "transform 0.1s";
+                hudIcon.style.transform = "scale(1.5)";
+                hudIcon.style.filter = "brightness(2)";
+                setTimeout(() => {
+                    hudIcon.style.transform = "scale(1)";
+                    hudIcon.style.filter = "brightness(1)";
+                }, 200);
+                return;
+            }
+
+            // Ease-In-Out
+            const t = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+            const invT = 1 - t;
+
+            // Bezier
+            const currentX = (invT * invT * startX) + (2 * invT * t * cpX) + (t * t * targetX);
+            const currentY = (invT * invT * startY) + (2 * invT * t * cpY) + (t * t * targetY);
+
+            p.style.left = currentX + 'px';
+            p.style.top = currentY + 'px';
+            p.style.transform = `translate(-50%, -50%) scale(${1 + Math.sin(progress * Math.PI) * 0.5})`;
+
+            requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+    },
+
     // --- 1.2 WPM Selection ---
     selectWPM(wpm, btnElement) {
         // UI Reset
@@ -1708,13 +1784,16 @@ Game.typewriter = {
         // Correct Answer Check
         if (optionIndex === quiz.a) {
             // SUCCESS
-            // alert("Shadow Defeated! The Rift clears..."); // Deleted: Interrupts flow
-            Game.addGems(10); // +10 Gem (Mid-Boss)
+            // logic moved to flying resource callback
+            // Game.addGems(10); 
 
-            const bossDialog = document.querySelector(".boss-dialogue"); // FIXED: Correct class name
-            if (bossDialog && typeof Game.spawnFloatingText === 'function') {
-                Game.spawnFloatingText(bossDialog, "+10 Gems! CLEAR!", "bonus"); // Feedback
+            // Trigger Visuals
+            const btn = document.querySelectorAll("#boss-options button")[optionIndex];
+            if (btn && typeof Game.spawnFlyingResource === 'function') {
+                const rect = btn.getBoundingClientRect();
+                Game.spawnFlyingResource(rect.left + rect.width / 2, rect.top + rect.height / 2, 10, 'gem');
             } else {
+                Game.addGems(10); // Fallback
                 console.log("Boss Defeated! +10 Gems");
             }
 
