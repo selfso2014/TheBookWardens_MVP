@@ -928,7 +928,8 @@ span.tr-word.chunk-fade-out {
 /* 7. Game Toast (Top-Center Notification) */
 #game-toast {
   position: fixed;
-  top: 20px;
+  top: 10px;
+  /* Moved up */
   left: 50%;
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.85);
@@ -939,7 +940,8 @@ span.tr-word.chunk-fade-out {
   box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
   font-family: 'Outfit', sans-serif;
   font-size: 1rem;
-  z-index: 40000;
+  z-index: 99999;
+  /* Max z-index */
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s, transform 0.3s;
