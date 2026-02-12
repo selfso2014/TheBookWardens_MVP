@@ -236,8 +236,7 @@ export class CalibrationManager {
 
         const pt = toCanvasLocalPoint(this.state.point.x, this.state.point.y) || this.state.point;
 
-        // Smooth lerp
-        // Smooth lerp, but snap to 0 if target is 0 to avoid artifacts
+        // Smooth lerp for progress
         const target = this.state.progress || 0;
         if (target === 0) {
             this.state.displayProgress = 0;
@@ -246,37 +245,58 @@ export class CalibrationManager {
         }
 
         const p = this.state.displayProgress;
-
-        // Draw Orb
-        const r = 255;
-        const g = Math.round(255 * (1 - p));
-        const b = Math.round(255 * (1 - p));
-        const color = `rgb(${r}, ${g}, ${b})`;
-        const scale = 12.5;
-
         const cx = pt.x;
         const cy = pt.y;
 
-        // Glow
-        const grad = ctx.createRadialGradient(cx, cy, scale * 0.2, cx, cy, scale * 2.0);
-        grad.addColorStop(0, color);
-        grad.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(cx, cy, scale * 2.5, 0, Math.PI * 2);
-        ctx.fill();
+        // --- NEW LOGIC: Rotating Ellipse ---
+        // Initialize rotation angle if not present
+        if (typeof this.rotationAngle === 'undefined') this.rotationAngle = 0;
 
-        // Core
+        // 1. Calculate Rotation Speed (Base + Acceleration)
+        // Base speed: 0.05 rad/frame (slow spin)
+        // Acceleration: up to +0.4 rad/frame based on progress
+        const speed = 0.05 + (p * 0.4);
+        this.rotationAngle += speed;
+
+        // 2. Color Shift (Blue -> Bright Cyan/White)
+        // R: 0 -> 100
+        // G: 100 -> 255
+        // B: 255 (Always Blue base)
+        const r = Math.round(p * 100);
+        const g = Math.round(100 + p * 155);
+        const b = 255;
+        const color = `rgb(${r}, ${g}, ${b})`;
+
+        // 3. Draw Rotating Ellipse
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(this.rotationAngle);
+
+        ctx.beginPath();
+        // Ellipse shape: Width 25, Height 8 (Flat oval)
+        ctx.ellipse(0, 0, 25, 8, 0, 0, Math.PI * 2);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = color;
+        // Optional: Add glow
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = color;
+        ctx.stroke();
+
+        ctx.restore();
+
+        // 4. Draw Center Fixed Dot (For Gaze Fixation)
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
         ctx.fillStyle = "white";
-        ctx.beginPath();
-        ctx.arc(cx, cy, scale * 0.4, 0, Math.PI * 2);
+        ctx.shadowBlur = 0; // Reset shadow for crisp dot
         ctx.fill();
 
-        // Text
-        // Text Removed as per request (distracts user)
-        // ctx.fillStyle = "white";
-        // ctx.font = "bold 14px Arial";
-        // ctx.textAlign = "center";
-        // ctx.fillText(`${Math.round(p*100)}%`, cx, cy - 20);
+        // Text (Optional - kept commented out as per original)
+        /*
+        ctx.fillStyle = "white";
+        ctx.font = "bold 12px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(`${Math.round(p * 100)}%`, cx, cy - 20);
+        */
     }
 }
