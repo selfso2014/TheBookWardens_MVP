@@ -1877,16 +1877,66 @@ Game.typewriter = {
     checkFinalBossAnswer(index) {
         if (index === this.finalQuiz.a) {
             // TRUE VICTORY
-            // alert("ARCH-VILLAIN DEFEATED! The Rift is sealed forever."); // Removed per request
-            Game.addGems(30); // +30 Gem (Final Boss)
+            // [CHANGED] Rich Particle Explosion (Loot Burst)
+            const btn = document.querySelectorAll("#final-boss-options .quiz-btn")[index];
+            if (btn) {
+                const rect = btn.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
 
-            // Animation
+                // 1. Screen Shake & Flash
+                const bossScreen = document.getElementById("screen-final-boss");
+                if (bossScreen) {
+                    bossScreen.style.animation = "shake 0.5s ease-in-out";
+                    // Add temporary white flash
+                    const flash = document.createElement("div");
+                    flash.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:white; opacity:0; pointer-events:none; z-index:20000; transition:opacity 0.2s;";
+                    document.body.appendChild(flash);
+
+                    // Trigger Flash
+                    requestAnimationFrame(() => {
+                        flash.style.opacity = "0.8";
+                        setTimeout(() => {
+                            flash.style.opacity = "0";
+                            setTimeout(() => flash.remove(), 500);
+                        }, 100);
+                    });
+                }
+
+                // 2. Spawn Fountain of Gems (30 particles x 2 Gems = +60 Total Reward)
+                // Staggered Burst for "Rich" feel
+                let particleCount = 20;
+                let delay = 0;
+
+                for (let i = 0; i < particleCount; i++) {
+                    setTimeout(() => {
+                        // Randomize Start Position slightly for "Explosion" look
+                        const offsetX = (Math.random() * 100) - 50;
+                        const offsetY = (Math.random() * 60) - 30;
+
+                        // Mix of Gem and Ink (Gold & Cyan) 
+                        const type = Math.random() > 0.3 ? 'gem' : 'ink';
+                        const val = type === 'gem' ? 5 : 2; // High value per particle
+
+                        Game.spawnFlyingResource(centerX + offsetX, centerY + offsetY, val, type);
+                    }, delay);
+
+                    delay += 50; // 50ms interval = 1 second stream
+                }
+            } else {
+                Game.addGems(50); // Fallback
+            }
+
+            // Animation - Boss Defeat
             const villainImg = document.querySelector("#screen-final-boss .villain-img");
             if (villainImg) {
-                villainImg.classList.add("villain-defeated");
+                villainImg.style.transition = "transform 1s, filter 1s opacity 2s";
+                villainImg.style.transform = "scale(0) rotate(360deg)";
+                villainImg.style.filter = "brightness(5) blur(10px)";
+                villainImg.style.opacity = "0";
             }
             if (typeof Game.spawnFloatingText === "function") {
-                Game.spawnFloatingText(document.querySelector("#screen-final-boss h3"), "RIFT SEALED!", "bonus");
+                Game.spawnFloatingText(document.querySelector("#screen-final-boss h3"), "RIFT SEALED! LEGENDARY!", "bonus");
             }
 
             // Delay and Switch to New Sequence (Final Villain Screen -> Score -> etc)
