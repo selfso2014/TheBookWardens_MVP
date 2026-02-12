@@ -318,11 +318,10 @@ const Game = {
                 })();
             };
         }
-    }
 
         // Initialize WPM Previews
         this.initWPMPreviews();
-},
+    },
 
     // [New] Animation Logic for WPM Previews based on exact mathematical model
     initWPMPreviews() {
@@ -361,734 +360,734 @@ const Game = {
         });
     },
 
-        // --- NEW: SDK Loading Feedback ---
-        updateSDKProgress(progress, status) {
-    // Init state if missing
-    if (!this.state.sdkLoading) this.state.sdkLoading = { progress: 0, status: 'Idle', isReady: false };
+    // --- NEW: SDK Loading Feedback ---
+    updateSDKProgress(progress, status) {
+        // Init state if missing
+        if (!this.state.sdkLoading) this.state.sdkLoading = { progress: 0, status: 'Idle', isReady: false };
 
-    this.state.sdkLoading.progress = progress;
-    this.state.sdkLoading.status = status;
-    this.state.sdkLoading.isReady = (progress >= 100);
+        this.state.sdkLoading.progress = progress;
+        this.state.sdkLoading.status = status;
+        this.state.sdkLoading.isReady = (progress >= 100);
 
-    // Update Modal if visible
-    const modal = document.getElementById("sdk-loading-modal");
-    if (modal && modal.style.display === "flex") {
-        const bar = modal.querySelector(".sdk-progress-bar");
-        const txt = modal.querySelector(".sdk-status-text");
-        if (bar) bar.style.width = `${progress}%`;
-        if (txt) txt.textContent = `${status} (${progress}%)`;
+        // Update Modal if visible
+        const modal = document.getElementById("sdk-loading-modal");
+        if (modal && modal.style.display === "flex") {
+            const bar = modal.querySelector(".sdk-progress-bar");
+            const txt = modal.querySelector(".sdk-status-text");
+            if (bar) bar.style.width = `${progress}%`;
+            if (txt) txt.textContent = `${status} (${progress}%)`;
 
-        // Auto-close if ready
-        if (this.state.sdkLoading.isReady) {
-            setTimeout(() => {
-                modal.style.display = "none";
-                // If we were waiting, retry the pending action (WPM selection)
-                if (this.pendingWPMAction) {
-                    this.pendingWPMAction();
-                    this.pendingWPMAction = null;
-                }
-            }, 500);
+            // Auto-close if ready
+            if (this.state.sdkLoading.isReady) {
+                setTimeout(() => {
+                    modal.style.display = "none";
+                    // If we were waiting, retry the pending action (WPM selection)
+                    if (this.pendingWPMAction) {
+                        this.pendingWPMAction();
+                        this.pendingWPMAction = null;
+                    }
+                }, 500);
+            }
         }
-    }
-    // ELSE: Show non-intrusive Toast feedback
-    else {
-        // Do NOT show "Connected" toast automatically to avoid overlap with Intro
-        if (progress < 100) {
-            this.showToast(`${status} (${progress}%)`, 2000);
+        // ELSE: Show non-intrusive Toast feedback
+        else {
+            // Do NOT show "Connected" toast automatically to avoid overlap with Intro
+            if (progress < 100) {
+                this.showToast(`${status} (${progress}%)`, 2000);
+            }
         }
-    }
-},
+    },
 
-showToast(msg, duration = 3000) {
-    let toast = document.getElementById("game-toast");
-    if (!toast) {
-        toast = document.createElement("div");
-        toast.id = "game-toast";
-        document.body.appendChild(toast);
-    }
+    showToast(msg, duration = 3000) {
+        let toast = document.getElementById("game-toast");
+        if (!toast) {
+            toast = document.createElement("div");
+            toast.id = "game-toast";
+            document.body.appendChild(toast);
+        }
 
-    // Clear existing timer if updating
-    if (this.toastTimer) clearTimeout(this.toastTimer);
+        // Clear existing timer if updating
+        if (this.toastTimer) clearTimeout(this.toastTimer);
 
-    toast.textContent = msg;
-    toast.classList.add("show");
+        toast.textContent = msg;
+        toast.classList.add("show");
 
-    this.toastTimer = setTimeout(() => {
-        toast.classList.remove("show");
-        this.toastTimer = null;
-    }, duration);
-},
+        this.toastTimer = setTimeout(() => {
+            toast.classList.remove("show");
+            this.toastTimer = null;
+        }, duration);
+    },
 
-onCalibrationFinish() {
-    console.log("Calibration done. Entering Reading Rift...");
-    setTimeout(() => {
-        this.switchScreen("screen-read");
-    }, 1000);
-},
+    onCalibrationFinish() {
+        console.log("Calibration done. Entering Reading Rift...");
+        setTimeout(() => {
+            this.switchScreen("screen-read");
+        }, 1000);
+    },
 
-isInAppBrowser() {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    return (
-        /KAKAOTALK/i.test(ua) ||
-        /FBAV/i.test(ua) ||
-        /Line/i.test(ua) ||
-        /Instagram/i.test(ua) ||
-        /Snapchat/i.test(ua) ||
-        /Twitter/i.test(ua) ||
-        /DaumApps/i.test(ua)
-    );
-},
+    isInAppBrowser() {
+        const ua = navigator.userAgent || navigator.vendor || window.opera;
+        return (
+            /KAKAOTALK/i.test(ua) ||
+            /FBAV/i.test(ua) ||
+            /Line/i.test(ua) ||
+            /Instagram/i.test(ua) ||
+            /Snapchat/i.test(ua) ||
+            /Twitter/i.test(ua) ||
+            /DaumApps/i.test(ua)
+        );
+    },
 
-openSystemBrowser() {
-    const url = window.location.href;
-    if (/Android/i.test(navigator.userAgent)) {
-        let newUrl = url;
-        // Add 'skip_intro=1' to signal that we should skip the splash on re-entry
-        // Use 'skip_intro' instead of just 'skip' to differentiate intent if needed
-        if (newUrl.indexOf("?") === -1) newUrl += "?skip_intro=1";
-        else if (newUrl.indexOf("skip_intro=1") === -1) newUrl += "&skip_intro=1";
+    openSystemBrowser() {
+        const url = window.location.href;
+        if (/Android/i.test(navigator.userAgent)) {
+            let newUrl = url;
+            // Add 'skip_intro=1' to signal that we should skip the splash on re-entry
+            // Use 'skip_intro' instead of just 'skip' to differentiate intent if needed
+            if (newUrl.indexOf("?") === -1) newUrl += "?skip_intro=1";
+            else if (newUrl.indexOf("skip_intro=1") === -1) newUrl += "&skip_intro=1";
 
-        const noProtocol = newUrl.replace(/^https?:\/\//, "");
-        const intentUrl = `intent://${noProtocol}#Intent;scheme=https;package=com.android.chrome;end`;
-        window.location.href = intentUrl;
-    } else {
-        alert("Please copy the URL and open it in Safari or Chrome to play.");
-        navigator.clipboard.writeText(url).then(() => {
-            alert("URL copied to clipboard!");
-        }).catch(() => { });
-    }
-},
+            const noProtocol = newUrl.replace(/^https?:\/\//, "");
+            const intentUrl = `intent://${noProtocol}#Intent;scheme=https;package=com.android.chrome;end`;
+            window.location.href = intentUrl;
+        } else {
+            alert("Please copy the URL and open it in Safari or Chrome to play.");
+            navigator.clipboard.writeText(url).then(() => {
+                alert("URL copied to clipboard!");
+            }).catch(() => { });
+        }
+    },
 
-switchScreen(screenId) {
-    document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
-    const target = document.getElementById(screenId);
-    if (target) target.classList.add("active");
+    switchScreen(screenId) {
+        document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
+        const target = document.getElementById(screenId);
+        if (target) target.classList.add("active");
 
-    // [FIX] Ensure Cursor Visibility Logic
-    if (this.typewriter && this.typewriter.renderer && this.typewriter.renderer.cursor) {
+        // [FIX] Ensure Cursor Visibility Logic
+        if (this.typewriter && this.typewriter.renderer && this.typewriter.renderer.cursor) {
+            if (screenId === "screen-read") {
+                this.typewriter.renderer.cursor.style.display = "block"; // Show cursor
+                this.typewriter.renderer.cursor.style.opacity = "1";
+            } else {
+                this.typewriter.renderer.cursor.style.display = "none"; // Hide completely
+                this.typewriter.renderer.cursor.style.opacity = "0";
+            }
+        }
+
         if (screenId === "screen-read") {
-            this.typewriter.renderer.cursor.style.display = "block"; // Show cursor
-            this.typewriter.renderer.cursor.style.opacity = "1";
-        } else {
-            this.typewriter.renderer.cursor.style.display = "none"; // Hide completely
-            this.typewriter.renderer.cursor.style.opacity = "0";
+            // Reset Context Latching for new session to avoid carrying over old data
+            this.lastValidContext = null;
+
+            // [FIX] REMOVED typewriter.start() here to prevent resetting paragraph index.
+            // Screen transition handles layout, but game logic flows independently.
         }
-    }
-
-    if (screenId === "screen-read") {
-        // Reset Context Latching for new session to avoid carrying over old data
-        this.lastValidContext = null;
-
-        // [FIX] REMOVED typewriter.start() here to prevent resetting paragraph index.
-        // Screen transition handles layout, but game logic flows independently.
-    }
-},
-
-updateUI() {
-    // 1. Gem
-    const gemEl = document.getElementById("gem-count");
-    if (gemEl) gemEl.textContent = this.state.gems || 0;
-
-    // 2. Ink
-    const inkEl = document.getElementById("ink-count");
-    if (inkEl) inkEl.textContent = this.state.ink || 0;
-
-    // 3. Rune
-    const runeEl = document.getElementById("rune-count");
-    if (runeEl) {
-        runeEl.textContent = this.state.runes || 0;
-    }
-
-    // 4. WPM (Smoothed Low-Pass Filter)
-    const wpmEl = document.getElementById("wpm-display");
-    if (wpmEl) {
-        // Get Target WPM from GazeDataManager (or fallback)
-        let targetWPM = 0;
-        if (window.gazeDataManager && window.gazeDataManager.wpm > 0) {
-            targetWPM = window.gazeDataManager.wpm;
-        } else if (this.typewriter && this.typewriter.startTime && this.typewriter.chunkIndex > 0) {
-            // Simple Fallback calculation
-            const elapsedMin = (Date.now() - this.typewriter.startTime) / 60000;
-            if (elapsedMin > 0) targetWPM = (this.typewriter.chunkIndex * 3) / elapsedMin;
-        }
-
-        // Apply Low-Pass Filter (Simple Smoothing)
-        // current = prev + alpha * (target - prev)
-        // alpha = 0.05 (Very slow) to 0.2 (Fast). Let's use 0.1 for gentle smoothing.
-        const alpha = 0.1;
-        const currentWPM = this.state.wpmDisplay || 0;
-
-        // If difference is huge (e.g. init), jump directly
-        if (Math.abs(targetWPM - currentWPM) > 50 && currentWPM === 0) {
-            this.state.wpmDisplay = targetWPM;
-        } else {
-            this.state.wpmDisplay = currentWPM + alpha * (targetWPM - currentWPM);
-        }
-
-        wpmEl.textContent = Math.round(this.state.wpmDisplay);
-    }
-},
-
-// --- 1. Word Forge ---
-vocabList: [
-    {
-        word: "Luminous",
-        sentence: '"The <b>luminous</b> mushroom lit up the dark cave."',
-        options: [
-            "A. Very heavy and dark",
-            "B. Full of light / Shining",
-            "C. Related to the moon"
-        ],
-        answer: 1,
-        image: "./rune_luminous.png"
     },
-    {
-        word: "Peculiar",
-        sentence: '"Alice felt a very <b>peculiar</b> change in her size."',
-        options: [
-            "A. Strange or odd",
-            "B. Common and boring",
-            "C. Sudden and fast"
-        ],
-        answer: 0,
-        image: "./rune_peculiar.png"
+
+    updateUI() {
+        // 1. Gem
+        const gemEl = document.getElementById("gem-count");
+        if (gemEl) gemEl.textContent = this.state.gems || 0;
+
+        // 2. Ink
+        const inkEl = document.getElementById("ink-count");
+        if (inkEl) inkEl.textContent = this.state.ink || 0;
+
+        // 3. Rune
+        const runeEl = document.getElementById("rune-count");
+        if (runeEl) {
+            runeEl.textContent = this.state.runes || 0;
+        }
+
+        // 4. WPM (Smoothed Low-Pass Filter)
+        const wpmEl = document.getElementById("wpm-display");
+        if (wpmEl) {
+            // Get Target WPM from GazeDataManager (or fallback)
+            let targetWPM = 0;
+            if (window.gazeDataManager && window.gazeDataManager.wpm > 0) {
+                targetWPM = window.gazeDataManager.wpm;
+            } else if (this.typewriter && this.typewriter.startTime && this.typewriter.chunkIndex > 0) {
+                // Simple Fallback calculation
+                const elapsedMin = (Date.now() - this.typewriter.startTime) / 60000;
+                if (elapsedMin > 0) targetWPM = (this.typewriter.chunkIndex * 3) / elapsedMin;
+            }
+
+            // Apply Low-Pass Filter (Simple Smoothing)
+            // current = prev + alpha * (target - prev)
+            // alpha = 0.05 (Very slow) to 0.2 (Fast). Let's use 0.1 for gentle smoothing.
+            const alpha = 0.1;
+            const currentWPM = this.state.wpmDisplay || 0;
+
+            // If difference is huge (e.g. init), jump directly
+            if (Math.abs(targetWPM - currentWPM) > 50 && currentWPM === 0) {
+                this.state.wpmDisplay = targetWPM;
+            } else {
+                this.state.wpmDisplay = currentWPM + alpha * (targetWPM - currentWPM);
+            }
+
+            wpmEl.textContent = Math.round(this.state.wpmDisplay);
+        }
     },
-    {
-        word: "Vanish",
-        sentence: '"The cat began to <b>vanish</b> slowly, starting with its tail."',
-        options: [
-            "A. To appear suddenly",
-            "B. To disappear completely",
-            "C. To become brighter"
-        ],
-        answer: 1,
-        image: "./rune_vanish.png"
-    }
-],
+
+    // --- 1. Word Forge ---
+    vocabList: [
+        {
+            word: "Luminous",
+            sentence: '"The <b>luminous</b> mushroom lit up the dark cave."',
+            options: [
+                "A. Very heavy and dark",
+                "B. Full of light / Shining",
+                "C. Related to the moon"
+            ],
+            answer: 1,
+            image: "./rune_luminous.png"
+        },
+        {
+            word: "Peculiar",
+            sentence: '"Alice felt a very <b>peculiar</b> change in her size."',
+            options: [
+                "A. Strange or odd",
+                "B. Common and boring",
+                "C. Sudden and fast"
+            ],
+            answer: 0,
+            image: "./rune_peculiar.png"
+        },
+        {
+            word: "Vanish",
+            sentence: '"The cat began to <b>vanish</b> slowly, starting with its tail."',
+            options: [
+                "A. To appear suddenly",
+                "B. To disappear completely",
+                "C. To become brighter"
+            ],
+            answer: 1,
+            image: "./rune_vanish.png"
+        }
+    ],
 
     loadVocab(index) {
-    if (index >= this.vocabList.length) return;
-    const data = this.vocabList[index];
+        if (index >= this.vocabList.length) return;
+        const data = this.vocabList[index];
 
-    // Update Title and Sentence
-    const titleEl = document.getElementById("vocab-word");
-    if (titleEl) titleEl.textContent = data.word;
+        // Update Title and Sentence
+        const titleEl = document.getElementById("vocab-word");
+        if (titleEl) titleEl.textContent = data.word;
 
-    // Update Image
-    const imgPlaceholder = document.querySelector(".word-image-placeholder");
-    if (imgPlaceholder) {
-        imgPlaceholder.innerHTML = ""; // Clear text
-        if (data.image) {
-            const img = document.createElement("img");
-            img.src = data.image;
-            img.alt = data.word;
-            img.style.maxWidth = "100%";
-            img.style.maxHeight = "100%";
-            img.style.objectFit = "contain";
-            img.style.filter = "drop-shadow(0 0 10px rgba(255, 215, 0, 0.5))";
-            img.onerror = () => {
-                img.style.display = "none";
-                let icon = "📜";
-                // Fallback Icons based on word context
-                if (data.word === "Luminous") icon = "✨";
-                if (data.word === "Peculiar") icon = "🎩";
-                if (data.word === "Vanish") icon = "💨";
+        // Update Image
+        const imgPlaceholder = document.querySelector(".word-image-placeholder");
+        if (imgPlaceholder) {
+            imgPlaceholder.innerHTML = ""; // Clear text
+            if (data.image) {
+                const img = document.createElement("img");
+                img.src = data.image;
+                img.alt = data.word;
+                img.style.maxWidth = "100%";
+                img.style.maxHeight = "100%";
+                img.style.objectFit = "contain";
+                img.style.filter = "drop-shadow(0 0 10px rgba(255, 215, 0, 0.5))";
+                img.onerror = () => {
+                    img.style.display = "none";
+                    let icon = "📜";
+                    // Fallback Icons based on word context
+                    if (data.word === "Luminous") icon = "✨";
+                    if (data.word === "Peculiar") icon = "🎩";
+                    if (data.word === "Vanish") icon = "💨";
 
-                imgPlaceholder.style.display = "flex";
-                imgPlaceholder.style.justifyContent = "center";
-                imgPlaceholder.style.alignItems = "center";
-                imgPlaceholder.innerHTML = `<div style="font-size: 80px; text-shadow: 0 0 20px rgba(255,215,0,0.5); animation: float 3s infinite ease-in-out;">${icon}</div>`;
-            };
-            imgPlaceholder.appendChild(img);
-        } else {
-            imgPlaceholder.textContent = "[Magic Image Placeholder]";
-        }
-    }
-
-    // Find the sentence paragraph - assuming it's the <p> after title
-    const card = document.querySelector(".word-card");
-    if (card) {
-        const p = card.querySelector("p");
-        if (p) p.innerHTML = data.sentence;
-    }
-
-    // Update Counter (1/3)
-    const counterDiv = document.querySelector("#screen-word > div:first-child");
-    if (counterDiv) counterDiv.textContent = `WORD FORGE (${index + 1}/${this.vocabList.length})`;
-
-    // Update Options
-    const optionsDiv = document.getElementById("vocab-options");
-    if (optionsDiv) {
-        optionsDiv.innerHTML = ""; // Clear existing
-        data.options.forEach((optText, idx) => {
-            const btn = document.createElement("button");
-            btn.className = "option-btn";
-            btn.textContent = optText;
-            btn.onclick = (e) => Game.checkVocab(idx, e); // Pass event for coordinates
-            optionsDiv.appendChild(btn);
-        });
-    }
-},
-
-    async checkVocab(optionIndex, event) {
-    // Prevent re-entry if already processing (simple lock)
-    if (this.isProcessingVocab) return;
-    this.isProcessingVocab = true;
-
-    const currentIndex = this.state.vocabIndex || 0;
-    const currentData = this.vocabList[currentIndex];
-    // Use 'answer' property as per data structure
-    const isCorrect = (optionIndex === currentData.answer);
-
-    // Find the button element that was clicked
-    const optionsDiv = document.getElementById("vocab-options");
-    const btns = optionsDiv ? optionsDiv.querySelectorAll(".option-btn") : [];
-    const selectedBtn = btns[optionIndex];
-
-    // Disable ALL buttons immediately to prevent multi-click
-    btns.forEach(btn => btn.disabled = true);
-
-    if (isCorrect) {
-        // --- JUICY SUCCESS ---
-        if (selectedBtn) {
-            selectedBtn.classList.add("correct");
-            this.spawnFloatingText(selectedBtn, "+10 Runes!", "bonus");
-
-            // Trigger Rune Particle Animation
-            const rect = selectedBtn.getBoundingClientRect();
-            const startX = event ? event.clientX : (rect.left + rect.width / 2);
-            const startY = event ? event.clientY : (rect.top + rect.height / 2);
-            this.spawnRuneParticles(startX, startY);
-        }
-
-        // Wait for animation
-        await new Promise(r => setTimeout(r, 1200));
-
-        // Progress
-        this.state.vocabIndex++;
-        this.isProcessingVocab = false; // Release lock
-
-        if (this.state.vocabIndex < this.vocabList.length) {
-            this.loadVocab(this.state.vocabIndex);
-        } else {
-            console.log("Word Forge Complete. Proceeding to WPM Selection...");
-            this.switchScreen("screen-wpm");
-        }
-    } else {
-        // --- JUICY FAIL ---
-        this.addRunes(-5); // -5 Rune (Penalty Reduced)
-        if (selectedBtn) {
-            selectedBtn.classList.add("wrong");
-            this.spawnFloatingText(selectedBtn, "-5 Rune", "error");
-        }
-
-        // Allow Retry? Or Move On?
-        // "맞든 틀리든 1회로 끝나야 한다" -> Move on anyway?
-        // Usually games let you retry or just mark wrong and move on.
-        // Let's implement: Re-enable others so they can find the right one (Learning), 
-        // BUT penalty applied. 
-        // If strictly "1 attempt", we should move on.
-        // User requirement ambiguity: "1회로 끝나야 한다" -> likely implies "processing done in one go".
-        // Let's keep retry logic for now as it's better for learning.
-        btns.forEach((btn, idx) => {
-            if (idx !== optionIndex) btn.disabled = false;
-        });
-
-        this.isProcessingVocab = false; // Release lock
-    }
-},
-
-// --- NEW: Rune Particle Animation (Curve to HUD) ---
-spawnRuneParticles(startX, startY) {
-    const targetEl = document.getElementById("rune-count"); // HUD Rune Icon
-    if (!targetEl) return;
-
-    const targetRect = targetEl.getBoundingClientRect();
-    // Target center coordinates
-    const targetX = targetRect.left + targetRect.width / 2;
-    const targetY = targetRect.top + targetRect.height / 2;
-
-    const particleCount = 12; // Increased from 6
-    const colors = ["#ffd700", "#ffae00", "#ffffff", "#e0ffff"]; // Gold, Orange, White, Cyan Tint
-
-    for (let i = 0; i < particleCount; i++) {
-        const p = document.createElement("div");
-        p.className = "rune-particle";
-
-        // Random size for variety
-        const size = 5 + Math.random() * 8;
-        p.style.width = size + "px";
-        p.style.height = size + "px";
-        p.style.borderRadius = "50%";
-        p.style.position = "fixed";
-        p.style.zIndex = "10000";
-
-        // Initial Position (Fixed to start point)
-        p.style.left = startX + "px";
-        p.style.top = startY + "px";
-
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        p.style.backgroundColor = color;
-        p.style.boxShadow = "0 0 10px " + color;
-
-        // Bezier Control Point (Random curve direction)
-        // Midpoint between start and target
-        const midX = (startX + targetX) / 2;
-        const midY = (startY + targetY) / 2;
-        // Offset for curve
-        const curveStrength = 150 + Math.random() * 200; // Strong curve
-        const curveAngle = Math.random() * Math.PI * 2;
-        const cpX = midX + Math.cos(curveAngle) * curveStrength;
-        const cpY = midY + Math.sin(curveAngle) * curveStrength;
-
-        // Generate Keyframes for Bezier Curve
-        const keyframes = [];
-        const steps = 30; // Smoothness
-        for (let s = 0; s <= steps; s++) {
-            const t = s / steps;
-            // Quadratic Bezier Formula: B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
-            const xx = (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * cpX + t * t * targetX;
-            const yy = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * cpY + t * t * targetY;
-
-            // Scale & Opacity Logic for Impact
-            let scale = 1;
-            let opacity = 1;
-
-            // 1. Burst Start (t: 0 -> 0.2)
-            if (t < 0.2) {
-                scale = 0.5 + (t * 5); // 0.5 -> 1.5 (Pop out)
+                    imgPlaceholder.style.display = "flex";
+                    imgPlaceholder.style.justifyContent = "center";
+                    imgPlaceholder.style.alignItems = "center";
+                    imgPlaceholder.innerHTML = `<div style="font-size: 80px; text-shadow: 0 0 20px rgba(255,215,0,0.5); animation: float 3s infinite ease-in-out;">${icon}</div>`;
+                };
+                imgPlaceholder.appendChild(img);
+            } else {
+                imgPlaceholder.textContent = "[Magic Image Placeholder]";
             }
-            // 2. Flight (t: 0.2 -> 0.8)
-            else if (t < 0.8) {
-                scale = 1.5 - ((t - 0.2) * 0.5); // 1.5 -> 1.2 (Slight shrink)
-            }
-            // 3. Arrival Impact (t: 0.8 -> 1.0)
-            else {
-                // Do NOT fade out. Accelerate into target.
-                scale = 1.2 - ((t - 0.8) * 4); // 1.2 -> 0.4 (Collapse into icon)
-                opacity = 1; // Keep fully visible until impact
-            }
+        }
 
-            // Append to keyframes
-            keyframes.push({
-                left: `${xx}px`,
-                top: `${yy}px`,
-                transform: `scale(${scale})`,
-                opacity: opacity,
-                offset: t
+        // Find the sentence paragraph - assuming it's the <p> after title
+        const card = document.querySelector(".word-card");
+        if (card) {
+            const p = card.querySelector("p");
+            if (p) p.innerHTML = data.sentence;
+        }
+
+        // Update Counter (1/3)
+        const counterDiv = document.querySelector("#screen-word > div:first-child");
+        if (counterDiv) counterDiv.textContent = `WORD FORGE (${index + 1}/${this.vocabList.length})`;
+
+        // Update Options
+        const optionsDiv = document.getElementById("vocab-options");
+        if (optionsDiv) {
+            optionsDiv.innerHTML = ""; // Clear existing
+            data.options.forEach((optText, idx) => {
+                const btn = document.createElement("button");
+                btn.className = "option-btn";
+                btn.textContent = optText;
+                btn.onclick = (e) => Game.checkVocab(idx, e); // Pass event for coordinates
+                optionsDiv.appendChild(btn);
             });
         }
+    },
 
-        document.body.appendChild(p);
+    async checkVocab(optionIndex, event) {
+        // Prevent re-entry if already processing (simple lock)
+        if (this.isProcessingVocab) return;
+        this.isProcessingVocab = true;
 
-        // Animation: Bezier Curve
-        const duration = 1200 + Math.random() * 600;
+        const currentIndex = this.state.vocabIndex || 0;
+        const currentData = this.vocabList[currentIndex];
+        // Use 'answer' property as per data structure
+        const isCorrect = (optionIndex === currentData.answer);
 
-        const anim = p.animate(keyframes, {
-            duration: duration,
-            easing: "linear", // Keyframes handle easing via spacing if needed, but linear t allows consistent curve
-            fill: "forwards"
-        });
+        // Find the button element that was clicked
+        const optionsDiv = document.getElementById("vocab-options");
+        const btns = optionsDiv ? optionsDiv.querySelectorAll(".option-btn") : [];
+        const selectedBtn = btns[optionIndex];
 
-        anim.onfinish = () => {
-            p.remove();
-            // Pump Effect on Target (Trigger on first few for impact)
-            if (i === 0) {
-                // Add Score HERE (On Arrival)
-                this.addRunes(10);
-                targetEl.style.transition = "transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-                targetEl.style.transform = "scale(1.8)";
-                targetEl.style.filter = "brightness(2.5) drop-shadow(0 0 20px gold)";
+        // Disable ALL buttons immediately to prevent multi-click
+        btns.forEach(btn => btn.disabled = true);
 
-                // Reset quickly
+        if (isCorrect) {
+            // --- JUICY SUCCESS ---
+            if (selectedBtn) {
+                selectedBtn.classList.add("correct");
+                this.spawnFloatingText(selectedBtn, "+10 Runes!", "bonus");
+
+                // Trigger Rune Particle Animation
+                const rect = selectedBtn.getBoundingClientRect();
+                const startX = event ? event.clientX : (rect.left + rect.width / 2);
+                const startY = event ? event.clientY : (rect.top + rect.height / 2);
+                this.spawnRuneParticles(startX, startY);
+            }
+
+            // Wait for animation
+            await new Promise(r => setTimeout(r, 1200));
+
+            // Progress
+            this.state.vocabIndex++;
+            this.isProcessingVocab = false; // Release lock
+
+            if (this.state.vocabIndex < this.vocabList.length) {
+                this.loadVocab(this.state.vocabIndex);
+            } else {
+                console.log("Word Forge Complete. Proceeding to WPM Selection...");
+                this.switchScreen("screen-wpm");
+            }
+        } else {
+            // --- JUICY FAIL ---
+            this.addRunes(-5); // -5 Rune (Penalty Reduced)
+            if (selectedBtn) {
+                selectedBtn.classList.add("wrong");
+                this.spawnFloatingText(selectedBtn, "-5 Rune", "error");
+            }
+
+            // Allow Retry? Or Move On?
+            // "맞든 틀리든 1회로 끝나야 한다" -> Move on anyway?
+            // Usually games let you retry or just mark wrong and move on.
+            // Let's implement: Re-enable others so they can find the right one (Learning), 
+            // BUT penalty applied. 
+            // If strictly "1 attempt", we should move on.
+            // User requirement ambiguity: "1회로 끝나야 한다" -> likely implies "processing done in one go".
+            // Let's keep retry logic for now as it's better for learning.
+            btns.forEach((btn, idx) => {
+                if (idx !== optionIndex) btn.disabled = false;
+            });
+
+            this.isProcessingVocab = false; // Release lock
+        }
+    },
+
+    // --- NEW: Rune Particle Animation (Curve to HUD) ---
+    spawnRuneParticles(startX, startY) {
+        const targetEl = document.getElementById("rune-count"); // HUD Rune Icon
+        if (!targetEl) return;
+
+        const targetRect = targetEl.getBoundingClientRect();
+        // Target center coordinates
+        const targetX = targetRect.left + targetRect.width / 2;
+        const targetY = targetRect.top + targetRect.height / 2;
+
+        const particleCount = 12; // Increased from 6
+        const colors = ["#ffd700", "#ffae00", "#ffffff", "#e0ffff"]; // Gold, Orange, White, Cyan Tint
+
+        for (let i = 0; i < particleCount; i++) {
+            const p = document.createElement("div");
+            p.className = "rune-particle";
+
+            // Random size for variety
+            const size = 5 + Math.random() * 8;
+            p.style.width = size + "px";
+            p.style.height = size + "px";
+            p.style.borderRadius = "50%";
+            p.style.position = "fixed";
+            p.style.zIndex = "10000";
+
+            // Initial Position (Fixed to start point)
+            p.style.left = startX + "px";
+            p.style.top = startY + "px";
+
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            p.style.backgroundColor = color;
+            p.style.boxShadow = "0 0 10px " + color;
+
+            // Bezier Control Point (Random curve direction)
+            // Midpoint between start and target
+            const midX = (startX + targetX) / 2;
+            const midY = (startY + targetY) / 2;
+            // Offset for curve
+            const curveStrength = 150 + Math.random() * 200; // Strong curve
+            const curveAngle = Math.random() * Math.PI * 2;
+            const cpX = midX + Math.cos(curveAngle) * curveStrength;
+            const cpY = midY + Math.sin(curveAngle) * curveStrength;
+
+            // Generate Keyframes for Bezier Curve
+            const keyframes = [];
+            const steps = 30; // Smoothness
+            for (let s = 0; s <= steps; s++) {
+                const t = s / steps;
+                // Quadratic Bezier Formula: B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
+                const xx = (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * cpX + t * t * targetX;
+                const yy = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * cpY + t * t * targetY;
+
+                // Scale & Opacity Logic for Impact
+                let scale = 1;
+                let opacity = 1;
+
+                // 1. Burst Start (t: 0 -> 0.2)
+                if (t < 0.2) {
+                    scale = 0.5 + (t * 5); // 0.5 -> 1.5 (Pop out)
+                }
+                // 2. Flight (t: 0.2 -> 0.8)
+                else if (t < 0.8) {
+                    scale = 1.5 - ((t - 0.2) * 0.5); // 1.5 -> 1.2 (Slight shrink)
+                }
+                // 3. Arrival Impact (t: 0.8 -> 1.0)
+                else {
+                    // Do NOT fade out. Accelerate into target.
+                    scale = 1.2 - ((t - 0.8) * 4); // 1.2 -> 0.4 (Collapse into icon)
+                    opacity = 1; // Keep fully visible until impact
+                }
+
+                // Append to keyframes
+                keyframes.push({
+                    left: `${xx}px`,
+                    top: `${yy}px`,
+                    transform: `scale(${scale})`,
+                    opacity: opacity,
+                    offset: t
+                });
+            }
+
+            document.body.appendChild(p);
+
+            // Animation: Bezier Curve
+            const duration = 1200 + Math.random() * 600;
+
+            const anim = p.animate(keyframes, {
+                duration: duration,
+                easing: "linear", // Keyframes handle easing via spacing if needed, but linear t allows consistent curve
+                fill: "forwards"
+            });
+
+            anim.onfinish = () => {
+                p.remove();
+                // Pump Effect on Target (Trigger on first few for impact)
+                if (i === 0) {
+                    // Add Score HERE (On Arrival)
+                    this.addRunes(10);
+                    targetEl.style.transition = "transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                    targetEl.style.transform = "scale(1.8)";
+                    targetEl.style.filter = "brightness(2.5) drop-shadow(0 0 20px gold)";
+
+                    // Reset quickly
+                    setTimeout(() => {
+                        targetEl.style.transform = "scale(1)";
+                        targetEl.style.filter = "brightness(1)";
+                    }, 200);
+                }
+            };
+        }
+    },
+
+    // FX Helpers
+    spawnFloatingText(targetEl, text, type) {
+        const rect = targetEl.getBoundingClientRect();
+        const floatEl = document.createElement("div");
+        floatEl.className = `feedback-text ${type}`;
+        floatEl.innerText = text;
+        floatEl.style.left = (rect.left + rect.width / 2) + "px";
+        floatEl.style.top = (rect.top) + "px"; // Start slightly above
+        document.body.appendChild(floatEl);
+
+        // Cleanup
+        setTimeout(() => floatEl.remove(), 1000);
+    },
+
+    spawnParticles(targetEl, count) {
+        const rect = targetEl.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement("div");
+            p.className = "particle";
+
+            // Random scatter
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * 60 + 20; // 20px to 80px out
+            const tx = Math.cos(angle) * dist + "px";
+            const ty = Math.sin(angle) * dist + "px";
+
+            p.style.setProperty("--tx", tx);
+            p.style.setProperty("--ty", ty);
+            p.style.left = centerX + "px";
+            p.style.top = centerY + "px";
+            p.style.backgroundColor = `hsl(${Math.random() * 50 + 40}, 100%, 50%)`; // Gold/Yellow range
+
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 800);
+        }
+    },
+
+    // --- 1.2 WPM Selection ---
+    selectWPM(wpm, btnElement) {
+        console.log(`[Game] User selected WPM: ${wpm}`);
+
+        // Visual Feedback: Active State
+        // Remove .selected from all buttons first (if querySelector available)
+        document.querySelectorAll(".wpm-btn").forEach(b => b.classList.remove("selected"));
+
+        // Add to clicked button
+        // Since we didn't pass btnElement in HTML onclick, we might need to find it or just trust the user click effect.
+        // But better to add it. For now, let's assume we can't easily get the element without changing HTML.
+        // If we change HTML, we need to change onclick="Game.selectWPM(200, this)".
+        // Let's rely on event.target if possible, or just proceed with delay.
+
+        // Wait for visual feedback (300ms)
+        setTimeout(() => {
+            // Formula: Delay (ms) = 10000 / WPM
+            const delay = Math.floor(10000 / wpm);
+            this.targetSpeed = delay;
+            this.targetChunkDelay = delay * 8;
+            console.log(`[Game] WPM: ${wpm} -> CharDelay: ${delay}ms, ChunkDelay: ${this.targetChunkDelay}ms`);
+
+            // Initialize Eye Tracking & Calibration logic
+            (async () => {
+                // --- NEW: Loading Guard ---
+                if (this.state.sdkLoading && !this.state.sdkLoading.isReady) {
+                    console.log("SDK not ready, showing modal...");
+
+                    // Show Modal
+                    const modal = document.getElementById("sdk-loading-modal");
+                    if (modal) {
+                        modal.style.display = "flex";
+                        // Update initial state
+                        const p = this.state.sdkLoading.progress;
+                        const s = this.state.sdkLoading.status;
+                        const bar = modal.querySelector(".sdk-progress-bar");
+                        const txt = modal.querySelector(".sdk-status-text");
+                        if (bar) bar.style.width = `${p}%`;
+                        if (txt) txt.textContent = `${s} (${p}%)`;
+                    }
+
+                    // Queue Action
+                    this.pendingWPMAction = () => {
+                        console.log("SDK Ready! Resuming WPM Selection...");
+                        this.selectWPM(wpm, btnElement); // Recursive call when ready
+                    };
+                    return; // Stop here
+                }
+
+                if (this.trackingInitPromise) {
+                    const ok = await this.trackingInitPromise;
+                    if (!ok) return;
+                }
+
+                this.switchScreen("screen-calibration");
                 setTimeout(() => {
-                    targetEl.style.transform = "scale(1)";
-                    targetEl.style.filter = "brightness(1)";
-                }, 200);
+                    if (typeof window.startCalibrationRoutine === "function") {
+                        window.startCalibrationRoutine();
+                    } else {
+                        this.switchScreen("screen-read");
+                    }
+                }, 500);
+            })();
+        }, 300); // 300ms Visual Delay
+    },
+
+
+    // --- 1.5 Owl ---
+    startOwlScene() {
+        this.state.isTracking = true;
+        this.state.isOwlTracker = true;
+        this.switchScreen("screen-owl");
+        // User Request: Make gaze dot transparent (invisible) but keep tracking active
+        if (typeof window.setGazeDotState === "function") {
+            window.setGazeDotState(false);
+        }
+    },
+
+    startReadingFromOwl() {
+        // Stop owl tracking and start reading
+        this.state.isOwlTracker = false;
+        this.switchScreen("screen-read");
+
+        // [FIX] Explicitly START the game engine here mostly ONCE.
+        if (this.typewriter && typeof this.typewriter.start === 'function') {
+            this.typewriter.start();
+        }
+    },
+
+    // --- 2. Reading Rift (Original Logic kept for reference, overlaid below) ---
+    startReadingSession_OLD() {
+        // ... existing logic ...
+    },
+
+    confrontVillain() {
+        if (this.typewriter) this.typewriter.isPaused = true; // Stop typewriter logic
+        this.state.isTracking = false;
+
+        // [FIX] Clean up Reading Screen Artifacts
+        // 1. Hide Pang Markers (Clear Layer)
+        const pangLayer = document.getElementById("pang-marker-layer");
+        if (pangLayer) pangLayer.innerHTML = "";
+
+        // 2. Hide Reading Content (Prevent Flash/Ghosting on next load)
+        // By clearing this now, we ensure the next paragraph starts fresh without old text visible.
+        const bookContent = document.getElementById("book-content");
+        if (bookContent) bookContent.innerHTML = "";
+
+        this.switchScreen("screen-boss");
+    },
+
+    // Called by app.js (SeeSo overlay)
+    onGaze(x, y) {
+        // Owl Interaction
+        if (this.state.isOwlTracker) {
+            const pupils = document.querySelectorAll('.pupil');
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight / 2;
+            const maxMove = 20;
+
+            let dx = (x - cx) / (window.innerWidth / 2) * maxMove;
+            let dy = (y - cy) / (window.innerHeight / 2) * maxMove;
+            dx = Math.max(-maxMove, Math.min(maxMove, dx));
+            dy = Math.max(-maxMove, Math.min(maxMove, dy));
+
+            pupils.forEach(p => {
+                p.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+            });
+            return;
+        }
+
+        // Typewriter Gaze Feedback
+        if (this.typewriter) {
+            // New Ink Logic
+            if (typeof this.typewriter.updateGazeStats === "function") {
+                this.typewriter.updateGazeStats(x, y);
+            }
+            // Legacy Logic (if exists)
+            if (typeof this.typewriter.checkGazeDistance === "function") {
+                this.typewriter.checkGazeDistance(x, y);
+            }
+        }
+    },
+
+    onCalibrationFinish() {
+        console.log("Calibration finished. Starting Owl Scene.");
+        this.startOwlScene();
+    },
+
+    // --- 3. Boss Battle ---
+    // checkBoss(optionIndex) - DELETED (Deprecated feature: Direct call to Typewriter checkBossAnswer used instead)
+
+
+    // --- 4. Splash Screen Logic ---
+    dismissSplash() {
+        console.log("Splash Displayed. User interaction detected.");
+
+        // 1. Check In-App Browser IMMEDIATELY upon touch
+        if (this.isInAppBrowser()) {
+            // If In-App, redirect to System Browser (Chrome) immediately.
+            // This will reload the page in Chrome with ?skip_intro=1
+            this.openSystemBrowser();
+            return;
+        }
+
+        // 2. If Normal Browser, Transition to Lobby
+        // Audio interaction could go here
+
+        // Transition to Lobby
+        const splash = document.getElementById("screen-splash");
+        if (splash) {
+            splash.style.opacity = "0";
+            setTimeout(() => {
+                this.switchScreen("screen-home");
+                // Reset opacity for potential reuse or simply hide
+                splash.style.display = "none";
+            }, 500); // Match CSS transition if any, or just fast
+        } else {
+            this.switchScreen("screen-home");
+        }
+    },
+
+    // --- NEW: Enriched Game Flow (Debug / Implementation) ---
+    debugFinalVillain() {
+        console.log("Debug: Starting Final Villain Sequence");
+        if (this.typewriter && typeof this.typewriter.triggerFinalBossBattle === "function") {
+            this.typewriter.triggerFinalBossBattle();
+        } else {
+            console.error("Game.typewriter.triggerFinalBossBattle is missing!");
+            this.switchScreen("screen-final-boss"); // Fallback
+        }
+    },
+
+    goToNewScore() {
+        this.switchScreen("screen-new-score");
+
+        // Animated Count Up for Stats
+        // 1. WPM
+        let wpmVal = Math.round(this.state.wpmDisplay || 180);
+        if (wpmVal < 50) wpmVal = 150 + Math.floor(Math.random() * 100); // Fallback for debug
+        this.animateValue("report-wpm", 0, wpmVal, 1500);
+
+        // 2. Accuracy (Mock based on missing lines?)
+        const accVal = 88 + Math.floor(Math.random() * 11); // 88-99%
+        this.animateValue("report-acc", 0, accVal, 1500, "%");
+    },
+
+    goToNewSignup() {
+        this.switchScreen("screen-new-signup");
+    },
+
+    goToNewShare() {
+        // Simulate Signup submission if coming from Signup screen
+        const emailInput = document.querySelector("#screen-new-signup input[type='email']");
+        if (emailInput && emailInput.value) {
+            console.log("Signup Email:", emailInput.value);
+            // Optionally show toast
+        }
+        this.switchScreen("screen-new-share");
+    },
+
+    // Utilities
+    animateValue(id, start, end, duration, suffix = "") {
+        const obj = document.getElementById(id);
+        if (!obj) return;
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            // Ease-out effect
+            const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+            obj.innerHTML = Math.floor(easeProgress * (end - start) + start) + suffix;
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
             }
         };
+        window.requestAnimationFrame(step);
     }
-},
-
-// FX Helpers
-spawnFloatingText(targetEl, text, type) {
-    const rect = targetEl.getBoundingClientRect();
-    const floatEl = document.createElement("div");
-    floatEl.className = `feedback-text ${type}`;
-    floatEl.innerText = text;
-    floatEl.style.left = (rect.left + rect.width / 2) + "px";
-    floatEl.style.top = (rect.top) + "px"; // Start slightly above
-    document.body.appendChild(floatEl);
-
-    // Cleanup
-    setTimeout(() => floatEl.remove(), 1000);
-},
-
-spawnParticles(targetEl, count) {
-    const rect = targetEl.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    for (let i = 0; i < count; i++) {
-        const p = document.createElement("div");
-        p.className = "particle";
-
-        // Random scatter
-        const angle = Math.random() * Math.PI * 2;
-        const dist = Math.random() * 60 + 20; // 20px to 80px out
-        const tx = Math.cos(angle) * dist + "px";
-        const ty = Math.sin(angle) * dist + "px";
-
-        p.style.setProperty("--tx", tx);
-        p.style.setProperty("--ty", ty);
-        p.style.left = centerX + "px";
-        p.style.top = centerY + "px";
-        p.style.backgroundColor = `hsl(${Math.random() * 50 + 40}, 100%, 50%)`; // Gold/Yellow range
-
-        document.body.appendChild(p);
-        setTimeout(() => p.remove(), 800);
-    }
-},
-
-// --- 1.2 WPM Selection ---
-selectWPM(wpm, btnElement) {
-    console.log(`[Game] User selected WPM: ${wpm}`);
-
-    // Visual Feedback: Active State
-    // Remove .selected from all buttons first (if querySelector available)
-    document.querySelectorAll(".wpm-btn").forEach(b => b.classList.remove("selected"));
-
-    // Add to clicked button
-    // Since we didn't pass btnElement in HTML onclick, we might need to find it or just trust the user click effect.
-    // But better to add it. For now, let's assume we can't easily get the element without changing HTML.
-    // If we change HTML, we need to change onclick="Game.selectWPM(200, this)".
-    // Let's rely on event.target if possible, or just proceed with delay.
-
-    // Wait for visual feedback (300ms)
-    setTimeout(() => {
-        // Formula: Delay (ms) = 10000 / WPM
-        const delay = Math.floor(10000 / wpm);
-        this.targetSpeed = delay;
-        this.targetChunkDelay = delay * 8;
-        console.log(`[Game] WPM: ${wpm} -> CharDelay: ${delay}ms, ChunkDelay: ${this.targetChunkDelay}ms`);
-
-        // Initialize Eye Tracking & Calibration logic
-        (async () => {
-            // --- NEW: Loading Guard ---
-            if (this.state.sdkLoading && !this.state.sdkLoading.isReady) {
-                console.log("SDK not ready, showing modal...");
-
-                // Show Modal
-                const modal = document.getElementById("sdk-loading-modal");
-                if (modal) {
-                    modal.style.display = "flex";
-                    // Update initial state
-                    const p = this.state.sdkLoading.progress;
-                    const s = this.state.sdkLoading.status;
-                    const bar = modal.querySelector(".sdk-progress-bar");
-                    const txt = modal.querySelector(".sdk-status-text");
-                    if (bar) bar.style.width = `${p}%`;
-                    if (txt) txt.textContent = `${s} (${p}%)`;
-                }
-
-                // Queue Action
-                this.pendingWPMAction = () => {
-                    console.log("SDK Ready! Resuming WPM Selection...");
-                    this.selectWPM(wpm, btnElement); // Recursive call when ready
-                };
-                return; // Stop here
-            }
-
-            if (this.trackingInitPromise) {
-                const ok = await this.trackingInitPromise;
-                if (!ok) return;
-            }
-
-            this.switchScreen("screen-calibration");
-            setTimeout(() => {
-                if (typeof window.startCalibrationRoutine === "function") {
-                    window.startCalibrationRoutine();
-                } else {
-                    this.switchScreen("screen-read");
-                }
-            }, 500);
-        })();
-    }, 300); // 300ms Visual Delay
-},
-
-
-// --- 1.5 Owl ---
-startOwlScene() {
-    this.state.isTracking = true;
-    this.state.isOwlTracker = true;
-    this.switchScreen("screen-owl");
-    // User Request: Make gaze dot transparent (invisible) but keep tracking active
-    if (typeof window.setGazeDotState === "function") {
-        window.setGazeDotState(false);
-    }
-},
-
-startReadingFromOwl() {
-    // Stop owl tracking and start reading
-    this.state.isOwlTracker = false;
-    this.switchScreen("screen-read");
-
-    // [FIX] Explicitly START the game engine here mostly ONCE.
-    if (this.typewriter && typeof this.typewriter.start === 'function') {
-        this.typewriter.start();
-    }
-},
-
-// --- 2. Reading Rift (Original Logic kept for reference, overlaid below) ---
-startReadingSession_OLD() {
-    // ... existing logic ...
-},
-
-confrontVillain() {
-    if (this.typewriter) this.typewriter.isPaused = true; // Stop typewriter logic
-    this.state.isTracking = false;
-
-    // [FIX] Clean up Reading Screen Artifacts
-    // 1. Hide Pang Markers (Clear Layer)
-    const pangLayer = document.getElementById("pang-marker-layer");
-    if (pangLayer) pangLayer.innerHTML = "";
-
-    // 2. Hide Reading Content (Prevent Flash/Ghosting on next load)
-    // By clearing this now, we ensure the next paragraph starts fresh without old text visible.
-    const bookContent = document.getElementById("book-content");
-    if (bookContent) bookContent.innerHTML = "";
-
-    this.switchScreen("screen-boss");
-},
-
-// Called by app.js (SeeSo overlay)
-onGaze(x, y) {
-    // Owl Interaction
-    if (this.state.isOwlTracker) {
-        const pupils = document.querySelectorAll('.pupil');
-        const cx = window.innerWidth / 2;
-        const cy = window.innerHeight / 2;
-        const maxMove = 20;
-
-        let dx = (x - cx) / (window.innerWidth / 2) * maxMove;
-        let dy = (y - cy) / (window.innerHeight / 2) * maxMove;
-        dx = Math.max(-maxMove, Math.min(maxMove, dx));
-        dy = Math.max(-maxMove, Math.min(maxMove, dy));
-
-        pupils.forEach(p => {
-            p.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-        });
-        return;
-    }
-
-    // Typewriter Gaze Feedback
-    if (this.typewriter) {
-        // New Ink Logic
-        if (typeof this.typewriter.updateGazeStats === "function") {
-            this.typewriter.updateGazeStats(x, y);
-        }
-        // Legacy Logic (if exists)
-        if (typeof this.typewriter.checkGazeDistance === "function") {
-            this.typewriter.checkGazeDistance(x, y);
-        }
-    }
-},
-
-onCalibrationFinish() {
-    console.log("Calibration finished. Starting Owl Scene.");
-    this.startOwlScene();
-},
-
-// --- 3. Boss Battle ---
-// checkBoss(optionIndex) - DELETED (Deprecated feature: Direct call to Typewriter checkBossAnswer used instead)
-
-
-// --- 4. Splash Screen Logic ---
-dismissSplash() {
-    console.log("Splash Displayed. User interaction detected.");
-
-    // 1. Check In-App Browser IMMEDIATELY upon touch
-    if (this.isInAppBrowser()) {
-        // If In-App, redirect to System Browser (Chrome) immediately.
-        // This will reload the page in Chrome with ?skip_intro=1
-        this.openSystemBrowser();
-        return;
-    }
-
-    // 2. If Normal Browser, Transition to Lobby
-    // Audio interaction could go here
-
-    // Transition to Lobby
-    const splash = document.getElementById("screen-splash");
-    if (splash) {
-        splash.style.opacity = "0";
-        setTimeout(() => {
-            this.switchScreen("screen-home");
-            // Reset opacity for potential reuse or simply hide
-            splash.style.display = "none";
-        }, 500); // Match CSS transition if any, or just fast
-    } else {
-        this.switchScreen("screen-home");
-    }
-},
-
-// --- NEW: Enriched Game Flow (Debug / Implementation) ---
-debugFinalVillain() {
-    console.log("Debug: Starting Final Villain Sequence");
-    if (this.typewriter && typeof this.typewriter.triggerFinalBossBattle === "function") {
-        this.typewriter.triggerFinalBossBattle();
-    } else {
-        console.error("Game.typewriter.triggerFinalBossBattle is missing!");
-        this.switchScreen("screen-final-boss"); // Fallback
-    }
-},
-
-goToNewScore() {
-    this.switchScreen("screen-new-score");
-
-    // Animated Count Up for Stats
-    // 1. WPM
-    let wpmVal = Math.round(this.state.wpmDisplay || 180);
-    if (wpmVal < 50) wpmVal = 150 + Math.floor(Math.random() * 100); // Fallback for debug
-    this.animateValue("report-wpm", 0, wpmVal, 1500);
-
-    // 2. Accuracy (Mock based on missing lines?)
-    const accVal = 88 + Math.floor(Math.random() * 11); // 88-99%
-    this.animateValue("report-acc", 0, accVal, 1500, "%");
-},
-
-goToNewSignup() {
-    this.switchScreen("screen-new-signup");
-},
-
-goToNewShare() {
-    // Simulate Signup submission if coming from Signup screen
-    const emailInput = document.querySelector("#screen-new-signup input[type='email']");
-    if (emailInput && emailInput.value) {
-        console.log("Signup Email:", emailInput.value);
-        // Optionally show toast
-    }
-    this.switchScreen("screen-new-share");
-},
-
-// Utilities
-animateValue(id, start, end, duration, suffix = "") {
-    const obj = document.getElementById(id);
-    if (!obj) return;
-    let startTimestamp = null;
-    const step = (timestamp) => {
-        if (!startTimestamp) startTimestamp = timestamp;
-        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-        // Ease-out effect
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
-
-        obj.innerHTML = Math.floor(easeProgress * (end - start) + start) + suffix;
-        if (progress < 1) {
-            window.requestAnimationFrame(step);
-        }
-    };
-    window.requestAnimationFrame(step);
-}
 };
 
 // --- Typewriter Mode Logic (Refactored for TextRenderer) ---
