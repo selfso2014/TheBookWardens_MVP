@@ -30,6 +30,14 @@ const Game = {
     // --- Rift Intro Sequence (Cinematic 20s) ---
     async startRiftIntro() {
         console.log("Starting Rift Intro Sequence...");
+
+        // Helper for delays
+        const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Initial Delay for SDK Loading Message (2.0s)
+        // Kept on Home Screen during this time
+        await wait(2000);
+
         this.switchScreen("screen-rift-intro");
 
         const introScreen = document.getElementById("screen-rift-intro");
@@ -45,15 +53,7 @@ const Game = {
         meteorLayer.innerHTML = "";
 
         // Restore original text
-        // Restore original State (Image is static)
-        /* Removed Text Logic
-        if (riftText) {
-            riftText.innerText = "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, 'and what is the use of a book,' thought Alice 'without pictures or conversation?'";
-        }
-        */
-
-        // Helper for delays
-        const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        /* Removed Text Logic */
 
         // --- SCENE 1: PEACE (0s - 2.2s) ---
         // Text fades in smoothly
@@ -115,6 +115,12 @@ const Game = {
         await wait(1000);
 
         console.log("Rift Intro Done. Moving to Word Forge.");
+
+        // Show deferred connected message if already ready
+        if (this.state.sdkLoading && this.state.sdkLoading.isReady) {
+            this.showToast("Magic Eye Connected!");
+        }
+
         this.state.vocabIndex = 0;
         this.loadVocab(0);
         this.switchScreen("screen-word");
@@ -287,6 +293,8 @@ const Game = {
                     // this.loadVocab(0);         // Load first word
                     // this.switchScreen("screen-word");
                 }, 800);
+                // Start Rift Intro Scene immediately
+                this.startRiftIntro();
 
                 this.trackingInitPromise = (async () => {
                     try {
@@ -303,7 +311,7 @@ const Game = {
                             }
 
                             this.updateSDKProgress(100, "Connected!");
-                            this.showToast("Magic Eye Connected!"); // Shortened message
+                            // this.showToast("Magic Eye Connected!"); // Shortened message - DEFERRED
                             return true;
                         } else {
                             console.warn("window.startEyeTracking not found.");
