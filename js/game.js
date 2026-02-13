@@ -1,8 +1,8 @@
 import { storyParagraphs } from './data/StoryContent.js';
 import { vocabList, midBossQuizzes, finalBossQuiz } from './data/QuizData.js';
-import { ScoreManager } from './js/managers/ScoreManager.js';
-import { SceneManager } from './js/managers/SceneManager.js';
-import { bus } from './js/core/EventBus.js';
+import { ScoreManager } from './managers/ScoreManager.js';
+import { SceneManager } from './managers/SceneManager.js';
+import { bus } from './core/EventBus.js';
 
 const Game = {
     // Initialized in init()
