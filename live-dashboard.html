@@ -142,6 +142,10 @@
             </p>
             <canvas id="chart5"></canvas>
         </div>
+        <div class="card">
+            <h2>📜 WPM Analysis (Precise Log)</h2>
+            <div id="wpm-section">No WPM data available.</div>
+        </div>
     </div>
 
     <script>
@@ -256,6 +260,10 @@
                 if (val) {
                     currentSessionMeta = val;
                     updateDashboardTitle();
+
+                    // [NEW] Render WPM Table
+                    if (val.wpmData) renderWPMTable(val.wpmData);
+
                     // Force refresh if we have data
                     if (currentSessionData.length > 0) processData(currentSessionData, currentReplayData);
                 } else {
@@ -722,6 +730,49 @@
                     }
                 }
             });
+        }
+
+        // [NEW] WPM Table Renderer
+        function renderWPMTable(wpmData) {
+            const container = document.getElementById("wpm-section");
+            if (!wpmData || wpmData.length === 0) {
+                container.innerHTML = "<p>No WPM data logged yet.</p>";
+                return;
+            }
+
+            let html = `
+            <table style="width:100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em;">
+                <thead>
+                    <tr style="background:#f8f9fa; border-bottom: 2px solid #dee2e6;">
+                        <th style="padding:8px; text-align:left;">Line #</th>
+                        <th style="padding:8px; text-align:right;">Start (ms)</th>
+                        <th style="padding:8px; text-align:right;">End (ms)</th>
+                        <th style="padding:8px; text-align:right;">Duration</th>
+                        <th style="padding:8px; text-align:right;">Words</th>
+                        <th style="padding:8px; text-align:right;">WPM (Inst)</th>
+                        <th style="padding:8px; text-align:right;">Cumul WPM</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            wpmData.forEach(row => {
+                const instWPM = Math.round(row.words / (row.duration / 60000)) || 0;
+                html += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding:8px;">${row.lineIndex}</td>
+                        <td style="padding:8px; text-align:right; color:#666;">${row.startTime}</td>
+                        <td style="padding:8px; text-align:right; color:#666;">${row.endTime}</td>
+                        <td style="padding:8px; text-align:right; font-weight:bold;">${row.duration}ms</td>
+                        <td style="padding:8px; text-align:right;">${row.words}</td>
+                        <td style="padding:8px; text-align:right; color:#666;">${instWPM}</td>
+                        <td style="padding:8px; text-align:right; color:#007bff; font-weight:bold;">${row.wpm}</td>
+                    </tr>
+                `;
+            });
+
+            html += "</tbody></table>";
+            container.innerHTML = html;
         }
     </script>
 </body>

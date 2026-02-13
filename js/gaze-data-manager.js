@@ -36,6 +36,9 @@ export class GazeDataManager {
 
         // NEW: Incremental Upload State (Memory Optimization)
         this.lastUploadedIndex = 0;
+
+        // [NEW] WPM Log for Dashboard
+        this.wpmData = [];
     }
 
     /**
@@ -396,7 +399,8 @@ export class GazeDataManager {
                 userAgent: navigator.userAgent,
                 lineMetadata: this.lineMetadata,
                 totalSamples: this.data.length,
-                firstContentTime: this.firstContentTime
+                firstContentTime: this.firstContentTime,
+                wpmData: this.wpmData || [] // [NEW] Send WPM Log
             };
 
             // A. Full Session Path (Heavy Data Context)
@@ -784,6 +788,18 @@ export class GazeDataManager {
                     const minutes = this.validTimeSum / 60000;
                     if (minutes > 0) {
                         this.wpm = Math.round(this.validWordSum / minutes);
+
+                        // [NEW] WPM Data Logging
+                        if (!this.wpmData) this.wpmData = [];
+                        this.wpmData.push({
+                            lineIndex: targetLine,
+                            startTime: Math.round(now - duration),
+                            endTime: now,
+                            duration: duration,
+                            words: wordCount,
+                            wpm: this.wpm
+                        });
+
                         console.log(`[WPM] Updated: ${this.wpm} (Words: ${this.validWordSum}, Time: ${this.validTimeSum}ms)`);
                     }
 
