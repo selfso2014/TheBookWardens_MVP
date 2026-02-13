@@ -176,15 +176,7 @@ const Game = {
         }).join('');
     },
 
-    addRunes(amount) {
-        this.state.runes = Math.max(0, (this.state.runes || 0) + amount);
-        this.updateUI();
-    },
 
-    addGems(amount) {
-        this.state.gems = Math.max(0, (this.state.gems || 0) + amount);
-        this.updateUI();
-    },
 
     init() {
         console.log("Game Init");
