@@ -32,6 +32,9 @@ export class GazeDataManager {
         this.validTimeSum = 0;     // Cumulative time from valid lines (ms)
         this.lastRSTime = 0;       // Timestamp of last valid Return Sweep
         this.lastRSLine = -1;      // Line Index of last valid Return Sweep
+
+        // NEW: Incremental Upload State (Memory Optimization)
+        this.lastUploadedIndex = 0;
     }
 
     /**
@@ -249,6 +252,7 @@ export class GazeDataManager {
         this.lastTriggerTime = 0;
         this.lastPosPeakTime = 0;
         this.firstContentTime = null;
+        this.lastUploadedIndex = 0; // Reset upload cursor
     }
 
     // NEW: Reset only trigger logic (for new paragraph/level) without clearing data
@@ -371,54 +375,64 @@ export class GazeDataManager {
     async uploadToCloud(sessionId) {
         if (!window.firebase || !window.FIREBASE_CONFIG) {
             console.error("[Firebase] SDK or Config not loaded.");
-            alert("Firebase not configured. Cannot upload.");
+            // alert("Firebase not configured. Cannot upload."); // Silence alert for background sync
             return;
         }
-        console.log(`[Firebase] Uploading session [${sessionId}]...`);
+
+        // console.log(`[Firebase] Syncing session [${sessionId}]...`);
         try {
             if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+
+            // 1. Ensure Data is Processed
             this.preprocessData();
 
-            // [FIXED] Define deviceType for uploadToCloud context
-            const ua = navigator.userAgent.toLowerCase();
-            let deviceType = "desktop";
-            if (/mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(ua)) deviceType = "smartphone";
-            else if (/tablet|ipad|playbook|silk/i.test(ua)) deviceType = "tablet";
-
-            // [MODIFIED] Capture Chart Image cropped to content start
-            const chartStartTime = (this.firstContentTime !== null) ? this.firstContentTime : 0;
-            // this.exportChartImage(deviceType, chartStartTime, Infinity); // DISABLED: No auto-download per user request
-
-            const rawPayload = {
-                meta: {
-                    timestamp: Date.now(),
-                    userAgent: navigator.userAgent,
-                    lineMetadata: this.lineMetadata,
-                    totalSamples: this.data.length,
-                    firstContentTime: this.firstContentTime // [NEW] Pass this info to Cloud
-                },
-                data: this.data,
-                replayData: this.replayData // [NEW] Upload Replay Data
-            };
-            const payload = JSON.parse(JSON.stringify(rawPayload, (key, value) => {
-                if (typeof value === 'number' && isNaN(value)) return null;
-                return value;
-            }));
             const db = firebase.database();
-            await db.ref('sessions/' + sessionId).set(payload);
-            console.log("[Firebase] Upload Complete! ✅");
-            // console.log("[Firebase] Upload Complete! ✅");
-            // Toast removed per user request (Production)
-            /*
-            const toast = document.createElement("div");
-            toast.innerText = `☁️ Cloud Upload Done: ${sessionId}`;
-            toast.style.cssText = "position:fixed; bottom:50px; left:50%; transform:translateX(-50%); background:#0d47a1; color:white; padding:10px 20px; border-radius:20px; z-index:99999;";
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 4000);
-            */
+
+            // 2. Upload Metadata (Always update to reflect latest stats)
+            // Use 'update' instead of 'set' to avoid wiping other fields if any
+            await db.ref('sessions/' + sessionId + '/meta').set({
+                timestamp: Date.now(),
+                userAgent: navigator.userAgent,
+                lineMetadata: this.lineMetadata,
+                totalSamples: this.data.length,
+                firstContentTime: this.firstContentTime
+            });
+
+            // 3. Incremental Chunk Upload (Memory Safe)
+            // Only upload data that hasn't been uploaded yet
+            const startIndex = this.lastUploadedIndex;
+            const newData = this.data.slice(startIndex);
+
+            if (newData.length > 0) {
+                console.log(`[Firebase] Uploading Chunk: ${newData.length} items (Index ${startIndex} -> ${this.data.length})`);
+
+                // Sanitize Payload (Remove Infinity/NaN which Firebase hates)
+                const payload = JSON.parse(JSON.stringify(newData, (key, value) => {
+                    if (typeof value === 'number' && isNaN(value)) return null;
+                    return value;
+                }));
+
+                // Push as a new chunk
+                const chunksRef = db.ref('sessions/' + sessionId + '/chunks');
+                await chunksRef.push(payload);
+
+                // Update Cursor
+                this.lastUploadedIndex = this.data.length;
+            } else {
+                // console.log("[Firebase] Nothing new to upload.");
+            }
+
+            // 4. Upload Replay Data (If exists and changed - simplest to just set it)
+            // Replay Data is usually set once per paragraph or updated infrequently.
+            if (this.replayData) {
+                await db.ref('sessions/' + sessionId + '/replayData').set(this.replayData);
+            }
+
+            // console.log("[Firebase] Sync Complete! ✅");
+
         } catch (e) {
             console.error("[Firebase] Upload Failed", e);
-            alert(`Upload Failed: ${e.message}`);
+            // Don't alert on background sync fail
         }
     }
 

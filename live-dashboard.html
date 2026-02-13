@@ -146,7 +146,7 @@
 
     <script>
         // --- Global Chart Instances ---
-        let chart1, chart2, chart3, chart4, chart5;
+        let chart1, chart2, chart3, chart4, chart5, chart6;
 
         // --- Init ---
         window.onload = function () {
@@ -198,6 +198,11 @@
         }
 
         // --- Firebase Logic ---
+        // Global Accumulators for Incremental Data
+        let currentSessionData = [];
+        let currentSessionMeta = {};
+        let currentReplayData = [];
+
         function loadSession(sessionId) {
             // Update Input
             document.getElementById('sessionIdInput').value = sessionId;
@@ -205,19 +210,62 @@
             const db = firebase.database();
             document.getElementById('status').innerText = `Connecting to [${sessionId}]...`;
 
-            // Listen for changes
+            // 1. Reset State
+            currentSessionData = [];
+            currentSessionMeta = {};
+            currentReplayData = [];
+
             const ref = db.ref('sessions/' + sessionId);
-            ref.off(); // Detach previous listeners if any (simple approach)
-            ref.on('value', (snapshot) => {
+
+            // Detach previous listeners
+            ref.off();
+            ref.child('meta').off();
+            ref.child('chunks').off();
+            ref.child('replayData').off();
+
+            // 2. Listen for Metadata
+            ref.child('meta').on('value', (snapshot) => {
                 const val = snapshot.val();
                 if (val) {
-                    document.getElementById('status').innerHTML = `✅ Data Received! Last Update: ${new Date(val.meta.timestamp).toLocaleTimeString()}`;
-                    // Process Data (Pass replayData if available)
-                    processData(val.data, val.replayData);
+                    currentSessionMeta = val;
+                    updateDashboardTitle();
+                    // Force refresh if we have data
+                    if (currentSessionData.length > 0) processData(currentSessionData, currentReplayData);
                 } else {
-                    document.getElementById('status').innerText = `⚠️ Session [${sessionId}] not found or empty.`;
+                    // Check if it's an old format session (legacy support)
+                    ref.once('value', (snap) => {
+                        const fullVal = snap.val();
+                        if (fullVal && fullVal.data && !fullVal.chunks) {
+                            document.getElementById('status').innerText = "⚠️ Legacy Session Detected (Old Format)";
+                            processData(fullVal.data, fullVal.replayData);
+                        }
+                    });
                 }
             });
+
+            // 3. Listen for Incremental Chunks
+            ref.child('chunks').on('child_added', (snapshot) => {
+                const chunk = snapshot.val();
+                if (Array.isArray(chunk)) {
+                    currentSessionData = currentSessionData.concat(chunk);
+                    updateDashboardTitle();
+                    processData(currentSessionData, currentReplayData);
+                }
+            });
+
+            // 4. Listen for Replay Data (Optional)
+            ref.child('replayData').on('value', (snapshot) => {
+                const val = snapshot.val();
+                if (val) {
+                    currentReplayData = val;
+                    if (currentSessionData.length > 0) processData(currentSessionData, currentReplayData);
+                }
+            });
+        }
+
+        function updateDashboardTitle() {
+            const timeStr = currentSessionMeta.timestamp ? new Date(currentSessionMeta.timestamp).toLocaleTimeString() : "Live";
+            document.getElementById('status').innerHTML = `✅ <b>Live Sync</b>: ${currentSessionData.length} samples. (Start: ${timeStr})`;
         }
 
         // --- Data Processing Setup ---
