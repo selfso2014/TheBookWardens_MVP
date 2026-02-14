@@ -386,27 +386,12 @@ const Game = {
         let timer = null;
         let chunkCount = 0;
 
-        // --- SPECIFICATION ---
-        // Word Interval: Fixed 150ms (Matches Game)
-        const WORD_INTERVAL = 150;
-
-        // Target Chunk Size (Variable by WPM)
-        let targetChunkSize = 4; // Default (200 WPM)
-        if (wpm <= 100) targetChunkSize = 3; // Short (2-3)
-        if (wpm >= 300) targetChunkSize = 6; // Long (5-6)
-
-        // Pause Calibration (Calculated to approximate WPM)
-        // Formula: Pause = (ChunkSize * 60000 / WPM) - (ChunkSize * 150)
-        // We use a simplified multiplier based on the spec analysis.
-        let pauseMultiplier = 1.0;
-        if (wpm <= 100) pauseMultiplier = 1.4; // Need longer pause
-        if (wpm === 200) pauseMultiplier = 1.5; // Correction
-        if (wpm >= 300) pauseMultiplier = 1.0; // Close enough
-
-        // Base Calculation from Game Logic
-        const baseDelay = Math.floor(10000 / wpm);
-        // Apply calibration
-        const calibratedPause = Math.max(200, (baseDelay * 8) * pauseMultiplier);
+        // --- SPECIFICATION: UNIFIED PREVIEW ENGINE ---
+        // Use the EXACT same logic as the main game
+        const params = this.calculateWPMAttributes(wpm);
+        const WORD_INTERVAL = params.interval;
+        const TARGET_CHUNK_SIZE = params.chunkSize;
+        const CHUNK_DELAY = params.delay;
 
         const tick = () => {
             if (!isRunning) return;
@@ -450,11 +435,8 @@ const Game = {
             const isComma = wordText.includes(',');
 
             // Logic: Pause if Punctuation OR Chunk Size Reached
-            if (isEnd || isComma || chunkCount >= targetChunkSize) {
-                nextDelay = calibratedPause;
-
-                // Reset chunk count. 
-                // For 100 WPM, maybe randomize 2 or 3? Let's stick to 3 for consistency.
+            if (isEnd || isComma || chunkCount >= TARGET_CHUNK_SIZE) {
+                nextDelay = CHUNK_DELAY;
                 chunkCount = 0;
             }
 
@@ -961,6 +943,48 @@ const Game = {
     },
 
     // --- 1.2 WPM Selection ---
+    calculateWPMAttributes(wpm) {
+        // A. Constraints
+        let chunkSize = 4;
+        if (wpm <= 100) chunkSize = 3;
+        if (wpm >= 300) chunkSize = 6;
+
+        // B. Target Times (ms)
+        const msPerMinute = 60000;
+        // Target time for ONE chunk (including wait)
+        const targetChunkTotalTime = (msPerMinute / wpm) * chunkSize;
+
+        // C. System Constants (Overhead)
+        // 1. TextRenderer buffer (100ms fixed in V2)
+        const SYSTEM_BUFFER = 100;
+        // 2. Line Break Average Overhead (450ms / 3 chunks approx = 150ms)
+        const LINE_BREAK_AVG = 150;
+
+        // D. Initial Settings
+        let interval = 150; // Visual preference for "typing" speed
+
+        // E. Calculate Required Wait Time (Delay)
+        // Total = (Interval * Count) + Buffer + LineBreak + Delay
+        // Delay = Total - (Interval * Count) - Buffer - LineBreak
+        let delay = targetChunkTotalTime - (interval * chunkSize) - SYSTEM_BUFFER - LINE_BREAK_AVG;
+
+        // F. Adaptive Logic (High Speed Handling)
+        // If calculated delay is too short (< 200ms), it feels rushed.
+        // We must increase typing speed (reduce interval) to buy more pause time.
+        if (delay < 200) {
+            delay = 200; // Floor the pause
+            // Solve for Interval:
+            // interval * chunkSize = Total - Buffer - LineBreak - 200
+            const availableRenderTime = targetChunkTotalTime - SYSTEM_BUFFER - LINE_BREAK_AVG - 200;
+            interval = Math.floor(availableRenderTime / chunkSize);
+
+            // Safety: Min interval 20ms (browser constraints)
+            if (interval < 20) interval = 20;
+        }
+
+        return { chunkSize, interval, delay: Math.floor(delay) };
+    },
+
     selectWPM(wpm, btnElement) {
         // UI Reset
         const buttons = document.querySelectorAll('.wpm-btn');
@@ -981,24 +1005,12 @@ const Game = {
 
         this.wpm = wpm;
 
-        // --- CORE LOGIC: Sync with WPM Preview ---
-        // 1. Target Chunk Size
-        let targetChunkSize = 4;
-        if (wpm <= 100) targetChunkSize = 3;
-        if (wpm >= 300) targetChunkSize = 6;
-        Game.targetChunkSize = targetChunkSize;
+        // --- CORE LOGIC: Reverse Calculation for Exact Timing ---
+        this.wpmParams = this.calculateWPMAttributes(wpm);
+        Game.targetChunkSize = this.wpmParams.chunkSize;
 
-        // 2. Calibrated Pause Time
-        let pauseMultiplier = 1.0;
-        if (wpm <= 100) pauseMultiplier = 1.4;
-        if (wpm === 200) pauseMultiplier = 1.5;
-        if (wpm >= 300) pauseMultiplier = 1.0;
-
-        const baseDelay = Math.floor(10000 / wpm);
-        const calibratedPause = Math.max(200, (baseDelay * 8) * pauseMultiplier);
-
-        this.targetSpeed = baseDelay;
-        this.targetChunkDelay = calibratedPause;
+        console.log(`[Game] WPM Selected: ${wpm}`);
+        console.log(`[Game Logic] Params: Interval=${this.wpmParams.interval}ms, Delay=${this.wpmParams.delay}ms, Chunk=${this.wpmParams.chunkSize}`);
 
         console.log(`[Game] WPM Selected: ${wpm}`);
         console.log(`[Game Logic] Target Chunk Size: ${targetChunkSize}, Pause: ${Math.round(calibratedPause)}ms`);
@@ -1404,7 +1416,7 @@ Game.typewriter = {
             this.renderer.scheduleFadeOut(this.chunkIndex, 3000); // 3 seconds lifetime
 
             // Wait for Animation to Finish (Promise-based) with Timeout Safety
-            const revealPromise = this.renderer.revealChunk(this.chunkIndex);
+            const revealPromise = this.renderer.revealChunk(this.chunkIndex, Game.wpmParams.interval);
 
             // Safety timeout: If animation gets stuck, proceed anyway after 2s
             const timeoutPromise = new Promise(resolve => setTimeout(resolve, 2000));
@@ -1414,8 +1426,9 @@ Game.typewriter = {
                 this.chunkIndex++;
 
                 // Calculate Delay (Pause AFTER valid reading)
-                let delay = Game.targetChunkDelay || 1500;
-                if (delay < 500) delay = 500; // Min pause
+                // Use the precise calculated delay from WPM settings
+                // Default to 1000ms if not set (fallback)
+                let delay = (Game.wpmParams && Game.wpmParams.delay) ? Game.wpmParams.delay : 1000;
 
                 this.timer = setTimeout(() => {
                     this.timer = null;
