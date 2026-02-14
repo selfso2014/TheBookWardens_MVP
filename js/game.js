@@ -1279,7 +1279,9 @@ Game.typewriter = {
 
         // WPM Monitor
         if (this.wpmMonitor) clearInterval(this.wpmMonitor);
-        this.wpmMonitor = setInterval(() => this.updateWPM(), 1000);
+        // [FIX] Removed WPM polling interval. 
+        // WPM should only update on discrete "Pang" events driven by GazeDataManager.
+        // this.wpmMonitor = setInterval(() => this.updateWPM(), 1000);
 
         // --- CHANGED: Periodic Cloud Upload REMOVED ---
         // As per user request, we now upload ONLY when Replay starts (per paragraph).
@@ -1661,13 +1663,9 @@ Game.typewriter = {
         if (window.gazeDataManager && window.gazeDataManager.wpm > 0) {
             targetWPM = window.gazeDataManager.wpm;
         }
-        // Priority 2: Simple estimation (Fallback)
-        else if (this.startTime && this.chunkIndex > 0) {
-            const elapsedMin = (Date.now() - this.startTime) / 60000;
-            if (elapsedMin > 0) {
-                targetWPM = (this.chunkIndex * 3) / elapsedMin;
-            }
-        }
+        // Priority 2: Simple estimation (Fallback) - REMOVED
+        // We strictly use GazeDataManager's calculated WPM.
+        // If 0, display 0. Do not use time-based estimation as it causes fluctuations.
 
         // Bridge to Manager
         Game.updateWPM(targetWPM);
