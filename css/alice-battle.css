@@ -5,13 +5,17 @@
     justify-content: center;
     align-items: center;
     height: 100vh;
+    width: 100vw;
     font-family: 'serif', 'Pretendard', sans-serif;
     color: white;
     user-select: none;
     overflow: hidden;
-    position: relative;
-    z-index: 1000;
-    /* Ensure on top */
+    position: fixed !important;
+    /* Force Fixed */
+    top: 0;
+    left: 0;
+    z-index: 30000 !important;
+    /* Highest Layer */
 }
 
 #alice-canvas {
@@ -27,6 +31,7 @@
     /* Click-through */
 }
 
+/* Debug Border - remove later */
 #alice-game-ui {
     position: relative;
     z-index: 10;
@@ -43,6 +48,8 @@
     transition: opacity 1s ease;
     opacity: 1 !important;
     /* Safety fallback */
+    border: 2px solid rgba(255, 0, 0, 0.3);
+    /* Visual Debug */
 }
 
 #screen-alice-battle .entity-area {
