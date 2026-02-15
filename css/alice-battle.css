@@ -41,6 +41,8 @@
     padding: 20px;
     box-sizing: border-box;
     transition: opacity 1s ease;
+    opacity: 1 !important;
+    /* Safety fallback */
 }
 
 #screen-alice-battle .entity-area {

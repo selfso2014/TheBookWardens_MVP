@@ -32,35 +32,50 @@ export const AliceBattle = {
 
     init() {
         alert("Debug: AliceBattle.init() STARTED!");
-        console.log("Initializing Alice Battle...");
-        const container = document.getElementById('screen-alice-battle');
-        if (container) {
-            container.style.display = 'flex';
-            container.classList.add('active');
+        try {
+            console.log("Initializing Alice Battle...");
+            const container = document.getElementById('screen-alice-battle');
+            if (container) {
+                container.style.display = 'flex';
+                container.classList.add('active');
+            } else {
+                alert("CRITICAL: Container #screen-alice-battle NOT FOUND!");
+            }
+
+            this.canvas = document.getElementById('alice-canvas');
+            if (!this.canvas) {
+                alert("CRITICAL: Canvas #alice-canvas NOT FOUND!");
+                return;
+            }
+            this.ctx = this.canvas.getContext('2d');
+
+            this.ui.gameUi = document.getElementById('alice-game-ui');
+            if (!this.ui.gameUi) alert("CRITICAL: #alice-game-ui NOT FOUND!");
+
+            this.ui.villainHp = document.getElementById('villain-hp');
+            this.ui.wardenHp = document.getElementById('warden-hp');
+            this.ui.log = document.getElementById('al-log');
+            this.ui.finalScreen = document.getElementById('alice-final-screen');
+            this.ui.storyDisplay = document.getElementById('story-display');
+            this.ui.resultHeader = document.getElementById('result-header');
+            this.ui.restartBtn = document.getElementById('alice-restart-btn');
+
+            this.resize();
+            window.addEventListener('resize', () => this.resize());
+
+            // Reset State
+            alert("Debug: Resetting Game State...");
+            this.resetGame();
+
+            // Start Loop
+            if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
+            this.animate();
+            alert("Debug: AliceBattle Init COMPLETE! Loop Started.");
+
+        } catch (e) {
+            alert("CRITICAL INIT ERROR: " + e.message);
+            console.error(e);
         }
-
-        this.canvas = document.getElementById('alice-canvas');
-        if (!this.canvas) return;
-        this.ctx = this.canvas.getContext('2d');
-
-        this.ui.gameUi = document.getElementById('alice-game-ui');
-        this.ui.villainHp = document.getElementById('villain-hp');
-        this.ui.wardenHp = document.getElementById('warden-hp');
-        this.ui.log = document.getElementById('al-log');
-        this.ui.finalScreen = document.getElementById('alice-final-screen');
-        this.ui.storyDisplay = document.getElementById('story-display');
-        this.ui.resultHeader = document.getElementById('result-header');
-        this.ui.restartBtn = document.getElementById('alice-restart-btn');
-
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
-
-        // Reset State
-        this.resetGame();
-
-        // Start Loop
-        if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
-        this.animate();
     },
 
     resize() {
