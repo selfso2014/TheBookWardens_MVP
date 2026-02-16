@@ -417,8 +417,9 @@
 
       <!-- NEW DIRECT DEBUG BUTTON (ID-based binding) -->
       <button id="btn-debug-alice"
+        onclick="if(window.AliceBattleRef) window.AliceBattleRef.init(); else alert('Error: AliceBattleRef not found. Script may have failed to load.');"
         style="margin-top: 10px; background: #500; color: #f88; border: 1px solid #f44; padding: 8px 15px; font-size: 0.9rem; cursor: pointer; display: block; margin-left: auto; margin-right: auto; font-weight: bold;">
-        Direct - Alice Battle (Visual Mode)
+        Direct - Alice Battle (Text Conquest Mode)
       </button>
     </section>
 
@@ -1093,7 +1094,7 @@
 
       <!-- Middle Area: Rift Textfield -->
       <div id="rift-textfield-container"
-        style="flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 10px; position: relative;">
+        style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; position: relative;">
 
         <div class="rift-textfield"
           style="border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(0, 0, 0, 0.4); padding: 10px 15px; border-radius: 6px; max-width: 850px; width: 98%; max-height: 170px; overflow: hidden; position: relative; backdrop-filter: blur(2px);">
@@ -1110,16 +1111,17 @@
             see it pop down a large rabbit-hole under the hedge..."
           </div>
         </div>
+
+        <!-- Battle Message Log (Moved Here) -->
+        <div class="battle-log" id="al-log"
+          style="text-align: center; color: #ffcc00; font-size: 1.2rem; font-weight: bold; margin-top: 15px; text-shadow: 0 0 5px rgba(0,0,0,0.8); min-height: 1.5em; z-index: 10;">
+          Battle started...
+        </div>
       </div>
 
       <!-- Bottom Entity Area (WARDEN CONTROLS) -->
       <div class="entity-area warden"
         style="width: 100%; height: 38vh; min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 110px; background: linear-gradient(to top, rgba(0,0,20,0.8), transparent);">
-
-        <div class="battle-log" id="al-log"
-          style="text-align: center; color: #888; font-size: 0.8rem; margin-bottom: 5px; min-height: 1.2em;">
-          Battle started...
-        </div>
 
         <!-- Warden HP -->
         <div class="status-bar"
