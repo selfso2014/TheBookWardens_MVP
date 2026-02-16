@@ -424,8 +424,14 @@
 
       <!-- DEBUG: Jump to New Scenes -->
       <button onclick="Game.debugFinalVillain()"
-        style="margin-top: 30px; background: #333; color: #777; border: 1px solid #444; padding: 5px 10px; font-size: 0.8rem; cursor: pointer;">
-        Debug - Final Villain
+        style="margin-top: 20px; background: #333; color: #777; border: 1px solid #444; padding: 5px 10px; font-size: 0.8rem; cursor: pointer;">
+        Debug - Final Villain (Original Path)
+      </button>
+
+      <!-- NEW DIRECT DEBUG BUTTON -->
+      <button onclick="Game.triggerFinalBossBattle()"
+        style="margin-top: 10px; background: #500; color: #f88; border: 1px solid #f44; padding: 8px 15px; font-size: 0.9rem; cursor: pointer; display: block; margin-left: auto; margin-right: auto; font-weight: bold;">
+        Direct - Alice Battle (Visual Mode)
       </button>
     </section>
 
@@ -1115,16 +1121,16 @@
 
   <!-- Scripts -->
   <!-- 1. Eye Tracking Core -->
-  <script type="module" src="./js/app.js?v=260216_2101"></script>
+  <script type="module" src="./js/app.js?v=260216_2102"></script>
   <script type="module">
-    import { AliceBattle } from './js/alice-battle.js?v=5.07_DEBUG_VISUAL';
+    import { AliceBattle } from './js/alice-battle.js?v=5.08_BUTTON';
     window.AliceBattleRef = AliceBattle;
     // Game.AliceBattle is now handled in game.js import
-    console.log("AliceBattle Module Loaded (v5.07)");
+    console.log("AliceBattle Module Loaded (v5.08)");
   </script>
   <!-- 2. Game Logic -->
-  <script src="./js/calibration.js?v=260216_2101"></script>
-  <script type="module" src="./js/game.js?v=260216_2101"></script>
+  <script src="./js/calibration.js?v=260216_2102"></script>
+  <script type="module" src="./js/game.js?v=260216_2102"></script>
 </body>
 
 </html>
