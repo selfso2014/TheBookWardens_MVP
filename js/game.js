@@ -1880,21 +1880,21 @@ Game.typewriter = {
     },
 
     triggerFinalBossBattle() {
-        console.log("[Game] Alice Battle Mode Started (Interaction Check V2).");
+        console.log("[Game] Alice Battle Mode Started (Global Capture V3).");
 
-        // 1. Disable Specific Blocking Overlays (Identify from app.js)
+        // 1. Disable Specific Blocking Overlays
         const blockers = ['hud-top', 'output', 'preview', 'calibration-overlay'];
         blockers.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
                 el.style.display = 'none'; // Hide visual
-                el.style.pointerEvents = 'none'; // Pass clicks
+                el.style.setProperty('pointer-events', 'none', 'important'); // Pass clicks FORCE
             }
         });
 
         // Safety Net: Force pointer-events:none on ALL canvases
         document.querySelectorAll('canvas').forEach(c => {
-            c.style.pointerEvents = 'none';
+            c.style.setProperty('pointer-events', 'none', 'important');
         });
 
         // 2. Explicit Screen Switch
@@ -1908,7 +1908,7 @@ Game.typewriter = {
             screen.style.opacity = '1';
             screen.style.visibility = 'visible';
             screen.style.backgroundColor = '#111';
-            screen.style.zIndex = '99999'; // FORCE TOP LAYER
+            screen.style.zIndex = '2147483647'; // MAX INT Z-Index
 
             if (screen.parentElement && screen.parentElement.tagName !== 'BODY') {
                 screen.parentElement.style.display = 'block';
@@ -1924,34 +1924,11 @@ Game.typewriter = {
         this.aliceBattleState.isPlayerTurn = true;
         this.updateBattleUI();
 
-        // 4. Event Delegation: Single Listener on Screen
-        // Remove old listener to prevent duplicates (simple way: clone & replace)
-        const newScreen = screen.cloneNode(true);
-        screen.parentNode.replaceChild(newScreen, screen);
-
-        // Re-attach listener to new element
-        newScreen.onclick = (e) => {
-            // Check if clicked element is a card inside .warden area
-            const card = e.target.closest('.warden .card');
-            if (card) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                const text = card.innerText.toLowerCase();
-                let action = '';
-                if (text.includes('ink')) action = 'ink';
-                else if (text.includes('rune')) action = 'rune';
-                else if (text.includes('gem')) action = 'gem';
-
-                if (action) {
-                    this.handleBattleAction(action);
-                }
-            }
-        };
-
-        // 5. Remove Dummy Overlay if exists (in new DOM)
-        const dummy = newScreen.querySelector("div[onclick='Game.endFinalBossDummy()']");
+        // 4. Remove Dummy Overlay if exists
+        const dummy = document.querySelector("#screen-final-boss > div[onclick='Game.endFinalBossDummy()']");
         if (dummy) dummy.remove();
+
+        // Note: Event Listeners are handled globally by 'handleBattleClick' below
     },
 
     updateBattleUI() {
@@ -2028,5 +2005,49 @@ window.Game = Game;
 document.addEventListener("DOMContentLoaded", () => {
     Game.init();
 });
+
+// --- GLOBAL BATTLE INTERACTION HANDLER (CAPTURE PHASE) ---
+// This ensures clicks work even if obscured by transparent overlays or if event bubbling is stopped.
+const handleBattleClick = (e) => {
+    // 1. Active Check
+    const screen = document.getElementById('screen-final-boss');
+    // Check if visible (flex or block) and has the mode class
+    const style = screen ? window.getComputedStyle(screen) : null;
+    const isBattleActive = screen &&
+        style.display !== 'none' &&
+        screen.classList.contains('alice-battle-mode');
+
+    if (!isBattleActive) return;
+
+    // 2. Target Check (Is it a card?)
+    const card = e.target.closest('.warden .card');
+    if (!card) return;
+
+    // 3. Prevent Default Behaviors (Zoom, Highlight, Bubbling)
+    // Only if it's a valid card click in battle mode
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 4. Extract Action
+    const text = card.innerText.toLowerCase();
+    let action = '';
+    if (text.includes('ink')) action = 'ink';
+    else if (text.includes('rune')) action = 'rune';
+    else if (text.includes('gem')) action = 'gem';
+
+    // 5. Execute Game Logic
+    if (action && window.Game && typeof window.Game.handleBattleAction === 'function') {
+        // Debounce slightly to prevent double-fire from touch+click
+        if (window.Game._lastBattleClick && (Date.now() - window.Game._lastBattleClick < 300)) return;
+        window.Game._lastBattleClick = Date.now();
+
+        console.log(`[Battle] Global Handler: Action ${action}`);
+        window.Game.handleBattleAction(action);
+    }
+};
+
+// Bind to Capture Phase (true) to intercept events before they reach targets
+document.addEventListener('click', handleBattleClick, true);
+document.addEventListener('touchstart', handleBattleClick, { passive: false, capture: true });
 
 
