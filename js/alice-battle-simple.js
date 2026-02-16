@@ -1,10 +1,10 @@
 
 // alice-battle-simple.js (No Modules, Pure Global Script)
 // LOGIC REWORK: Text Conquest (Purify vs Corrupt)
-// V2: Added Priority Logic for Counter-Attacks
+// V3: Fixing Lightning Targeting & Colors
 
 (function () {
-    console.log("Loading AliceBattle Simple Script (Text Conquest Mode V2)...");
+    console.log("Loading AliceBattle Simple Script (Text Conquest Mode V3)...");
 
     // Private Variables
     let canvas, ctx, width, height;
@@ -124,7 +124,8 @@
                 charSpan.innerText = char;
                 charSpan.id = `char-${charGlobalIndex}`;
                 charSpan.style.transition = "color 0.5s, text-shadow 0.5s";
-                charSpan.style.color = "#666"; // Default Gray
+                // Color #555 is slightly darker/clearer than #666 on dark bg
+                charSpan.style.color = "#555";
                 charSpan.dataset.state = 'gray';
 
                 wordSpan.appendChild(charSpan);
@@ -145,6 +146,7 @@
         });
 
         updateGameStatus();
+        if (ui.log) ui.log.innerText = ""; // Clear initial "Battle started..."
     }
 
     function updateGameStatus() {
@@ -166,10 +168,9 @@
         indices.forEach(idx => {
             if (textData[idx]) {
                 textData[idx].state = newState;
-                textData[idx].dom.style.color = newState === 'white' ? '#fff' : '#444';
+                textData[idx].dom.style.color = newState === 'white' ? '#fff' : '#555';
                 textData[idx].dom.style.textShadow = newState === 'white' ? `0 0 5px ${color}` : 'none';
 
-                // Add flash animation class?
                 // Minimal inline style animation
                 textData[idx].dom.animate([
                     { transform: 'scale(1.3)', color: color },
@@ -191,6 +192,32 @@
             temp.splice(rnd, 1);
         }
         return result;
+    }
+
+    // Helper to get safe target coordinates with Fallback
+    function getSafeTarget(element) {
+        let x = 0, y = 0;
+        if (element) {
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                x = rect.left + rect.width / 2;
+                y = rect.top + rect.height / 2;
+            }
+        }
+
+        // Fallback to container center if 0,0 or out of bounds (sanity check)
+        if (x === 0 && y === 0 || x < 0 || y < 0) {
+            if (ui.aliceTextContainer) {
+                const cRect = ui.aliceTextContainer.getBoundingClientRect();
+                x = cRect.left + cRect.width / 2;
+                y = cRect.top + cRect.height / 2;
+            } else {
+                // Absolute fallback
+                x = window.innerWidth / 2;
+                y = window.innerHeight / 2;
+            }
+        }
+        return { x, y };
     }
 
     // --- GAME FUNCTIONS ---
@@ -233,7 +260,7 @@
         if (!ctx) return;
         ctx.clearRect(0, 0, width, height);
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter'; // Use lighter for nicer glow overlap
+        ctx.globalCompositeOperation = 'lighter';
 
         if (flashOpacity > 0) {
             ctx.fillStyle = `rgba(255, 255, 255, ${flashOpacity})`;
@@ -257,7 +284,7 @@
     window.AliceBattleRef = {
         init: function () {
             try {
-                console.log("AliceBattleRef Init");
+                console.log("AliceBattleRef Init V3");
                 const container = document.getElementById('screen-alice-battle');
                 if (container) {
                     container.style.display = 'flex';
@@ -310,12 +337,10 @@
             const startX = wBox.left + wBox.width / 2;
             const startY = wBox.top;
 
-            // Visual Card Glow
             const origShadow = sourceEl.style.boxShadow;
             sourceEl.style.boxShadow = `0 0 20px 10px ${type === 'ink' ? '#b300ff' : type === 'rune' ? '#00f2ff' : '#fff'}`;
             setTimeout(() => sourceEl.style.boxShadow = origShadow, 300);
 
-            // LOGIC: Select Targets based on Priority (Recently Corrupted > Random Gray)
             let targets = [];
             let color = '#fff';
             let message = "";
@@ -325,11 +350,9 @@
                 const priorityIndices = recentlyCorrupted.filter(idx => textData[idx].state === 'gray');
                 const otherGrayIndices = textData.filter(d => d.state === 'gray' && !recentlyCorrupted.includes(d.index)).map(d => d.index);
 
-                // Take from priority first
                 const takenPriority = pickRandom(priorityIndices, 10);
                 targets.push(...takenPriority);
 
-                // Fill rest from random gray
                 if (targets.length < 10) {
                     const needed = 10 - targets.length;
                     targets.push(...pickRandom(otherGrayIndices, needed));
@@ -339,14 +362,10 @@
                 message = "Ink Splash!";
             }
             else if (type === 'rune') {
-                // 3 Words. Priority: Word contains Corrupted char.
+                // 3 Words.
                 const grayWords = wordsData.filter(w => w.some(idx => textData[idx].state === 'gray'));
-
-                // Sort words? Or just pick random. Let's pick random gray words.
-                // Could prioritize words containing 'recentlyCorrupted' chars but random is fine for Words.
                 const selectedWords = pickRandom(grayWords, 3);
                 selectedWords.forEach(w => targets.push(...w));
-
                 color = '#00f2ff';
                 message = "Rune Cast!";
             }
@@ -368,26 +387,21 @@
             ui.log.innerText = message;
 
             if (targets.length > 0) {
-                // Add to 'recentlyPurified' for Villain logic
                 recentlyPurified = [...new Set([...recentlyPurified, ...targets])];
-                // Limit history size
                 if (recentlyPurified.length > 50) recentlyPurified = recentlyPurified.slice(-50);
 
                 // Fire Lightnings
                 const distinctWordIndices = [...new Set(targets.map(idx => textData[idx].wordIndex))];
-
-                // Fire to each word center (limit visual spam)
                 distinctWordIndices.forEach((wIdx, i) => {
                     setTimeout(() => {
-                        const wordChars = wordsData[wIdx];
-                        const firstChar = textData[wordChars[0]].dom;
-                        const lastChar = textData[wordChars[wordChars.length - 1]].dom;
-                        const fBox = firstChar.getBoundingClientRect();
-                        const lBox = lastChar.getBoundingClientRect();
-                        const targetX = (fBox.left + lBox.right) / 2;
-                        const targetY = (fBox.top + lBox.bottom) / 2;
+                        const wordIndices = wordsData[wIdx];
+                        // Target middle char of word
+                        const midCharIdx = wordIndices[Math.floor(wordIndices.length / 2)];
+                        const midCharEl = textData[midCharIdx].dom;
 
-                        lightnings.push(new Lightning(startX, startY, targetX, targetY, type === 'ink' ? '#b300ff' : type === 'rune' ? '#00f2ff' : '#fff'));
+                        const targetPos = getSafeTarget(midCharEl);
+
+                        lightnings.push(new Lightning(startX, startY, targetPos.x, targetPos.y, type === 'ink' ? '#b300ff' : type === 'rune' ? '#00f2ff' : '#fff'));
                         shakeTime = 3;
                     }, i * 30);
                 });
@@ -400,7 +414,6 @@
             cardValues[type] = Math.max(0, cardValues[type] - decreaseAmount[type]);
             updateCardDisplay();
 
-            // Villain Retaliates
             setTimeout(() => { if (gameState === 'playing') this.villainCounter(); }, 1000 + Math.random() * 500);
         },
 
@@ -427,29 +440,24 @@
             let lightningColor = "#ff0044";
 
             if (chosenKey === 'queen') {
-                // 10 Chars. Priority: Recently Purified (White)
                 const priorityIndices = recentlyPurified.filter(idx => textData[idx].state === 'white');
                 const otherWhiteIndices = textData.filter(d => d.state === 'white' && !recentlyPurified.includes(d.index)).map(d => d.index);
 
                 const takenPriority = pickRandom(priorityIndices, 10);
                 targets.push(...takenPriority);
-
                 if (targets.length < 10) {
                     const needed = 10 - targets.length;
                     targets.push(...pickRandom(otherWhiteIndices, needed));
                 }
-
                 message = "The Queen Corrupts!";
             }
             else if (chosenKey === 'king') {
-                // 3 Random White Words
                 const whiteWords = wordsData.filter(w => w.some(idx => textData[idx].state === 'white'));
                 const selectedWords = pickRandom(whiteWords, 3);
                 selectedWords.forEach(w => targets.push(...w));
                 message = "King's Decree!";
             }
             else {
-                // 3 Consecutive
                 const whiteWords = wordsData.filter(w => w.some(idx => textData[idx].state === 'white'));
                 if (whiteWords.length > 0) {
                     const startWordIdx = textData[whiteWords[Math.floor(Math.random() * whiteWords.length)][0]].wordIndex;
@@ -469,18 +477,15 @@
                 if (recentlyCorrupted.length > 50) recentlyCorrupted = recentlyCorrupted.slice(-50);
 
                 const distinctWordIndices = [...new Set(targets.map(idx => textData[idx].wordIndex))];
-
                 distinctWordIndices.forEach((wIdx, i) => {
                     setTimeout(() => {
-                        const wordChars = wordsData[wIdx];
-                        const firstChar = textData[wordChars[0]].dom;
-                        const lastChar = textData[wordChars[wordChars.length - 1]].dom;
-                        const fBox = firstChar.getBoundingClientRect();
-                        const lBox = lastChar.getBoundingClientRect();
-                        const targetX = (fBox.left + lBox.right) / 2;
-                        const targetY = (fBox.top + lBox.bottom) / 2;
+                        const wordIndices = wordsData[wIdx];
+                        const midCharIdx = wordIndices[Math.floor(wordIndices.length / 2)];
+                        const midCharEl = textData[midCharIdx].dom;
 
-                        lightnings.push(new Lightning(startX, startY, targetX, targetY, lightningColor));
+                        const targetPos = getSafeTarget(midCharEl);
+
+                        lightnings.push(new Lightning(startX, startY, targetPos.x, targetPos.y, lightningColor));
                         shakeTime = 3;
                     }, i * 30);
                 });
@@ -493,7 +498,9 @@
                 }, 200 + distinctWordIndices.length * 30);
             } else {
                 if (ui.wardenHp && wardenHP > 0) {
-                    lightnings.push(new Lightning(startX, startY, width / 2, height - 100, lightningColor));
+                    // Attack Center if no text targets
+                    const targetPos = getSafeTarget(null); // Fallback to center
+                    lightnings.push(new Lightning(startX, startY, targetPos.x, targetPos.y, lightningColor));
                     setTimeout(() => {
                         wardenHP -= 10;
                         if (ui.wardenHp) ui.wardenHp.style.width = wardenHP + '%';
