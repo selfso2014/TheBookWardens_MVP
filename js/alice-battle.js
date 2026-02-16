@@ -235,12 +235,6 @@ export const AliceBattle = {
         // Clear canvas
         this.ctx.clearRect(0, 0, this.width, this.height);
 
-        // DEBUG: Force Draw Red Circle
-        this.ctx.fillStyle = 'red';
-        this.ctx.beginPath();
-        this.ctx.arc(this.width / 2, this.height / 2, 50, 0, Math.PI * 2);
-        this.ctx.fill();
-
         this.ctx.save();
         if (this.flashOpacity > 0) {
             this.ctx.fillStyle = `rgba(255, 255, 255, ${this.flashOpacity})`;
