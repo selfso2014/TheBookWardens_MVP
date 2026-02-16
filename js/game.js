@@ -1880,13 +1880,19 @@ Game.typewriter = {
     },
 
     triggerFinalBossBattle() {
-        console.log("[Game] Alice Battle Mode Started (Interaction Check).");
+        console.log("[Game] Alice Battle Mode Started (Interaction Check V2).");
 
-        // 1. Disable HUD & Blocking Overlays (Canvas)
-        const hud = document.getElementById('hud-top');
-        if (hud) hud.style.display = 'none';
+        // 1. Disable Specific Blocking Overlays (Identify from app.js)
+        const blockers = ['hud-top', 'output', 'preview', 'calibration-overlay'];
+        blockers.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.display = 'none'; // Hide visual
+                el.style.pointerEvents = 'none'; // Pass clicks
+            }
+        });
 
-        // Force pointer-events:none on ALL canvases to prevent click hijacking
+        // Safety Net: Force pointer-events:none on ALL canvases
         document.querySelectorAll('canvas').forEach(c => {
             c.style.pointerEvents = 'none';
         });

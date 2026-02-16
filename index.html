@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SeeSo Eye Tracking Web Demo</title>
-  <link rel="stylesheet" href="./css/style.css?v=260216_2149" />
+  <link rel="stylesheet" href="./css/style.css?v=260216_2158" />
   <link rel="stylesheet" href="./css/rune-game.css" />
   <link rel="stylesheet" href="./css/rabbit.css" />
   <link rel="stylesheet" href="./css/splash.css" />
@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="./css/fx.css" />
   <link rel="stylesheet" href="./css/rift.css" />
   <link rel="stylesheet" href="./css/rift-book.css" />
-  <link rel="stylesheet" href="./css/alice-battle.css?v=5.14" />
+  <link rel="stylesheet" href="./css/alice-battle.css?v=5.15" />
   <link rel="stylesheet" href="./css/loading-modal.css" />
 
   <!-- Firebase SDK (Compat) -->
@@ -1121,15 +1121,15 @@
 
   <!-- Scripts -->
   <!-- 1. Eye Tracking Core -->
-  <script type="module" src="./js/app.js?v=260216_2149"></script>
+  <script type="module" src="./js/app.js?v=260216_2158"></script>
   <script type="module">
-    import { AliceBattle } from './js/alice-battle.js?v=5.14_HUD_FIX';
+    import { AliceBattle } from './js/alice-battle.js?v=5.15_BLOCKER_FIX';
     window.AliceBattleRef = AliceBattle;
-    console.log("AliceBattle Module Loaded (v5.14)");
+    console.log("AliceBattle Module Loaded (v5.15)");
   </script>
   <!-- 2. Game Logic -->
-  <script src="./js/calibration.js?v=260216_2149"></script>
-  <script type="module" src="./js/game.js?v=260216_2149"></script>
+  <script src="./js/calibration.js?v=260216_2158"></script>
+  <script type="module" src="./js/game.js?v=260216_2158"></script>
 
   <!-- 3. Explicit Event Binding for Debug Button (With STANDALONE BATTLE LOGIC) -->
   <script>
