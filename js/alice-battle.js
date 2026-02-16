@@ -108,10 +108,16 @@ export const AliceBattle = {
             return;
         }
 
-        const wBox = wAvatar.getBoundingClientRect();
-        const vBox = vAvatar.getBoundingClientRect();
+        let wBox = wAvatar.getBoundingClientRect();
+        let vBox = vAvatar.getBoundingClientRect();
 
-        console.log(`[AliceBattle] Coords - Warden: (${wBox.left}, ${wBox.top}), Villain: (${vBox.left}, ${vBox.top})`);
+        // FALLBACK COORDINATES (If elements are not rendered yet, prevent invisible lightning)
+        if (wBox.width === 0 || wBox.height === 0) {
+            wBox = { left: window.innerWidth * 0.2, top: window.innerHeight * 0.6, width: 100, height: 100, bottom: window.innerHeight * 0.6 + 100 };
+        }
+        if (vBox.width === 0 || vBox.height === 0) {
+            vBox = { left: window.innerWidth * 0.8, top: window.innerHeight * 0.2, width: 100, height: 100, bottom: window.innerHeight * 0.2 + 100 };
+        }
 
         let color = '#00ffff', damage = 10, count = 1;
 
