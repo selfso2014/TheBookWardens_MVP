@@ -131,7 +131,8 @@ export const AliceBattle = {
         for (let i = 0; i < count; i++) {
             setTimeout(() => {
                 if (this.gameState !== 'playing' || this.villainHP <= 0) return; // Add check
-                this.lightnings.push(new Lightning(wBox.left + wBox.width / 2, wBox.top, vBox.left + vBox.width / 2, vBox.bottom, false, 0, color));
+                // PASS 'this' as system reference
+                this.lightnings.push(new Lightning(wBox.left + wBox.width / 2, wBox.top, vBox.left + vBox.width / 2, vBox.bottom, false, 0, color, this));
                 this.flashOpacity = 0.2;
                 this.shakeTime = 8;
                 this.dealDamage('villain', damage / count);
@@ -156,7 +157,7 @@ export const AliceBattle = {
 
         if (availableCards.length === 0) {
             this.ui.log.innerText = "Red Queen is fading...";
-            this.lightnings.push(new Lightning(vBox.left + vBox.width / 2, vBox.bottom, wBox.left + wBox.width / 2, wBox.top, false, 0, '#664444'));
+            this.lightnings.push(new Lightning(vBox.left + vBox.width / 2, vBox.bottom, wBox.left + wBox.width / 2, wBox.top, false, 0, '#664444', this));
             this.dealDamage('warden', 3);
             return;
         }
@@ -171,7 +172,7 @@ export const AliceBattle = {
         this.updateCardDisplay();
 
         setTimeout(() => {
-            this.lightnings.push(new Lightning(vBox.left + vBox.width / 2, vBox.bottom, wBox.left + wBox.width / 2, wBox.top, false, 0, '#ff0044'));
+            this.lightnings.push(new Lightning(vBox.left + vBox.width / 2, vBox.bottom, wBox.left + wBox.width / 2, wBox.top, false, 0, '#ff0044', this));
             this.flashOpacity = 0.25;
             this.shakeTime = 12;
             this.dealDamage('warden', damage);
@@ -256,7 +257,7 @@ export const AliceBattle = {
 };
 
 class Lightning {
-    constructor(startX, startY, targetX, targetY, isBranch = false, depth = 0, color = '#00ffff') {
+    constructor(startX, startY, targetX, targetY, isBranch = false, depth = 0, color = '#00ffff', system = null) {
         this.segments = [];
         this.startX = startX;
         this.startY = startY;
@@ -265,6 +266,7 @@ class Lightning {
         this.opacity = 1.0;
         this.depth = depth;
         this.color = color;
+        this.system = system; // Store reference to battle system
 
         // Color override for villain (simple logic)
         const originalBaseWidth = isBranch ? (3 - depth) : (color === '#ff0055' ? 10 : 8);
@@ -288,9 +290,10 @@ class Lightning {
             this.segments.push({ x: curX, y: curY, nextX, nextY });
 
             if (this.depth < 2 && Math.random() > 0.85 && i > 0 && i < segmentCount) {
-                // Add Branch -> access global AliceBattle instance? Or Pass array?
-                // For simplicity, access AliceBattle.lightnings
-                AliceBattle.lightnings.push(new Lightning(nextX, nextY, nextX + (Math.random() - 0.5) * 300, nextY + (Math.random() - 0.5) * 300, true, this.depth + 1, this.color));
+                // Safely add branch using system reference
+                if (this.system && this.system.lightnings) {
+                    this.system.lightnings.push(new Lightning(nextX, nextY, nextX + (Math.random() - 0.5) * 300, nextY + (Math.random() - 0.5) * 300, true, this.depth + 1, this.color, this.system));
+                }
             }
             curX = nextX; curY = nextY;
         }
@@ -298,9 +301,9 @@ class Lightning {
 
     draw(ctx) {
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalCompositeOperation = 'source-over'; // standard blend
         ctx.strokeStyle = this.color;
-        ctx.globalAlpha = this.opacity * 0.4;
+        ctx.globalAlpha = this.opacity; // Full brightness
         ctx.lineWidth = this.baseWidth * 4;
         ctx.shadowBlur = 15;
         ctx.shadowColor = this.color;
