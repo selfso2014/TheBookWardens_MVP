@@ -1916,7 +1916,7 @@ Game.typewriter = {
             setTimeout(() => {
                 // Initialize Battle Module Logic
                 if (window.AliceBattleRef) {
-                    console.log("[Battle] Initializing AliceBattle Module...");
+                    console.log("[Battle] AliceBattleRef FOUND. Calling init()...");
 
                     // Expose to Game object for inline HTML handlers (if any remain active)
                     if (window.Game) {
@@ -1926,118 +1926,125 @@ Game.typewriter = {
                     // Force Canvas Display & Resize
                     const canvas = document.getElementById('alice-canvas');
                     if (canvas) {
+                        console.log("[Battle] Canvas FOUND. Forcing display/size...");
                         canvas.style.display = 'block';
                         canvas.style.zIndex = '25'; // Ensure above UI (which is 10)
                         canvas.width = window.innerWidth;
                         canvas.height = window.innerHeight;
+                        canvas.style.pointerEvents = 'none'; // Click-through
+                    } else {
+                        console.error("[Battle] CRITICAL: #alice-canvas NOT FOUND in game.js check.");
                     }
 
                     window.AliceBattleRef.init();
                 } else {
-                    console.warn("[Battle] AliceBattleRef not found! Fallback to manual binding.");
+                    console.error("[Battle] CRITICAL: window.AliceBattleRef IS MISSING!");
+                    // console.warn("[Battle] AliceBattleRef not found! Fallback to manual binding."); 
                 }
+                console.warn("[Battle] AliceBattleRef not found! Fallback to manual binding.");
+            }
 
                 // Force Event Binding (Safety Net)
                 const cards = screen.querySelectorAll('.warden .card');
-                console.log(`[Battle] Found ${cards.length} cards in REAL screen.`);
+            console.log(`[Battle] Found ${cards.length} cards in REAL screen.`);
 
-                cards.forEach(card => {
-                    // Force interactive styles
-                    card.style.cursor = 'pointer';
-                    card.style.pointerEvents = 'auto'; // CRITICAL: Override parent's potential 'none'
+            cards.forEach(card => {
+                // Force interactive styles
+                card.style.cursor = 'pointer';
+                card.style.pointerEvents = 'auto'; // CRITICAL: Override parent's potential 'none'
 
-                    // We don't necessarily need to overwrite onclick if the module handles it,
-                    // but ensuring pointer-events is auto is crucial.
-                    // If the module's startBattle() attaches listeners or if HTML has onclick, we are good.
-                });
+                // We don't necessarily need to overwrite onclick if the module handles it,
+                // but ensuring pointer-events is auto is crucial.
+                // If the module's startBattle() attaches listeners or if HTML has onclick, we are good.
+            });
 
-                // Ensure the UI container allows clicks
-                const uiContainer = document.getElementById('alice-game-ui');
-                if (uiContainer) {
-                    uiContainer.style.pointerEvents = 'none'; // Container pass-through
-                    // But children (entity-area) need auto
-                    const areas = uiContainer.querySelectorAll('.entity-area');
-                    areas.forEach(area => area.style.pointerEvents = 'auto');
-                }
+            // Ensure the UI container allows clicks
+            const uiContainer = document.getElementById('alice-game-ui');
+            if (uiContainer) {
+                uiContainer.style.pointerEvents = 'none'; // Container pass-through
+                // But children (entity-area) need auto
+                const areas = uiContainer.querySelectorAll('.entity-area');
+                areas.forEach(area => area.style.pointerEvents = 'auto');
+            }
 
-            }, 100);
+        }, 100);
 
-        } else {
-            console.error("[Game] CRITICAL: #screen-alice-battle not found!");
-            return;
-        }
+    } else {
+        console.error("[Game] CRITICAL: #screen-alice-battle not found!");
+        return;
+    }
 
         // 4. Reset Legacy State (Just in case)
         this.aliceBattleState.playerHp = 100;
-        this.aliceBattleState.villainHp = 100;
-        this.aliceBattleState.isPlayerTurn = true;
-        this.updateBattleUI();
-    },
+    this.aliceBattleState.villainHp = 100;
+    this.aliceBattleState.isPlayerTurn = true;
+    this.updateBattleUI();
+},
 
 
 
     updateBattleUI() {
-        const pBar = document.querySelector("#screen-final-boss .warden .hp");
-        if (pBar) pBar.style.width = `${this.aliceBattleState.playerHp}%`;
-        if (vBar) vBar.style.width = `${this.aliceBattleState.villainHp}%`;
-    },
+    const pBar = document.querySelector("#screen-final-boss .warden .hp");
+    if (pBar) pBar.style.width = `${this.aliceBattleState.playerHp}%`;
+    if (vBar) vBar.style.width = `${this.aliceBattleState.villainHp}%`;
+},
 
-    handleBattleAction(type) {
-        if (!this.aliceBattleState.isPlayerTurn) return;
+handleBattleAction(type) {
+    if (!this.aliceBattleState.isPlayerTurn) return;
 
-        // 1. Player Attack
-        console.log(`[Battle] Player used ${type}!`);
-        this.aliceBattleState.isPlayerTurn = false;
+    // 1. Player Attack
+    console.log(`[Battle] Player used ${type}!`);
+    this.aliceBattleState.isPlayerTurn = false;
 
-        // Visual Feedback (Card Shake)
-        const cardIndex = ['ink', 'rune', 'gem'].indexOf(type);
-        const card = document.querySelectorAll("#screen-final-boss .warden .card")[cardIndex];
-        if (card) {
-            card.style.transform = "scale(0.9)";
-            setTimeout(() => card.style.transform = "scale(1)", 100);
+    // Visual Feedback (Card Shake)
+    const cardIndex = ['ink', 'rune', 'gem'].indexOf(type);
+    const card = document.querySelectorAll("#screen-final-boss .warden .card")[cardIndex];
+    if (card) {
+        card.style.transform = "scale(0.9)";
+        setTimeout(() => card.style.transform = "scale(1)", 100);
+    }
+
+    // Damage Logic (Simplified)
+    let dmg = 20;
+    if (type === 'ink') dmg = 15; // Fast
+    if (type === 'rune') dmg = 25; // Strong
+    if (type === 'gem') dmg = 35; // Ultimate
+
+    this.aliceBattleState.villainHp = Math.max(0, this.aliceBattleState.villainHp - dmg);
+    this.updateBattleUI();
+
+    // 2. Check Win
+    if (this.aliceBattleState.villainHp <= 0) {
+        setTimeout(() => this.winBattle(), 500);
+        return;
+    }
+
+    // 3. Villain Turn (Simulated)
+    setTimeout(() => {
+        const vAction = document.querySelector("#screen-final-boss .villain .avatar");
+        if (vAction) {
+            vAction.style.transform = "scale(1.2)";
+            setTimeout(() => vAction.style.transform = "scale(1)", 200);
         }
 
-        // Damage Logic (Simplified)
-        let dmg = 20;
-        if (type === 'ink') dmg = 15; // Fast
-        if (type === 'rune') dmg = 25; // Strong
-        if (type === 'gem') dmg = 35; // Ultimate
-
-        this.aliceBattleState.villainHp = Math.max(0, this.aliceBattleState.villainHp - dmg);
+        // Player takes minimal damage (scripted to win easily)
+        this.aliceBattleState.playerHp = Math.max(0, this.aliceBattleState.playerHp - 10);
         this.updateBattleUI();
+        this.aliceBattleState.isPlayerTurn = true;
+    }, 800);
+},
 
-        // 2. Check Win
-        if (this.aliceBattleState.villainHp <= 0) {
-            setTimeout(() => this.winBattle(), 500);
-            return;
-        }
+winBattle() {
+    console.log("[Battle] VICTORY!");
+    // Visuals
+    const bossScreen = document.getElementById("screen-final-boss");
+    if (bossScreen) bossScreen.style.animation = "shake 0.5s ease-in-out";
 
-        // 3. Villain Turn (Simulated)
-        setTimeout(() => {
-            const vAction = document.querySelector("#screen-final-boss .villain .avatar");
-            if (vAction) {
-                vAction.style.transform = "scale(1.2)";
-                setTimeout(() => vAction.style.transform = "scale(1)", 200);
-            }
-
-            // Player takes minimal damage (scripted to win easily)
-            this.aliceBattleState.playerHp = Math.max(0, this.aliceBattleState.playerHp - 10);
-            this.updateBattleUI();
-            this.aliceBattleState.isPlayerTurn = true;
-        }, 800);
-    },
-
-    winBattle() {
-        console.log("[Battle] VICTORY!");
-        // Visuals
-        const bossScreen = document.getElementById("screen-final-boss");
-        if (bossScreen) bossScreen.style.animation = "shake 0.5s ease-in-out";
-
-        // Delay then Score
-        setTimeout(() => {
-            Game.goToNewScore();
-        }, 1500);
-    },
+    // Delay then Score
+    setTimeout(() => {
+        Game.goToNewScore();
+    }, 1500);
+},
 
     /*
     checkFinalBossAnswer(index) {
