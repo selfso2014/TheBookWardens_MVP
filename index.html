@@ -1121,28 +1121,70 @@
 
   <!-- Scripts -->
   <!-- 1. Eye Tracking Core -->
-  <script type="module" src="./js/app.js?v=260216_2106"></script>
+  <script type="module" src="./js/app.js?v=260216_2110"></script>
   <script type="module">
-    import { AliceBattle } from './js/alice-battle.js?v=5.08_BUTTON';
+    import { AliceBattle } from './js/alice-battle.js?v=5.10_EMERGENCY';
     window.AliceBattleRef = AliceBattle;
-    console.log("AliceBattle Module Loaded (v5.08)");
+    console.log("AliceBattle Module Loaded (v5.10)");
   </script>
   <!-- 2. Game Logic -->
-  <script src="./js/calibration.js?v=260216_2106"></script>
-  <script type="module" src="./js/game.js?v=260216_2106"></script>
+  <script src="./js/calibration.js?v=260216_2110"></script>
+  <script type="module" src="./js/game.js?v=260216_2110"></script>
 
-  <!-- 3. Explicit Event Binding for Debug Button (Fix Module Scope Issues) -->
+  <!-- 3. Explicit Event Binding for Debug Button (With FALLBACK) -->
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const btn = document.getElementById("btn-debug-alice");
       if (btn) {
         btn.addEventListener("click", () => {
+          // TRY 1: Existing Module Method
           if (window.Game && typeof window.Game.triggerFinalBossBattle === 'function') {
-            console.log("[Debug] Button Clicked -> Calling triggerFinalBossBattle...");
+            console.log("[Debug] Button Clicked -> Calling Game.triggerFinalBossBattle...");
             window.Game.triggerFinalBossBattle();
+            return;
+          }
+
+          // FALLBACK: Emergency Visual Mode (Direct DOM Manipulation)
+          console.warn("[Debug] Game module not ready. Activating EMERGENCY VISUAL MODE.");
+
+          // 1. Hide all screens
+          document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+
+          // 2. Show Final Boss Screen
+          const screen = document.getElementById("screen-final-boss");
+          if (screen) {
+            screen.style.display = 'flex';
+            screen.classList.add('alice-battle-mode');
+            screen.style.opacity = '1';
+            screen.style.visibility = 'visible';
+            screen.style.backgroundColor = '#111'; // Fallback bg
+            console.log("[Debug] Forced screen-final-boss to DISPLAY:FLEX");
+
+            // 3. Inject Visual Inspector (Duplicate logic for safety)
+            let debugBox = document.getElementById("debug-inspector");
+            if (!debugBox) {
+              debugBox = document.createElement("div");
+              debugBox.id = "debug-inspector";
+              debugBox.style.cssText = "position:fixed; top:10px; left:10px; background:rgba(255,0,0,0.8); color:white; border:2px solid yellow; padding:10px; z-index:99999; font-family:monospace; font-size:12px; pointer-events:auto;";
+              document.body.appendChild(debugBox);
+            }
+
+            const updateStatus = () => {
+              const style = window.getComputedStyle(screen);
+              debugBox.innerHTML = `
+                            <strong>EMERGENCY MODE</strong><br>
+                            Target: #screen-final-boss <br>
+                            Display: ${style.display} <br>
+                            Opacity: ${style.opacity} <br>
+                            Z-Index: ${style.zIndex} <br>
+                            <br>
+                            <button onclick="document.getElementById('screen-final-boss').style.display='flex'" style="background:white; color:black; padding:5px;">FORCE SHOW</button>
+                        `;
+              requestAnimationFrame(updateStatus);
+            };
+            updateStatus();
           } else {
-            alert("Game module not fully loaded yet. Please wait a moment.");
-            console.error("[Debug] window.Game is missing or invalid:", window.Game);
+            alert("CRITICAL ERROR: #screen-final-boss element missing in HTML!");
           }
         });
       }
