@@ -413,17 +413,7 @@
         By entering the Rift,<br>you grant camera access for the Magic Eye.
       </p>
 
-      <!-- DEBUG: WPM Setup -->
-      <button onclick="Game.switchScreen('screen-wpm')"
-        style="margin-top: 10px; background: #222; color: #666; border: 1px solid #444; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; display: block; margin-left: auto; margin-right: auto;">
-        Debug - WPM Setup
-      </button>
-
-      <!-- DEBUG: Jump to New Scenes -->
-      <button onclick="Game.debugFinalVillain()"
-        style="margin-top: 20px; background: #333; color: #777; border: 1px solid #444; padding: 5px 10px; font-size: 0.8rem; cursor: pointer;">
-        Debug - Final Villain (Original Path)
-      </button>
+      <!-- DEBUG BUTTONS REMOVED -->
 
       <!-- NEW DIRECT DEBUG BUTTON (ID-based binding) -->
       <button id="btn-debug-alice"
@@ -1197,95 +1187,7 @@
   <script type="module" src="./js/game.js?v=DEBUG_FORCE_INIT"></script>
 
   <!-- 3. Explicit Event Binding for Debug Button (With STANDALONE BATTLE LOGIC) -->
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const btn = document.getElementById("btn-debug-alice");
-
-      // Standalone Battle State
-      window.EmergencyBattle = {
-        hp: 100,
-        active: false
-      };
-
-      if (btn) {
-        btn.addEventListener("click", () => {
-          // TRY 1: Game Module (Preferred)
-          if (window.Game && typeof window.Game.triggerFinalBossBattle === 'function' && window.Game.aliceBattleState) {
-            console.log("[Debug] Calling Game.triggerFinalBossBattle...");
-            window.Game.triggerFinalBossBattle();
-            return;
-          }
-
-          // TRY 2: Standalone Battle Mode (If Game module fails)
-          console.log("[Debug] Game module not ready. Starting STANDALONE BATTLE.");
-
-          // 1. Show Screen
-          document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
-          const screen = document.getElementById("screen-alice-battle"); // Changed to screen-alice-battle as per context
-          if (screen) {
-            screen.style.display = 'flex';
-            screen.classList.add('alice-battle-mode');
-            screen.style.opacity = '1';
-            screen.style.visibility = 'visible';
-            screen.style.backgroundColor = '#111';
-
-            // 2. Initialize Battle UI
-            window.EmergencyBattle.hp = 100;
-            window.EmergencyBattle.active = true;
-            const vHp = screen.querySelector('.villain .hp');
-            if (vHp) vHp.style.width = '100%';
-
-            // 3. Bind Card Clicks (Directly)
-            const cards = screen.querySelectorAll('.warden .card');
-            cards.forEach(card => {
-              card.style.cursor = 'pointer';
-              card.onclick = (e) => {
-                e.stopPropagation();
-                if (window.EmergencyBattle.hp <= 0) return;
-
-                // Animate Card
-                card.style.transform = 'scale(0.9)';
-                setTimeout(() => card.style.transform = 'scale(1)', 100);
-
-                // Damage Logic
-                let dmg = 20; // Default
-                if (card.innerText.includes('INK')) dmg = 15;
-                if (card.innerText.includes('RUNE')) dmg = 25;
-                if (card.innerText.includes('GEM')) dmg = 35;
-
-                window.EmergencyBattle.hp = Math.max(0, window.EmergencyBattle.hp - dmg);
-
-                // Update UI
-                if (vHp) vHp.style.width = window.EmergencyBattle.hp + '%';
-
-                // Win Check
-                if (window.EmergencyBattle.hp <= 0) {
-                  console.log("VICTORY (Standalone)");
-                  screen.style.animation = "shake 0.5s ease-in-out";
-                  setTimeout(() => {
-                    // Try to go to score if Game exists, else reload
-                    if (window.Game && window.Game.goToNewScore) {
-                      window.Game.goToNewScore();
-                    } else {
-                      alert("VICTORY! (Reloading...)");
-                      location.reload();
-                    }
-                  }, 1000);
-                } else {
-                  // Villain React
-                  const vAv = screen.querySelector('.villain .avatar');
-                  if (vAv) {
-                    vAv.style.transform = 'scale(1.1)';
-                    setTimeout(() => vAv.style.transform = 'scale(1)', 200);
-                  }
-                }
-              };
-            });
-          }
-        });
-      }
-    });
-  </script>
+  <!-- 3. Conflicting Emergency Script REMOVED for Stability -->
 </body>
 
 </html>
