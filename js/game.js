@@ -1872,85 +1872,108 @@ Game.typewriter = {
         }
     },
 
-    triggerFinalBossBattle() {
-        // [MODIFIED] Final Boss -> Alice Battle Visual Mode
-        // No Quiz logic. Just Visuals.
-        Game.switchScreen("screen-final-boss");
-        console.log("[Game] Alice Battle Visual Mode Activated.");
-
-        // [DEBUG] Visual Inspector Tool for User
-        this.debugScreenState("screen-final-boss");
-
-        // Optional: Trigger any entrance animation if needed
-        const villainArea = document.querySelector("#screen-final-boss .villain");
-        if (villainArea) {
-            villainArea.style.animation = "float 3s infinite ease-in-out";
-        }
+    // [State] Simple Battle System
+    aliceBattleState: {
+        playerHp: 100,
+        villainHp: 100,
+        isPlayerTurn: true
     },
 
-    // [New] Debug Tool: Visual Inspector Overlay
-    debugScreenState(screenId) {
-        const el = document.getElementById(screenId);
-        if (!el) {
-            console.error(`[Debug] Element #${screenId} NOT FOUND!`);
+    triggerFinalBossBattle() {
+        // 1. Switch Screen
+        Game.switchScreen("screen-final-boss");
+        console.log("[Game] Alice Battle Mode Started.");
+
+        // 2. Reset State & UI
+        this.aliceBattleState.playerHp = 100;
+        this.aliceBattleState.villainHp = 100;
+        this.aliceBattleState.isPlayerTurn = true;
+        this.updateBattleUI();
+
+        // 3. Attach Click Handlers to Cards (Warden)
+        // Note: Using onclick via JS to ensure context
+        const actions = ['ink', 'rune', 'gem'];
+        actions.forEach(action => {
+            const card = document.querySelector(`#screen-final-boss .warden .card i:contains('${action.toUpperCase()}')`)?.closest('.card')
+                || document.querySelector(`#screen-final-boss .warden .card:nth-child(${actions.indexOf(action) + 1})`); // Fallback selector
+
+            if (card) {
+                card.style.cursor = "pointer";
+                card.onclick = (e) => {
+                    e.stopPropagation(); // Prevent bg click
+                    this.handleBattleAction(action);
+                };
+            }
+        });
+
+        // 4. Remove Dummy Overlay if exists
+        const dummy = document.querySelector("#screen-final-boss > div[onclick='Game.endFinalBossDummy()']");
+        if (dummy) dummy.remove();
+    },
+
+    updateBattleUI() {
+        const pBar = document.querySelector("#screen-final-boss .warden .hp");
+        const vBar = document.querySelector("#screen-final-boss .villain .hp");
+
+        if (pBar) pBar.style.width = `${this.aliceBattleState.playerHp}%`;
+        if (vBar) vBar.style.width = `${this.aliceBattleState.villainHp}%`;
+    },
+
+    handleBattleAction(type) {
+        if (!this.aliceBattleState.isPlayerTurn) return;
+
+        // 1. Player Attack
+        console.log(`[Battle] Player used ${type}!`);
+        this.aliceBattleState.isPlayerTurn = false;
+
+        // Visual Feedback (Card Shake)
+        const cardIndex = ['ink', 'rune', 'gem'].indexOf(type);
+        const card = document.querySelectorAll("#screen-final-boss .warden .card")[cardIndex];
+        if (card) {
+            card.style.transform = "scale(0.9)";
+            setTimeout(() => card.style.transform = "scale(1)", 100);
+        }
+
+        // Damage Logic (Simplified)
+        let dmg = 20;
+        if (type === 'ink') dmg = 15; // Fast
+        if (type === 'rune') dmg = 25; // Strong
+        if (type === 'gem') dmg = 35; // Ultimate
+
+        this.aliceBattleState.villainHp = Math.max(0, this.aliceBattleState.villainHp - dmg);
+        this.updateBattleUI();
+
+        // 2. Check Win
+        if (this.aliceBattleState.villainHp <= 0) {
+            setTimeout(() => this.winBattle(), 500);
             return;
         }
 
-        // Create Debug Overlay if not exists
-        let debugBox = document.getElementById("debug-inspector");
-        if (!debugBox) {
-            debugBox = document.createElement("div");
-            debugBox.id = "debug-inspector";
-            debugBox.style.cssText = "position:fixed; top:10px; left:10px; background:rgba(0,0,0,0.8); color:#0f0; border:2px solid #0f0; padding:10px; z-index:99999; font-family:monospace; font-size:12px; pointer-events:auto;";
-            document.body.appendChild(debugBox);
-        }
+        // 3. Villain Turn (Simulated)
+        setTimeout(() => {
+            const vAction = document.querySelector("#screen-final-boss .villain .avatar");
+            if (vAction) {
+                vAction.style.transform = "scale(1.2)";
+                setTimeout(() => vAction.style.transform = "scale(1)", 200);
+            }
 
-        // Status Update Loop
-        const updateStatus = () => {
-            const style = window.getComputedStyle(el);
-            debugBox.innerHTML = `
-                <strong>Target: #${screenId}</strong><br>
-                Display: ${style.display} <br>
-                Opacity: ${style.opacity} <br>
-                Visibility: ${style.visibility} <br>
-                Z-Index: ${style.zIndex} <br>
-                Width: ${style.width} / Height: ${style.height} <br>
-                <br>
-                <button onclick="Game.forceShowScreen('${screenId}')" style="background:red; color:white; border:none; padding:5px; cursor:pointer;">FORCE SHOW</button>
-                <button onclick="this.parentElement.remove()" style="background:#444; color:white; border:none; padding:5px; margin-left:5px; cursor:pointer;">CLOSE</button>
-            `;
-            if (document.getElementById("debug-inspector")) requestAnimationFrame(updateStatus);
-        };
-        updateStatus();
+            // Player takes minimal damage (scripted to win easily)
+            this.aliceBattleState.playerHp = Math.max(0, this.aliceBattleState.playerHp - 10);
+            this.updateBattleUI();
+            this.aliceBattleState.isPlayerTurn = true;
+        }, 800);
     },
 
-    // [New] Debug Action: Force Show
-    forceShowScreen(screenId) {
-        const el = document.getElementById(screenId);
-        if (el) {
-            el.style.display = "flex";
-            el.style.opacity = "1";
-            el.style.visibility = "visible";
-            el.style.zIndex = "30000"; // Ensure top layer
-            el.style.backgroundColor = "#222"; // Ensure background is visible
-            console.log(`[Debug] Forced Show on #${screenId}`);
-        }
-    },
-
-    // [New] Dummy Trigger for Visual-Only Mode
-    endFinalBossDummy() {
-        console.log("[Game] Dummy Boss Battle Cleared. Proceeding...");
-
-        // Transition Effect (Shake)
+    winBattle() {
+        console.log("[Battle] VICTORY!");
+        // Visuals
         const bossScreen = document.getElementById("screen-final-boss");
-        if (bossScreen) {
-            bossScreen.style.animation = "shake 0.5s ease-in-out";
-        }
+        if (bossScreen) bossScreen.style.animation = "shake 0.5s ease-in-out";
 
-        // Short delay then Win
+        // Delay then Score
         setTimeout(() => {
             Game.goToNewScore();
-        }, 1000);
+        }, 1500);
     },
 
     /*
