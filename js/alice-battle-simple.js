@@ -331,6 +331,16 @@
     // Alias for compatibility if needed
     window.AliceBattle = window.AliceBattleRef;
 
+    // AUTO-LINKER: Ensure Game.AliceBattle is connected
+    const linkInterval = setInterval(() => {
+        if (window.Game && window.AliceBattleRef) {
+            if (window.Game.AliceBattle !== window.AliceBattleRef) {
+                window.Game.AliceBattle = window.AliceBattleRef;
+                console.log("Auto-Linked Game.AliceBattle");
+            }
+        }
+    }, 1000);
+
     console.log("AliceBattleRef IS READY (Global Mode).");
 
 })();
