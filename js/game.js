@@ -1880,13 +1880,18 @@ Game.typewriter = {
     },
 
     triggerFinalBossBattle() {
-        console.log("[Game] Alice Battle Mode Started (Delayed Bind & No Move).");
+        console.log("[Game] Alice Battle Mode Started (Target: #screen-alice-battle).");
 
-        // 1. Remove Blockers
+        // 1. Handle Blockers (Disable pointer events instead of removing)
         const blockers = ['output', 'preview', 'calibration-overlay'];
         blockers.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.remove();
+            if (el) {
+                // Keep element visible but pass-through clicks
+                el.style.pointerEvents = 'none';
+                // Ensure z-index is lower than battle screen
+                el.style.zIndex = '0';
+            }
         });
 
         const hud = document.getElementById('hud-top');
@@ -1896,68 +1901,65 @@ Game.typewriter = {
         const allScreens = document.querySelectorAll('.screen');
         allScreens.forEach(s => s.style.display = 'none');
 
-        const screen = document.getElementById("screen-final-boss");
+        // TARGET THE REAL SCREEN (Defined in index.html line ~1063)
+        const screen = document.getElementById("screen-alice-battle");
+
         if (screen) {
-            // DO NOT MOVE DOM. Keep it where it is to preserve CSS.
             screen.style.display = 'flex';
             screen.classList.add('alice-battle-mode');
             screen.style.opacity = '1';
             screen.style.visibility = 'visible';
             screen.style.backgroundColor = '#111';
-            screen.style.zIndex = '2147483647';
+            screen.style.zIndex = '2147483647'; // Ensure top-most
 
-            // 3. Delayed Binding (Give browser a frame to render)
+            // 3. Delayed Binding & Initialization
             setTimeout(() => {
+                // Initialize Battle Module Logic
+                if (window.AliceBattleRef) {
+                    console.log("[Battle] Initializing AliceBattle Module...");
+                    window.AliceBattleRef.startBattle();
+                } else {
+                    console.warn("[Battle] AliceBattleRef not found! Fallback to manual binding.");
+                }
+
+                // Force Event Binding (Safety Net)
                 const cards = screen.querySelectorAll('.warden .card');
-                console.log(`[Battle] Found ${cards.length} cards to bind.`);
+                console.log(`[Battle] Found ${cards.length} cards in REAL screen.`);
 
                 cards.forEach(card => {
-                    card.onclick = null;
-                    card.ontouchstart = null;
-
-                    const handler = (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        const text = card.innerText.toLowerCase();
-                        let action = '';
-                        if (text.includes('ink')) action = 'ink';
-                        else if (text.includes('rune')) action = 'rune';
-                        else if (text.includes('gem')) action = 'gem';
-
-                        if (action) {
-                            if (window.Game && window.Game.handleBattleAction) {
-                                window.Game.handleBattleAction(action);
-                            }
-                        }
-                    };
-
-                    card.onclick = handler;
-                    card.ontouchstart = handler;
-
-                    // Force styles
+                    // Force interactive styles
                     card.style.cursor = 'pointer';
-                    card.style.pointerEvents = 'auto';
-                    card.style.userSelect = 'none';
-                    card.style.webkitUserSelect = 'none';
+                    card.style.pointerEvents = 'auto'; // CRITICAL: Override parent's potential 'none'
+
+                    // We don't necessarily need to overwrite onclick if the module handles it,
+                    // but ensuring pointer-events is auto is crucial.
+                    // If the module's startBattle() attaches listeners or if HTML has onclick, we are good.
                 });
-            }, 100); // 100ms delay
+
+                // Ensure the UI container allows clicks
+                const uiContainer = document.getElementById('alice-game-ui');
+                if (uiContainer) {
+                    uiContainer.style.pointerEvents = 'none'; // Container pass-through
+                    // But children (entity-area) need auto
+                    const areas = uiContainer.querySelectorAll('.entity-area');
+                    areas.forEach(area => area.style.pointerEvents = 'auto');
+                }
+
+            }, 100);
 
         } else {
-            console.error("[Game] CRITICAL: #screen-final-boss not found!");
+            console.error("[Game] CRITICAL: #screen-alice-battle not found!");
             return;
         }
 
-        // 4. Reset State & UI
+        // 4. Reset Legacy State (Just in case)
         this.aliceBattleState.playerHp = 100;
         this.aliceBattleState.villainHp = 100;
         this.aliceBattleState.isPlayerTurn = true;
         this.updateBattleUI();
-
-        // 5. Remove Dummy
-        const dummy = document.querySelector("#screen-final-boss > div[onclick='Game.endFinalBossDummy()']");
-        if (dummy) dummy.remove();
     },
+
+
 
     updateBattleUI() {
         const pBar = document.querySelector("#screen-final-boss .warden .hp");
