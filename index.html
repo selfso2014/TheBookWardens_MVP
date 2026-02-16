@@ -1058,7 +1058,7 @@
 
   <!-- SCREEN: Alice Battlefield (Reordered Conflict) -->
   <div id="screen-alice-battle" class="screen"
-    style="display:none; flex-direction: column; overflow: hidden; background: #000; width: 100vw; height: 100vh;">
+    style="display:none; flex-direction: column; overflow: hidden; background: #000; width: 100%; height: 100vh;">
     <canvas id="alice-canvas"
       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none;"></canvas>
 
@@ -1071,9 +1071,9 @@
 
         <!-- Villain Background Image -->
         <div id="villain-visual-container"
-          style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;">
+          style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; display: flex; justify-content: center; align-items: flex-end;">
           <img id="villain-bg-img" src="finalredvillain.png" alt="Red Villain"
-            style="width: 100%; height: 100%; object-fit: cover; object-position: center top; mask-image: linear-gradient(to bottom, black 70%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%); opacity: 0.8;">
+            style="width: auto; height: 85%; max-width: 90%; object-fit: contain; object-position: center bottom; mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); opacity: 0.85;">
         </div>
 
         <!-- Villain Cards Overlay -->
@@ -1113,9 +1113,10 @@
           </div>
 
           <div class="middle-text" id="alice-text"
-            style="text-align: center; color: #ccc; font-family: 'Crimson Text', serif; font-size: 1.1rem; line-height: 1.5; font-style: italic;">
-            "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do:
-            once or twice she had peeped into the book her sister was reading..."
+            style="text-align: center; color: #eee; font-family: 'Crimson Text', serif; font-size: 1.1rem; line-height: 1.6; font-style: italic; max-height: 120px; overflow: hidden;">
+            "For it flashed across her mind that she had never before seen a rabbit with either a waistcoat-pocket, or a
+            watch to take out of it. Burning with curiosity, she ran across the field after it, and was just in time to
+            see it pop down a large rabbit-hole under the hedge..."
           </div>
         </div>
       </div>
