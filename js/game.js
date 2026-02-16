@@ -1880,9 +1880,32 @@ Game.typewriter = {
     },
 
     triggerFinalBossBattle() {
-        // 1. Switch Screen
-        Game.switchScreen("screen-final-boss");
-        console.log("[Game] Alice Battle Mode Started.");
+        console.log("[Game] Alice Battle Mode Started (Stable Method).");
+
+        // 1. Explicit Screen Switch (Robust Method)
+        // Hide all screens first
+        const allScreens = document.querySelectorAll('.screen');
+        allScreens.forEach(s => s.style.display = 'none');
+
+        // Force Show Final Boss Screen
+        const screen = document.getElementById("screen-final-boss");
+        if (screen) {
+            screen.style.display = 'flex';
+            screen.classList.add('alice-battle-mode');
+
+            // Ensure visibility styles are applied
+            screen.style.opacity = '1';
+            screen.style.visibility = 'visible';
+            screen.style.backgroundColor = '#111'; // Fallback bg if CSS fails
+
+            // Also ensure parent containers are visible if any (just in case)
+            if (screen.parentElement && screen.parentElement.tagName !== 'BODY') {
+                screen.parentElement.style.display = 'block';
+            }
+        } else {
+            console.error("[Game] CRITICAL: #screen-final-boss not found!");
+            return;
+        }
 
         // 2. Reset State & UI
         this.aliceBattleState.playerHp = 100;
@@ -1894,8 +1917,18 @@ Game.typewriter = {
         // Note: Using onclick via JS to ensure context
         const actions = ['ink', 'rune', 'gem'];
         actions.forEach(action => {
-            const card = document.querySelector(`#screen-final-boss .warden .card i:contains('${action.toUpperCase()}')`)?.closest('.card')
-                || document.querySelector(`#screen-final-boss .warden .card:nth-child(${actions.indexOf(action) + 1})`); // Fallback selector
+            // Find card by icon class or position as fallback
+            let card = null;
+            const cards = document.querySelectorAll(`#screen-final-boss .warden .card`);
+
+            // Improved check: content match
+            for (let c of cards) {
+                if (c.innerText.toLowerCase().includes(action)) {
+                    card = c;
+                    break;
+                }
+            }
+            if (!card && cards.length >= 3) card = cards[actions.indexOf(action)];
 
             if (card) {
                 card.style.cursor = "pointer";
@@ -1913,8 +1946,6 @@ Game.typewriter = {
 
     updateBattleUI() {
         const pBar = document.querySelector("#screen-final-boss .warden .hp");
-        const vBar = document.querySelector("#screen-final-boss .villain .hp");
-
         if (pBar) pBar.style.width = `${this.aliceBattleState.playerHp}%`;
         if (vBar) vBar.style.width = `${this.aliceBattleState.villainHp}%`;
     },
