@@ -417,9 +417,9 @@
 
       <!-- NEW DIRECT DEBUG BUTTON (ID-based binding) -->
       <button id="btn-debug-alice"
-        onclick="if(window.AliceBattleRef) window.AliceBattleRef.init(); else alert('Error: AliceBattleRef not found. Script may have failed to load.');"
+        onclick="if(window.AliceConquest) window.AliceConquest.init(); else alert('Error: AliceConquest not found. Script may have failed to load.');"
         style="margin-top: 10px; background: #500; color: #f88; border: 1px solid #f44; padding: 8px 15px; font-size: 0.9rem; cursor: pointer; display: block; margin-left: auto; margin-right: auto; font-weight: bold;">
-        Direct - Alice Battle (Text Conquest Mode)
+        Direct - Alice Battle (Text Conquest V3)
       </button>
     </section>
 
@@ -1175,8 +1175,8 @@
   <!-- Scripts -->
   <!-- 1. Eye Tracking Core -->
   <script type="module" src="./js/app.js?v=CLOSURE_FIX"></script>
-  <!-- Alice Battle Logic (Simplifed Global) -->
-  <script src="./js/alice-battle-simple.js?v=TEXT_CONQUEST_V3_FIXED"></script>
+  <!-- Alice Battle Logic (CONQUEST MODE V3) -->
+  <script src="./js/alice-battle-conquest.js"></script>
   <script>
     // Ensure Game.AliceBattle is linked if needed
     window.addEventListener('load', () => {
