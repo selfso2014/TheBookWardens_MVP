@@ -1880,25 +1880,30 @@ Game.typewriter = {
     },
 
     triggerFinalBossBattle() {
-        console.log("[Game] Alice Battle Mode Started (Stable Method).");
+        console.log("[Game] Alice Battle Mode Started (Interaction Check).");
 
-        // 1. Explicit Screen Switch (Robust Method)
-        // Hide all screens first
+        // 1. Disable HUD & Blocking Overlays (Canvas)
+        const hud = document.getElementById('hud-top');
+        if (hud) hud.style.display = 'none';
+
+        // Force pointer-events:none on ALL canvases to prevent click hijacking
+        document.querySelectorAll('canvas').forEach(c => {
+            c.style.pointerEvents = 'none';
+        });
+
+        // 2. Explicit Screen Switch
         const allScreens = document.querySelectorAll('.screen');
         allScreens.forEach(s => s.style.display = 'none');
 
-        // Force Show Final Boss Screen
         const screen = document.getElementById("screen-final-boss");
         if (screen) {
             screen.style.display = 'flex';
             screen.classList.add('alice-battle-mode');
-
-            // Ensure visibility styles are applied
             screen.style.opacity = '1';
             screen.style.visibility = 'visible';
-            screen.style.backgroundColor = '#111'; // Fallback bg if CSS fails
+            screen.style.backgroundColor = '#111';
+            screen.style.zIndex = '99999'; // FORCE TOP LAYER
 
-            // Also ensure parent containers are visible if any (just in case)
             if (screen.parentElement && screen.parentElement.tagName !== 'BODY') {
                 screen.parentElement.style.display = 'block';
             }
@@ -1907,40 +1912,39 @@ Game.typewriter = {
             return;
         }
 
-        // 2. Reset State & UI
+        // 3. Reset State & UI
         this.aliceBattleState.playerHp = 100;
         this.aliceBattleState.villainHp = 100;
         this.aliceBattleState.isPlayerTurn = true;
         this.updateBattleUI();
 
-        // 3. Attach Click Handlers to Cards (Warden)
-        // Note: Using onclick via JS to ensure context
-        const actions = ['ink', 'rune', 'gem'];
-        actions.forEach(action => {
-            // Find card by icon class or position as fallback
-            let card = null;
-            const cards = document.querySelectorAll(`#screen-final-boss .warden .card`);
+        // 4. Event Delegation: Single Listener on Screen
+        // Remove old listener to prevent duplicates (simple way: clone & replace)
+        const newScreen = screen.cloneNode(true);
+        screen.parentNode.replaceChild(newScreen, screen);
 
-            // Improved check: content match
-            for (let c of cards) {
-                if (c.innerText.toLowerCase().includes(action)) {
-                    card = c;
-                    break;
+        // Re-attach listener to new element
+        newScreen.onclick = (e) => {
+            // Check if clicked element is a card inside .warden area
+            const card = e.target.closest('.warden .card');
+            if (card) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const text = card.innerText.toLowerCase();
+                let action = '';
+                if (text.includes('ink')) action = 'ink';
+                else if (text.includes('rune')) action = 'rune';
+                else if (text.includes('gem')) action = 'gem';
+
+                if (action) {
+                    this.handleBattleAction(action);
                 }
             }
-            if (!card && cards.length >= 3) card = cards[actions.indexOf(action)];
+        };
 
-            if (card) {
-                card.style.cursor = "pointer";
-                card.onclick = (e) => {
-                    e.stopPropagation(); // Prevent bg click
-                    this.handleBattleAction(action);
-                };
-            }
-        });
-
-        // 4. Remove Dummy Overlay if exists
-        const dummy = document.querySelector("#screen-final-boss > div[onclick='Game.endFinalBossDummy()']");
+        // 5. Remove Dummy Overlay if exists (in new DOM)
+        const dummy = newScreen.querySelector("div[onclick='Game.endFinalBossDummy()']");
         if (dummy) dummy.remove();
     },
 
