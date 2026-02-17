@@ -13,49 +13,50 @@ export class IntroManager {
         const startBtn = document.getElementById("btn-start-game");
         if (startBtn) {
             startBtn.onclick = async () => {
-                // Prevent double clicks
+                // Prevent double clicks & Show Loading immediately
                 startBtn.disabled = true;
                 startBtn.classList.add("loading");
                 startBtn.innerText = "Initializing...";
 
-                // 1. Check In-App Browser
-                if (this.isInAppBrowser()) {
-                    this.openSystemBrowser();
-                    startBtn.disabled = false;
-                    startBtn.innerText = "Start Game";
-                    startBtn.classList.remove("loading");
-                    return;
-                }
-
-                // 2. Fullscreen Request
-                try {
-                    if (document.documentElement.requestFullscreen) {
-                        await document.documentElement.requestFullscreen();
+                // Defer heavy logic to next frame to allow UI repaint
+                setTimeout(async () => {
+                    // 1. Check In-App Browser
+                    if (this.isInAppBrowser()) {
+                        this.openSystemBrowser();
+                        startBtn.disabled = false;
+                        startBtn.innerText = "Start Game";
+                        startBtn.classList.remove("loading");
+                        return;
                     }
-                } catch (e) {
-                    console.warn("Fullscreen deferred: " + e.message);
-                }
 
-                // 3. Initialize Eye Tracking SDK
-                try {
-                    console.log("[IntroManager] Requesting Eye Tracking Boot...");
-                    if (typeof window.startEyeTracking === 'function') {
-                        const success = await window.startEyeTracking();
-                        if (!success) {
-                            console.error("[IntroManager] Eye Tracking Init Failed!");
-                            // Show error modal? Or just proceed with warning?
-                            // For now, proceed (Calibration will fail gracefully)
-                            alert("Eye tracking failed to initialize. Game may not work correctly.");
+                    // 2. Fullscreen Request
+                    try {
+                        if (document.documentElement.requestFullscreen) {
+                            await document.documentElement.requestFullscreen();
                         }
-                    } else {
-                        console.error("[IntroManager] startEyeTracking function not found!");
+                    } catch (e) {
+                        console.warn("Fullscreen deferred: " + e.message);
                     }
-                } catch (e) {
-                    console.error("[IntroManager] SDK Boot Error:", e);
-                }
 
-                // 4. Start Rift Intro
-                this.startRiftIntro();
+                    // 3. Initialize Eye Tracking SDK
+                    try {
+                        console.log("[IntroManager] Requesting Eye Tracking Boot...");
+                        if (typeof window.startEyeTracking === 'function') {
+                            const success = await window.startEyeTracking();
+                            if (!success) {
+                                console.error("[IntroManager] Eye Tracking Init Failed!");
+                                alert("Eye tracking failed to initialize. Game may not work correctly.");
+                            }
+                        } else {
+                            console.error("[IntroManager] startEyeTracking function not found!");
+                        }
+                    } catch (e) {
+                        console.error("[IntroManager] SDK Boot Error:", e);
+                    }
+
+                    // 4. Start Rift Intro
+                    this.startRiftIntro();
+                }, 50); // 50ms delay for UI update
             };
         }
     }
