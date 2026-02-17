@@ -956,6 +956,14 @@ Game.typewriter = {
                 // [CHANGED] Direct call to GameLogic to bypass potential 'this' issues
                 console.log("[Game] All paragraphs done. Summoning ARCH-VILLAIN...");
                 setTimeout(() => {
+                    // FORCE HIDE BOSS SCREEN
+                    const vs = document.getElementById("screen-boss");
+                    if (vs) {
+                        vs.style.display = "none";
+                        vs.style.pointerEvents = "auto"; // Reset for next time
+                        vs.classList.remove("active");
+                    }
+
                     if (this.gameLogic) {
                         this.gameLogic.triggerFinalBossBattle();
                     } else {
