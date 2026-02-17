@@ -2194,81 +2194,75 @@ Game.typewriter = {
 
     bindKeyAndUnlock() {
         const emailInput = document.getElementById('warden-email');
-        const email = emailInput ? emailInput.value : '';
+        let email = emailInput ? emailInput.value : '';
 
+        // [DEBUG] Bypass Validation for smoother flow test
+        if (!email) email = "anonymous_warden@test.com";
+
+        /*
         if (!email || !email.includes('@')) {
             alert("⚠️ Soul Binding Failed: Invalid Warden ID (Email).\nPlease invoke a valid identity.");
-            if (emailInput) {
-                emailInput.style.borderColor = 'red';
-                emailInput.focus();
-            }
             return;
         }
+        */
 
         // --- SUCCESS SEQUENCE ---
         console.log(`[Warden] Binding Key to: ${email}`);
 
         // 1. Visual Feedback
-        const btn = document.querySelector('#bind-form button.btn-primary');
+        const btn = document.querySelector('#bind-form button');
         if (btn) {
             btn.innerText = "✨ SOUL BOUND ✨";
             btn.style.background = "#fff";
             btn.disabled = true;
         }
 
-        // Initialize Firebase if needed
-        if (window.firebase && window.FIREBASE_CONFIG && !firebase.apps.length) {
-            try {
-                firebase.initializeApp(window.FIREBASE_CONFIG);
-                console.log("[Firebase] Initialized");
-            } catch (e) {
-                console.error("[Firebase] Init Error:", e);
-            }
-        }
-
-        // Prepare Data
-        const score = (window.Game && window.Game.scoreManager) ? window.Game.scoreManager : {};
-        const wardenData = {
-            email: email,
-            wpm: score.wpm || 0,
-            ink: score.ink || 0,
-            runes: score.runes || 0,
-            gems: score.gems || 0,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            device: navigator.userAgent
-        };
-
-        // 2. Store Data (Firestore)
-        if (window.firebase) {
-            const db = firebase.firestore();
-            db.collection("wardens").add(wardenData)
-                .then((docRef) => {
-                    console.log("[Firebase] Document written with ID: ", docRef.id);
-                })
-                .catch((error) => {
-                    console.error("[Firebase] Error adding document: ", error);
-                    alert("Data Sync Warning: Could not save to cloud (Network Error?). Proceeding locally.");
-                });
-        }
-
-        localStorage.setItem('warden_email', email);
-        localStorage.setItem('chapter_1_unlocked', 'true');
-
-        // 3. Transition (Delayed)
+        // 2. Transition FAST (Don't wait for DB)
         setTimeout(() => {
-            // [NEW] Transition to Social Share Screen
             if (typeof this.switchScreen === 'function') {
                 this.switchScreen('screen-new-share');
             } else {
-                console.error("switchScreen function not found in Game object.");
-                // Fallback if switchScreen is missing
                 const shareScreen = document.getElementById('screen-new-share');
                 if (shareScreen) {
                     shareScreen.classList.add('active');
                     shareScreen.style.display = 'flex';
+                    // Force overlay z-index
+                    shareScreen.style.zIndex = "100000";
+                    shareScreen.style.pointerEvents = "auto";
                 }
             }
-        }, 1500);
+        }, 500);
+
+        // 3. Store Data (Async Background)
+        try {
+            // Initialize Firebase if needed
+            if (window.firebase && window.FIREBASE_CONFIG && !firebase.apps.length) {
+                firebase.initializeApp(window.FIREBASE_CONFIG);
+            }
+
+            const score = (window.Game && window.Game.scoreManager) ? window.Game.scoreManager : {};
+            const wardenData = {
+                email: email,
+                wpm: score.wpm || 0,
+                ink: score.ink || 0,
+                runes: score.runes || 0,
+                gems: score.gems || 0,
+                timestamp: (window.firebase && firebase.firestore) ? firebase.firestore.FieldValue.serverTimestamp() : new Date(),
+                device: navigator.userAgent
+            };
+
+            if (window.firebase) {
+                const db = firebase.firestore();
+                db.collection("wardens").add(wardenData)
+                    .then((docRef) => console.log("[Firebase] Saved:", docRef.id))
+                    .catch((err) => console.error("[Firebase] Save Error:", err));
+            }
+        } catch (e) {
+            console.error("[Firebase] Critical Error:", e);
+        }
+
+        localStorage.setItem('warden_email', email);
+        localStorage.setItem('chapter_1_unlocked', 'true');
     },
 
     goToNewSignup() {
