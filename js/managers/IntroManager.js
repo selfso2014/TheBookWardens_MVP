@@ -18,50 +18,61 @@ export class IntroManager {
                 startBtn.classList.add("loading");
                 startBtn.innerText = "Initializing...";
 
-                // Defer heavy logic to next frame to allow UI repaint
-                setTimeout(async () => {
-                    // 1. Check In-App Browser
-                    if (this.isInAppBrowser()) {
-                        this.openSystemBrowser();
-                        startBtn.disabled = false;
-                        startBtn.innerText = "Start Game";
-                        startBtn.classList.remove("loading");
+                // 1. Check In-App Browser
+                if (this.isInAppBrowser()) {
+                    this.openSystemBrowser();
+                    this.resetStartBtn(startBtn);
+                    return;
+                }
+
+                /* 
+                // 2. Fullscreen Request (REMOVED per user preference)
+                // Restoration of original behavior: Do not force fullscreen.
+                try {
+                    if (document.documentElement.requestFullscreen) {
+                        await document.documentElement.requestFullscreen();
+                    }
+                } catch (e) {
+                    console.warn("Fullscreen deferred: " + e.message);
+                }
+                */
+
+                // 3. Initialize Eye Tracking SDK
+                try {
+                    console.log("[IntroManager] Requesting Eye Tracking Boot...");
+                    if (typeof window.startEyeTracking === 'function') {
+                        // Must be called DIRECTLY in event handler for mobile permissions
+                        const success = await window.startEyeTracking();
+                        if (!success) {
+                            console.error("[IntroManager] Eye Tracking Init Failed!");
+                            alert("Eye tracking failed to initialize. Please check camera permissions.");
+                            this.resetStartBtn(startBtn);
+                            return; // Stop here
+                        }
+                    } else {
+                        console.error("[IntroManager] startEyeTracking function not found!");
+                        alert("System Error: Tracking module missing.");
+                        this.resetStartBtn(startBtn);
                         return;
                     }
+                } catch (e) {
+                    console.error("[IntroManager] SDK Boot Error:", e);
+                    alert("Error starting eye tracking: " + e.message);
+                    this.resetStartBtn(startBtn);
+                    return;
+                }
 
-                    /* 
-                    // 2. Fullscreen Request (REMOVED per user preference)
-                    // Restoration of original behavior: Do not force fullscreen.
-                    try {
-                        if (document.documentElement.requestFullscreen) {
-                            await document.documentElement.requestFullscreen();
-                        }
-                    } catch (e) {
-                        console.warn("Fullscreen deferred: " + e.message);
-                    }
-                    */
-
-                    // 3. Initialize Eye Tracking SDK
-                    try {
-                        console.log("[IntroManager] Requesting Eye Tracking Boot...");
-                        if (typeof window.startEyeTracking === 'function') {
-                            const success = await window.startEyeTracking();
-                            if (!success) {
-                                console.error("[IntroManager] Eye Tracking Init Failed!");
-                                alert("Eye tracking failed to initialize. Game may not work correctly.");
-                            }
-                        } else {
-                            console.error("[IntroManager] startEyeTracking function not found!");
-                        }
-                    } catch (e) {
-                        console.error("[IntroManager] SDK Boot Error:", e);
-                    }
-
-                    // 4. Start Rift Intro
-                    this.startRiftIntro();
-                }, 50); // 50ms delay for UI update
+                // 4. Start Rift Intro
+                this.startRiftIntro();
             };
         }
+    }
+
+    resetStartBtn(btn) {
+        if (!btn) return;
+        btn.disabled = false;
+        btn.innerText = "Start Game";
+        btn.classList.remove("loading");
     }
 
     checkAutoStart() {
