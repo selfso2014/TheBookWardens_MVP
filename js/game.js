@@ -918,7 +918,6 @@ Game.typewriter = {
 
     checkBossAnswer(optionIndex) {
         const currentIndex = this.currentParaIndex;
-        alert(`CheckBossAnswer: Index=${currentIndex}, Total=${this.paragraphs.length}`);
         // Debugging
         const quiz = this.quizzes[currentIndex];
 
@@ -964,8 +963,8 @@ Game.typewriter = {
                         vs.style.pointerEvents = "auto";
                     }
 
-                    // 2. Diagnostic
-                    alert("Direct Trigger Final Boss (v14.1.30)! Skip GameLogic.");
+                    // 2. Log Transition
+                    console.log("Direct Trigger Final Boss (v14.1.32)! Skip GameLogic.");
 
                     // 3. FORCE SWITCH SCREEN (Manual)
                     const aliceScreen = document.getElementById("screen-alice-battle");
@@ -975,9 +974,8 @@ Game.typewriter = {
                         // Show Alice Screen
                         aliceScreen.classList.add('active');
                         aliceScreen.style.display = "flex";
-                        // Ensure blockers are hidden (output, preview, etc? leave them for now)
                     } else {
-                        alert("ERROR: screen-alice-battle element missing!");
+                        console.error("ERROR: screen-alice-battle element missing!");
                     }
 
                     // 4. INIT ALICE BATTLE
@@ -985,7 +983,7 @@ Game.typewriter = {
                         if (window.AliceBattleRef) {
                             window.AliceBattleRef.init();
                         } else {
-                            alert("FATAL: AliceBattleRef NOT FOUND! Check alice-battle.js loading.");
+                            console.error("FATAL: AliceBattleRef NOT FOUND!");
                         }
                     }, 100);
 
