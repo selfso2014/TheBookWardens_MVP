@@ -893,59 +893,6 @@ Game.typewriter = {
         // Priority 1: GazeDataManager (Accurate)
         if (window.gazeDataManager && window.gazeDataManager.wpm > 0) {
             targetWPM = window.gazeDataManager.wpm;
-        }
-        // Priority 2: Simple estimation (Fallback) - REMOVED
-        // We strictly use GazeDataManager's calculated WPM.
-        // If 0, display 0. Do not use time-based estimation as it causes fluctuations.
-
-        // Bridge to Manager
-        Game.updateWPM(targetWPM);
-    },
-
-    startBossBattle() {
-        console.log("Entering Boss Battle!");
-        if (this.uploadMonitor) clearInterval(this.uploadMonitor); // Stop auto-upload
-        if (window.gazeDataManager && Game.sessionId) {
-            window.gazeDataManager.uploadToCloud(Game.sessionId); // Final Upload
-        }
-        Game.confrontVillain();
-    },
-
-    // Stub
-    checkGazeDistance(x, y) {
-        this.updateGazeStats(x, y);
-    },
-
-    checkBossAnswer(optionIndex) {
-        const currentIndex = this.currentParaIndex;
-        const quiz = this.quizzes[currentIndex];
-
-        // Correct Answer Check
-        // Correct Answer Check
-        if (optionIndex === quiz.a) {
-            // SUCCESS
-            // logic moved to flying resource callback
-            // Game.addGems(10); 
-
-            // Trigger Visuals
-            const btn = document.querySelectorAll("#boss-options button")[optionIndex];
-            if (btn && typeof Game.spawnFlyingResource === 'function') {
-                const rect = btn.getBoundingClientRect();
-                Game.spawnFlyingResource(rect.left + rect.width / 2, rect.top + rect.height / 2, 10, 'gem');
-            } else {
-                Game.addGems(10); // Fallback
-                console.log("Boss Defeated! +10 Gems");
-            }
-
-            // Hide Boss UI immediately (Force)
-            const villainScreen = document.getElementById("villain-screen");
-            if (villainScreen) {
-                villainScreen.classList.remove("active");
-                villainScreen.style.display = "none"; // Hard hide to prevent loop
-                // Restore display property after transition so it can reappear later
-                setTimeout(() => { villainScreen.style.display = ""; }, 2000);
-            }
-
             // Check if this was the Last Paragraph
             if (this.currentParaIndex >= this.paragraphs.length - 1) {
                 // [CHANGED] Instead of Victory, go to FINAL BOSS
