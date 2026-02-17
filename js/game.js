@@ -1066,9 +1066,18 @@ window.Game = Game;
 
 // [DEBUG] Shortcut
 window.debugJump = (idx = 2) => {
-    console.log(`[Debug] Jumping to MidBoss Battle ${idx}`);
-    Game.currentParaIndex = idx;
-    Game.triggerMidBossBattle();
+    console.log(`[Debug v14.1.20] Jumping to MidBoss Battle ${idx}`);
+    // Use window.Game to ensure global reference
+    if (window.Game && typeof window.Game.triggerMidBossBattle === 'function') {
+        window.Game.currentParaIndex = idx;
+        window.Game.triggerMidBossBattle();
+    } else {
+        console.error("[Debug] Game.triggerMidBossBattle not found on window.Game", window.Game);
+        // Fallback: try local scope Game
+        if (typeof Game !== 'undefined' && Game.triggerMidBossBattle) {
+            Game.triggerMidBossBattle();
+        }
+    }
 };
 
 // [SAFETY FIX] Module timing protection
