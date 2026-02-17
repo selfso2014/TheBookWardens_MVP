@@ -2147,9 +2147,9 @@ Game.typewriter = {
         const gemScoreEl = document.getElementById('report-gem-score');
         if (gemScoreEl) gemScoreEl.innerText = `+${gemScore}`;
 
-        // Total Score
-        const totalEl = document.getElementById('report-total-score');
-        if (totalEl) totalEl.innerText = totalScore.toLocaleString();
+        // Detail Scoring - Boss Bonus (Fixed for Victory)
+        const bossScoreEl = document.getElementById('report-boss-score');
+        if (bossScoreEl) bossScoreEl.innerText = "+10,000";
     },
 
     bindKeyAndUnlock() {

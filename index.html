@@ -869,7 +869,7 @@
       style="text-align: center; background: radial-gradient(circle at center, #1a103c 0%, #000 90%); overflow-y: auto; padding-top: 100px; box-sizing: border-box; padding-bottom: 50px;">
 
       <h1
-        style="color: #ffd700; margin-bottom: 20px; font-family: 'Cinzel', serif; font-size: 2.5rem; text-shadow: 0 0 20px gold;">
+        style="color: #ffd700; margin-bottom: 30px; font-family: 'Cinzel', serif; font-size: 3rem; text-shadow: 0 0 20px gold; font-weight: bold; letter-spacing: 2px;">
         MISSION REPORT</h1>
 
       <!-- 1. PRIMARY STATS (WPM, RANK) -->
@@ -892,7 +892,7 @@
         </div>
       </div>
 
-      <!-- 2. DETAIL SCORING (Ink, Rune, Gem) -->
+      <!-- 2. DETAIL SCORING (Ink, Rune, Gem + Villain) -->
       <div
         style="max-width: 500px; margin: 0 auto 30px auto; background: rgba(0,0,0,0.5); border-radius: 15px; padding: 20px; text-align: left;">
 
@@ -900,7 +900,8 @@
         <div
           style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
           <div style="display: flex; align-items: center;">
-            <span style="font-size: 1.5rem; margin-right: 15px;">🖋️</span>
+            <span
+              style="font-size: 1.5rem; margin-right: 15px; color: #00e5ff; text-shadow: 0 0 10px #00e5ff;">🖋️</span>
             <div>
               <div style="color: #fff; font-weight: bold;">Ink (Lines Read)</div>
               <div id="report-ink-count" style="color: #888; font-size: 0.8rem;">0 lines</div>
@@ -913,7 +914,7 @@
         <div
           style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
           <div style="display: flex; align-items: center;">
-            <span style="font-size: 1.5rem; margin-right: 15px;">ᚱ</span>
+            <span style="font-size: 1.5rem; margin-right: 15px; color: #00ff00; text-shadow: 0 0 10px #00ff00;">ᚱ</span>
             <div>
               <div style="color: #fff; font-weight: bold;">Rune (Vocab)</div>
               <div id="report-rune-count" style="color: #888; font-size: 0.8rem;">0 words</div>
@@ -923,9 +924,11 @@
         </div>
 
         <!-- GEM -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <div
+          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;;">
           <div style="display: flex; align-items: center;">
-            <span style="font-size: 1.5rem; margin-right: 15px;">💎</span>
+            <span
+              style="font-size: 1.5rem; margin-right: 15px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff;">💎</span>
             <div>
               <div style="color: #fff; font-weight: bold;">Gem (Quiz)</div>
               <div id="report-gem-count" style="color: #888; font-size: 0.8rem;">0 solved</div>
@@ -934,13 +937,18 @@
           <div id="report-gem-score" style="color: #ff00ff; font-weight: bold; font-size: 1.2rem;">+0</div>
         </div>
 
-      </div>
+        <!-- VILLAIN BONUS -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <div style="display: flex; align-items: center;">
+            <span style="font-size: 1.5rem; margin-right: 15px; color: #ff4d4d; text-shadow: 0 0 10px red;">💀</span>
+            <div>
+              <div style="color: #fff; font-weight: bold;">Final Boss Defeated</div>
+              <div style="color: #888; font-size: 0.8rem;">World Saved Bonus</div>
+            </div>
+          </div>
+          <div id="report-boss-score" style="color: gold; font-weight: bold; font-size: 1.2rem;">+10,000</div>
+        </div>
 
-      <!-- TOTAL SCORE -->
-      <div style="margin-bottom: 40px;">
-        <span style="color: #aaa; font-size: 0.9rem; margin-right: 10px;">TOTAL SCORE</span>
-        <span id="report-total-score"
-          style="font-family: 'Cinzel', serif; font-size: 2.5rem; color: #fff; text-shadow: 0 0 15px white;">0</span>
       </div>
 
       <!-- 3. REWARD & ACTION (Golden Key Funnel) -->
@@ -949,8 +957,14 @@
 
         <div style="font-size: 3rem; margin-bottom: 10px;">🗝️</div>
         <h3 style="font-family: 'Cinzel', serif; color: #ffd700; margin-bottom: 5px;">THE GOLDEN KEY</h3>
-        <p style="color: #ccc; font-size: 0.9rem; margin-bottom: 20px;">
+        <p style="color: #ccc; font-size: 0.9rem; margin-bottom: 10px;">
           Unlocks <strong>'Alice in Wonderland' Chapter 1</strong>
+        </p>
+
+        <!-- WARNING MESSAGE -->
+        <p
+          style="color: #ff4d4d; font-weight: bold; font-size: 0.8rem; margin-bottom: 20px; text-shadow: 0 0 5px rgba(255,0,0,0.5);">
+          ⚠️ Warning: Unbound Key will vanish without Soul Bind.
         </p>
 
         <!-- Funnel Form -->
@@ -959,7 +973,7 @@
             style="width: 100%; padding: 12px; margin-bottom: 10px; background: rgba(255,255,255,0.1); border: 1px solid #555; color: #fff; border-radius: 5px; text-align: center;">
 
           <button class="btn-primary" onclick="Game.bindKeyAndUnlock()"
-            style="width: 100%; background: #ffd700; color: #000; font-weight: bold; border: none; padding: 12px; border-radius: 5px; cursor: pointer;">
+            style="width: 100%; background: #ffd700; color: #000; font-weight: bold; border: none; padding: 12px; border-radius: 5px; cursor: pointer; box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);">
             🛡️ JOIN WARDENS & UNLOCK
           </button>
         </div>
