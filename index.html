@@ -1233,7 +1233,75 @@
   <script type="module" src="./js/game.js?v=BIND_V2_FIX"></script>
 
   <!-- 3. Explicit Event Binding for Debug Button (With STANDALONE BATTLE LOGIC) -->
-  <!-- 3. Conflicting Emergency Script REMOVED for Stability -->
+  <!-- EMERGENCY INJECTED SCRIPT: BIND KEY V2 -->
+  <script>
+    window.addEventListener('load', () => {
+      if (!window.Game) window.Game = {};
+
+      window.Game.bindKeyAndUnlock_V2 = function () {
+        console.log("[DEBUG] INJECTED Bind Function Called");
+        const emailInput = document.getElementById('warden-email');
+        let email = emailInput ? emailInput.value : '';
+
+        // [DEBUG] Bypass Validation
+        if (!email) email = "anonymous_warden@test.com";
+
+        // Visual Feedback
+        const btn = document.querySelector('#bind-form button');
+        if (btn) {
+          btn.innerText = "✨ SOUL BOUND ✨";
+          btn.style.background = "#fff";
+          btn.disabled = true;
+        }
+
+        // Transition FAST
+        setTimeout(() => {
+          console.log("[DEBUG] Attempting Transition...");
+          const shareScreen = document.getElementById('screen-new-share');
+          if (shareScreen) {
+            shareScreen.classList.add('active');
+            shareScreen.style.display = 'flex';
+            shareScreen.style.zIndex = "100000";
+            shareScreen.style.pointerEvents = "auto";
+
+            // Hide previous screen
+            const oldScreen = document.getElementById('screen-new-score');
+            if (oldScreen) oldScreen.style.display = 'none';
+          } else {
+            alert("[ERROR] Share Screen Not Found!");
+          }
+        }, 500);
+
+        // Store Data (Async)
+        try {
+          if (window.firebase && window.FIREBASE_CONFIG && !firebase.apps.length) {
+            firebase.initializeApp(window.FIREBASE_CONFIG);
+          }
+          const score = (window.Game && window.Game.scoreManager) ? window.Game.scoreManager : {};
+          const wardenData = {
+            email: email,
+            wpm: score.wpm || 0,
+            ink: score.ink || 0,
+            runes: score.runes || 0,
+            gems: score.gems || 0,
+            timestamp: (window.firebase && firebase.firestore) ? firebase.firestore.FieldValue.serverTimestamp() : new Date(),
+            device: navigator.userAgent
+          };
+          if (window.firebase) {
+            firebase.firestore().collection("wardens").add(wardenData)
+              .then((docRef) => console.log("[Firebase] Saved:", docRef.id))
+              .catch((err) => console.error("[Firebase] Save Error:", err));
+          }
+        } catch (e) {
+          console.error("[Firebase] Critical Error:", e);
+        }
+
+        localStorage.setItem('warden_email', email);
+        localStorage.setItem('chapter_1_unlocked', 'true');
+      };
+      console.log("[SYSTEM] Game.bindKeyAndUnlock_V2 Injected Successfully.");
+    });
+  </script>
 </body>
 
 </html>
