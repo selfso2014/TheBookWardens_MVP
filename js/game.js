@@ -5,6 +5,7 @@ import { ScoreManager } from './managers/ScoreManager.js';
 import { SceneManager } from './managers/SceneManager.js';
 import { bus } from './core/EventBus.js';
 import { TextRenderer } from './TextRendererV2.js';
+import { WardenManager } from './managers/WardenManager.js';
 
 const Game = {
     // Initialized in init()
@@ -186,6 +187,7 @@ const Game = {
         // [NEW] Instantiate Managers
         this.scoreManager = new ScoreManager();
         this.sceneManager = new SceneManager();
+        this.wardenManager = new WardenManager(this);
 
         // [EVENT BUS] Subscribe to Game Events
         bus.on('pang', () => {
@@ -2204,91 +2206,11 @@ Game.typewriter = {
     },
 
     bindKeyAndUnlock_V2() {
-        alert("[DEBUG] Bind Function Called"); // Entry Check
-        const emailInput = document.getElementById('warden-email');
-        let email = emailInput ? emailInput.value : '';
-
-        // [DEBUG] Bypass Validation for smoother flow test
-        if (!email) email = "anonymous_warden@test.com";
-
-        /*
-        if (!email || !email.includes('@')) {
-            alert("⚠️ Soul Binding Failed: Invalid Warden ID (Email).\nPlease invoke a valid identity.");
-            return;
+        if (this.wardenManager) {
+            this.wardenManager.bindWarden();
+        } else {
+            console.error("WardenManager not initialized!");
         }
-        */
-
-        // --- SUCCESS SEQUENCE ---
-        console.log(`[Warden] Binding Key to: ${email}`);
-
-        // 1. Visual Feedback
-        const btn = document.querySelector('#bind-form button');
-        if (btn) {
-            btn.innerText = "✨ SOUL BOUND ✨";
-            btn.style.background = "#fff";
-            btn.disabled = true;
-        }
-
-        // 2. Transition FAST (Don't wait for DB)
-        setTimeout(() => {
-            alert("[DEBUG] Attempting Transition to Share Screen...");
-
-            // Try 'this' context first
-            if (typeof this.switchScreen === 'function') {
-                this.switchScreen('screen-new-share');
-            }
-            // Fallback to global Game object
-            else if (window.Game && typeof window.Game.switchScreen === 'function') {
-                window.Game.switchScreen('screen-new-share');
-            }
-            // Manual Fallback
-            else {
-                alert("[ERROR] switchScreen not found!");
-                const shareScreen = document.getElementById('screen-new-share');
-                if (shareScreen) {
-                    shareScreen.classList.add('active');
-                    shareScreen.style.display = 'flex';
-                    // Force overlay z-index
-                    shareScreen.style.zIndex = "100000";
-                    shareScreen.style.pointerEvents = "auto";
-
-                    // Hide previous screen if possible manually
-                    const oldScreen = document.getElementById('screen-new-score');
-                    if (oldScreen) oldScreen.style.display = 'none';
-                }
-            }
-        }, 500);
-
-        // 3. Store Data (Async Background)
-        try {
-            // Initialize Firebase if needed
-            if (window.firebase && window.FIREBASE_CONFIG && !firebase.apps.length) {
-                firebase.initializeApp(window.FIREBASE_CONFIG);
-            }
-
-            const score = (window.Game && window.Game.scoreManager) ? window.Game.scoreManager : {};
-            const wardenData = {
-                email: email,
-                wpm: score.wpm || 0,
-                ink: score.ink || 0,
-                runes: score.runes || 0,
-                gems: score.gems || 0,
-                timestamp: (window.firebase && firebase.firestore) ? firebase.firestore.FieldValue.serverTimestamp() : new Date(),
-                device: navigator.userAgent
-            };
-
-            if (window.firebase) {
-                const db = firebase.firestore();
-                db.collection("wardens").add(wardenData)
-                    .then((docRef) => console.log("[Firebase] Saved:", docRef.id))
-                    .catch((err) => console.error("[Firebase] Save Error:", err));
-            }
-        } catch (e) {
-            console.error("[Firebase] Critical Error:", e);
-        }
-
-        localStorage.setItem('warden_email', email);
-        localStorage.setItem('chapter_1_unlocked', 'true');
     },
 
     goToNewSignup() {
