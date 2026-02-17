@@ -585,13 +585,13 @@
                     parentBar.style.border = '2px solid #fff';
                     parentBar.style.height = '24px';
 
-                    // FIXED POSITIONING (Force Visibility)
-                    parentBar.style.position = 'absolute';
-                    parentBar.style.top = '42%'; // Below Cards (approx)
+                    // FIXED POSITIONING (BREAKOUT STRATEGY)
+                    parentBar.style.position = 'fixed';
+                    parentBar.style.top = '45vh'; // Center Screen 
                     parentBar.style.left = '50%';
                     parentBar.style.transform = 'translateX(-50%)';
-                    parentBar.style.width = '90%'; // Wider
-                    parentBar.style.zIndex = '950';
+                    parentBar.style.width = '90%';
+                    parentBar.style.zIndex = '9999'; // Highest priority
                     parentBar.style.marginTop = '0';
                     parentBar.style.boxShadow = '0 0 15px rgba(0,0,0,0.8)';
                     parentBar.style.overflow = 'visible';
@@ -602,11 +602,11 @@
                         wLbl.className = 'lbl-warden';
                         wLbl.innerText = "WARDEN";
                         wLbl.style.position = 'absolute';
-                        wLbl.style.left = '0'; // Inside or close
-                        wLbl.style.top = '-20px'; // Above bar
+                        wLbl.style.left = '0';
+                        wLbl.style.top = '-20px';
                         wLbl.style.color = '#2962FF';
                         wLbl.style.fontWeight = 'bold';
-                        wLbl.style.fontSize = '0.8rem'; // Small
+                        wLbl.style.fontSize = '0.8rem';
                         wLbl.style.fontFamily = 'Cinzel, serif';
                         wLbl.style.textShadow = '0 0 5px #000';
                         parentBar.appendChild(wLbl);
@@ -615,11 +615,11 @@
                         vLbl.className = 'lbl-villain';
                         vLbl.innerText = "VILLAIN";
                         vLbl.style.position = 'absolute';
-                        vLbl.style.right = '0'; // Inside or close
-                        vLbl.style.top = '-20px'; // Above bar
+                        vLbl.style.right = '0';
+                        vLbl.style.top = '-20px';
                         vLbl.style.color = '#D50000';
                         vLbl.style.fontWeight = 'bold';
-                        vLbl.style.fontSize = '0.8rem'; // Small
+                        vLbl.style.fontSize = '0.8rem';
                         vLbl.style.fontFamily = 'Cinzel, serif';
                         vLbl.style.textShadow = '0 0 5px #000';
                         parentBar.appendChild(vLbl);
@@ -629,57 +629,67 @@
                 // Adjust Layout compactness
                 const villainArea = container.querySelector('.entity-area.villain');
                 if (villainArea) {
-                    villainArea.style.height = '40vh'; // Give space for cards
-                    villainArea.style.minHeight = '200px';
+                    villainArea.style.height = '40vh';
+                    villainArea.style.overflow = 'visible'; // ALLOW BREAKOUT if needed
                 }
 
-                // Move Text Field Down (Below Bar)
+                // Text Field Adjustments (Fixed Position)
                 if (ui.textField) {
-                    const tfParent = ui.textField.parentElement;
-                    // Push down to lower half
-                    tfParent.style.marginTop = '48vh';
-                    tfParent.style.paddingTop = '10px';
-                    tfParent.style.zIndex = '800';
-                    tfParent.style.position = 'absolute'; // Force position logic
-                    tfParent.style.top = '0';
-                    tfParent.style.width = '100%';
+                    // 1. Remove Title Sibling
+                    const titleEl = ui.textField.previousElementSibling;
+                    if (titleEl) titleEl.style.display = 'none';
 
-                    // WIDER TEXT FIELD
+                    const tfParent = ui.textField.parentElement;
+                    // Reset standard positioning
+                    tfParent.style.position = 'fixed'; // FIXED to screen
+                    tfParent.style.top = '52vh'; // Below HP Bar (45vh + bar)
+                    tfParent.style.left = '0';
+                    tfParent.style.width = '100%';
+                    tfParent.style.marginTop = '0'; // Remove huge margin
+                    tfParent.style.paddingTop = '0';
+                    tfParent.style.zIndex = '800';
+                    tfParent.style.display = 'flex';
+                    tfParent.style.justifyContent = 'center';
+
+                    // Box Styles
                     ui.textField.style.width = '94vw';
-                    ui.textField.style.marginLeft = '3vw'; // Center approx
-                    ui.textField.style.minHeight = '180px'; // Reduced Height
-                    ui.textField.style.overflowY = 'auto'; // Scroll if needed
+                    ui.textField.style.marginLeft = '0';
+                    ui.textField.style.height = '150px';
+                    ui.textField.style.minHeight = '150px';
+                    ui.textField.style.maxHeight = '150px'; // FIXED
+                    ui.textField.style.overflowY = 'auto'; // SCROLLABLE
                 }
+            }
 
                 if (ui.wardenHp) ui.wardenHp.parentElement.style.display = 'none';
 
-                if (ui.gameUi) ui.gameUi.style.opacity = '1';
-                if (ui.finalScreen) {
-                    ui.finalScreen.style.display = 'none';
-                    ui.finalScreen.style.opacity = '0';
-                }
+            if (ui.gameUi) ui.gameUi.style.opacity = '1';
+            if (ui.finalScreen) {
+                ui.finalScreen.style.display = 'none';
+                ui.finalScreen.style.opacity = '0';
+            }
 
-                cardValues.ink = 190; cardValues.rune = 30; cardValues.gem = 50;
+            cardValues.ink = 190; cardValues.rune = 30; cardValues.gem = 50;
 
-                // Compact Villain Cards
-                const vCards = container.querySelector('.villain-cards');
-                if (vCards) {
-                    vCards.style.transform = 'scale(0.8)';
-                    vCards.style.transformOrigin = 'bottom center'; // Anchor to bottom
-                    vCards.style.marginTop = '0';
-                }
+            // Compact Villain Cards
+            const vCards = container.querySelector('.villain-cards');
+            if (vCards) {
+                vCards.style.transform = 'scale(0.8)';
+                vCards.style.transformOrigin = 'bottom center'; // Anchor to bottom
+                vCards.style.marginTop = '0';
+            }
 
-                initTextBattlefield();
-                updateCardDisplay();
+            initTextBattlefield();
+            updateCardDisplay();
 
-                if (animFrameId) cancelAnimationFrame(animFrameId);
-                animateLoop(); // Loop runs but does nothing if paused
+            if (animFrameId) cancelAnimationFrame(animFrameId);
+            animateLoop(); // Loop runs but does nothing if paused
 
-                // SHOW INTRO MODAL
-                showIntroModal();
+            // SHOW INTRO MODAL
+            showIntroModal();
 
-            } catch (e) { console.error(e); }
-        },
+        } catch(e) { console.error(e); }
+    },
 
         triggerAttack: function (type) {
             if (gameState !== 'playing' || cardValues[type] <= 0) return;
@@ -755,82 +765,82 @@
             lastVillainAttackTime = Date.now(); // Reset villain timer
         },
 
-        triggerVillainAttack: function () {
-            if (gameState !== 'playing') return;
+    triggerVillainAttack: function () {
+        if (gameState !== 'playing') return;
 
-            // Decide Attack Type
-            const rand = Math.random();
-            let type = 'joker'; let cardId = 'v-card-joker'; let color = '#ff00aa';
-            if (rand > 0.6) { type = 'king'; cardId = 'v-card-king'; color = '#ff0055'; }
-            if (rand > 0.9) { type = 'queen'; cardId = 'v-card-queen'; color = '#ff0000'; }
+        // Decide Attack Type
+        const rand = Math.random();
+        let type = 'joker'; let cardId = 'v-card-joker'; let color = '#ff00aa';
+        if (rand > 0.6) { type = 'king'; cardId = 'v-card-king'; color = '#ff0055'; }
+        if (rand > 0.9) { type = 'queen'; cardId = 'v-card-queen'; color = '#ff0000'; }
 
-            const sourceEl = document.getElementById(cardId) || document.getElementById('villain-visual-container');
-            const targetChars = getTargetCharsForVillain(type);
+        const sourceEl = document.getElementById(cardId) || document.getElementById('villain-visual-container');
+        const targetChars = getTargetCharsForVillain(type);
 
-            // Visual Tell
-            if (document.getElementById(cardId)) {
-                const cEl = document.getElementById(cardId);
-                cEl.style.boxShadow = `0 0 20px 10px ${color}`;
-                setTimeout(() => cEl.style.boxShadow = 'none', 500);
-            }
+        // Visual Tell
+        if (document.getElementById(cardId)) {
+            const cEl = document.getElementById(cardId);
+            cEl.style.boxShadow = `0 0 20px 10px ${color}`;
+            setTimeout(() => cEl.style.boxShadow = 'none', 500);
+        }
 
-            // NO LOGGING
+        // NO LOGGING
 
-            const sBox = sourceEl.getBoundingClientRect();
-            let startX = sBox.left + sBox.width / 2;
-            let startY = sBox.bottom - 50;
+        const sBox = sourceEl.getBoundingClientRect();
+        let startX = sBox.left + sBox.width / 2;
+        let startY = sBox.bottom - 50;
 
-            // FALLBACK FOR VILLAIN SOURCE
-            if (sBox.width === 0 && sBox.height === 0) {
-                startX = window.innerWidth / 2;
-                startY = 100; // Top Center fallback
-            }
+        // FALLBACK FOR VILLAIN SOURCE
+        if (sBox.width === 0 && sBox.height === 0) {
+            startX = window.innerWidth / 2;
+            startY = 100; // Top Center fallback
+        }
 
-            // If no letters to corrupt, we just wait (or could shake the screen)
-            if (targetChars.length === 0) {
-                // No target logic needed, victory is handled by updateVillainHP
-                return;
-            }
+        // If no letters to corrupt, we just wait (or could shake the screen)
+        if (targetChars.length === 0) {
+            // No target logic needed, victory is handled by updateVillainHP
+            return;
+        }
 
-            // Corrupt Text
-            targetChars.forEach((charEl, idx) => {
+        // Corrupt Text
+        targetChars.forEach((charEl, idx) => {
+            setTimeout(() => {
+                const tBox = charEl.getBoundingClientRect();
+                let targetX = tBox.left + tBox.width / 2;
+                let targetY = tBox.top + tBox.height / 2;
+
+                // FALLBACK FOR TARGET
+                if (tBox.width === 0 && tBox.height === 0) {
+                    targetX = window.innerWidth / 2 + (Math.random() - 0.5) * 200;
+                    targetY = window.innerHeight / 2 + (Math.random() - 0.5) * 100;
+                }
+
+                lightnings.push(new Lightning(startX, startY, targetX, targetY, false, 0, color));
+
                 setTimeout(() => {
-                    const tBox = charEl.getBoundingClientRect();
-                    let targetX = tBox.left + tBox.width / 2;
-                    let targetY = tBox.top + tBox.height / 2;
+                    changeCharState(charEl, 'gray');
+                    updateVillainHP();
+                }, 150);
 
-                    // FALLBACK FOR TARGET
-                    if (tBox.width === 0 && tBox.height === 0) {
-                        targetX = window.innerWidth / 2 + (Math.random() - 0.5) * 200;
-                        targetY = window.innerHeight / 2 + (Math.random() - 0.5) * 100;
-                    }
+            }, idx * 30);
+        });
+    }
+};
 
-                    lightnings.push(new Lightning(startX, startY, targetX, targetY, false, 0, color));
+// Alias
+window.AliceBattle = window.AliceBattleRef;
 
-                    setTimeout(() => {
-                        changeCharState(charEl, 'gray');
-                        updateVillainHP();
-                    }, 150);
-
-                }, idx * 30);
-            });
+// AUTO-LINKER
+const linkInterval = setInterval(() => {
+    if (window.Game && window.AliceBattleRef) {
+        if (window.Game.AliceBattle !== window.AliceBattleRef) {
+            window.Game.AliceBattle = window.AliceBattleRef;
         }
-    };
+    }
+    const debugBtn = document.getElementById('btn-debug-alice');
+    if (debugBtn && !debugBtn.onclick) {
+        debugBtn.onclick = function () { window.AliceBattleRef.init(); };
+    }
+}, 1000);
 
-    // Alias
-    window.AliceBattle = window.AliceBattleRef;
-
-    // AUTO-LINKER
-    const linkInterval = setInterval(() => {
-        if (window.Game && window.AliceBattleRef) {
-            if (window.Game.AliceBattle !== window.AliceBattleRef) {
-                window.Game.AliceBattle = window.AliceBattleRef;
-            }
-        }
-        const debugBtn = document.getElementById('btn-debug-alice');
-        if (debugBtn && !debugBtn.onclick) {
-            debugBtn.onclick = function () { window.AliceBattleRef.init(); };
-        }
-    }, 1000);
-
-})();
+}) ();
