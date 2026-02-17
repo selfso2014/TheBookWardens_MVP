@@ -587,10 +587,10 @@
 
                     // FIXED POSITIONING (Force Visibility)
                     parentBar.style.position = 'absolute';
-                    parentBar.style.top = '42%'; // Below Cards (approx)
+                    parentBar.style.top = '50vh'; // Exact center (vh units)
                     parentBar.style.left = '50%';
                     parentBar.style.transform = 'translateX(-50%)';
-                    parentBar.style.width = '90%'; // Wider
+                    parentBar.style.width = '90%';
                     parentBar.style.zIndex = '950';
                     parentBar.style.marginTop = '0';
                     parentBar.style.boxShadow = '0 0 15px rgba(0,0,0,0.8)';
@@ -602,11 +602,11 @@
                         wLbl.className = 'lbl-warden';
                         wLbl.innerText = "WARDEN";
                         wLbl.style.position = 'absolute';
-                        wLbl.style.left = '0'; // Inside or close
-                        wLbl.style.top = '-20px'; // Above bar
+                        wLbl.style.left = '0';
+                        wLbl.style.top = '-20px';
                         wLbl.style.color = '#2962FF';
                         wLbl.style.fontWeight = 'bold';
-                        wLbl.style.fontSize = '0.8rem'; // Small
+                        wLbl.style.fontSize = '0.8rem';
                         wLbl.style.fontFamily = 'Cinzel, serif';
                         wLbl.style.textShadow = '0 0 5px #000';
                         parentBar.appendChild(wLbl);
@@ -615,11 +615,11 @@
                         vLbl.className = 'lbl-villain';
                         vLbl.innerText = "VILLAIN";
                         vLbl.style.position = 'absolute';
-                        vLbl.style.right = '0'; // Inside or close
-                        vLbl.style.top = '-20px'; // Above bar
+                        vLbl.style.right = '0';
+                        vLbl.style.top = '-20px';
                         vLbl.style.color = '#D50000';
                         vLbl.style.fontWeight = 'bold';
-                        vLbl.style.fontSize = '0.8rem'; // Small
+                        vLbl.style.fontSize = '0.8rem';
                         vLbl.style.fontFamily = 'Cinzel, serif';
                         vLbl.style.textShadow = '0 0 5px #000';
                         parentBar.appendChild(vLbl);
@@ -629,26 +629,28 @@
                 // Adjust Layout compactness
                 const villainArea = container.querySelector('.entity-area.villain');
                 if (villainArea) {
-                    villainArea.style.height = '40vh'; // Give space for cards
+                    villainArea.style.height = '45vh'; // More space for cards
                     villainArea.style.minHeight = '200px';
                 }
 
                 // Move Text Field Down (Below Bar)
                 if (ui.textField) {
                     const tfParent = ui.textField.parentElement;
-                    // Push down to lower half
-                    tfParent.style.marginTop = '48vh';
+                    // Push down below HP Bar (50vh + bar height)
+                    tfParent.style.marginTop = '55vh';
                     tfParent.style.paddingTop = '10px';
                     tfParent.style.zIndex = '800';
-                    tfParent.style.position = 'absolute'; // Force position logic
+                    tfParent.style.position = 'absolute';
                     tfParent.style.top = '0';
                     tfParent.style.width = '100%';
 
-                    // WIDER TEXT FIELD
+                    // WIDER & SHORTER TEXT FIELD
                     ui.textField.style.width = '94vw';
-                    ui.textField.style.marginLeft = '3vw'; // Center approx
-                    ui.textField.style.minHeight = '180px'; // Reduced Height
-                    ui.textField.style.overflowY = 'auto'; // Scroll if needed
+                    ui.textField.style.marginLeft = '3vw';
+                    ui.textField.style.height = '150px !important'; // Force Fixed Height
+                    ui.textField.style.minHeight = '150px';
+                    ui.textField.style.maxHeight = '150px';
+                    ui.textField.style.overflowY = 'auto'; // SCROLLABLE
                 }
 
                 if (ui.wardenHp) ui.wardenHp.parentElement.style.display = 'none';
