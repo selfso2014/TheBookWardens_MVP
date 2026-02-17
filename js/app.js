@@ -629,61 +629,64 @@ function attachSeesoCallbacks() {
   calManager.bindTo(seeso);
 }
 
-async function initSeeso() {
-  setState("sdk", "loading");
-  // [REMOVED] Intermediate Toast: "Preparing Spells..."
+// --- Preload Logic ---
+let initPromise = null;
 
-  try {
-    SDK = await loadWebpackModule("./seeso/dist/seeso.js");
-    const SeesoClass = SDK?.default || SDK?.Seeso || SDK;
-    if (!SeesoClass) throw new Error("Seeso export not found from ./seeso/dist/seeso.js");
+async function preloadSDK() {
+  if (initPromise) return initPromise;
 
-    seeso = new SeesoClass();
-    window.__seeso = { SDK, seeso };
+  console.log("[Seeso] Starting Background Preload...");
+  initPromise = (async () => {
+    try {
+      setState("sdk", "loading");
+      SDK = await loadWebpackModule("./seeso/dist/seeso.js");
+      const SeesoClass = SDK?.default || SDK?.Seeso || SDK;
+      if (!SeesoClass) throw new Error("Seeso export not found");
 
-    setState("sdk", "constructed");
-    logI("sdk", "module loaded", { exportedKeys: Object.keys(SDK || {}) });
-    // [REMOVED] Intermediate Toast: "Spells Loaded!"
+      seeso = new SeesoClass();
+      window.__seeso = { SDK, seeso };
 
-  } catch (e) {
-    setState("sdk", "load_failed");
-    showRetry(true, "sdk load failed");
-    logE("sdk", "Failed to load ./seeso/dist/seeso.js", e);
-    if (window.updateLoadingProgress) window.updateLoadingProgress(0, "Spell Failed :(");
-    return false;
-  }
+      setState("sdk", "constructed");
 
-  // Bind callbacks before init
-  attachSeesoCallbacks();
+      // Bind callbacks early
+      attachSeesoCallbacks();
 
-  try {
-    // [REMOVED] Intermediate Toast: "Searching for Hero..."
-    const userStatusOption = SDK?.UserStatusOption
-      ? new SDK.UserStatusOption(true, true, true)
-      : { useAttention: true, useBlink: true, useDrowsiness: true };
+      // Initialize Engine
+      const userStatusOption = SDK?.UserStatusOption
+        ? new SDK.UserStatusOption(true, true, true)
+        : { useAttention: true, useBlink: true, useDrowsiness: true };
 
-    logI("sdk", "initializing", { userStatusOption });
+      logI("sdk", "initializing engine...");
+      const errCode = await seeso.initialize(LICENSE_KEY, userStatusOption);
 
-    // [REMOVED] Intermediate Toast: "Opening the Eye..."
-    const errCode = await seeso.initialize(LICENSE_KEY, userStatusOption);
-    logI("sdk", "initialize returned", { errCode });
+      if (errCode !== 0) {
+        setState("sdk", "init_failed");
+        throw new Error("Initialize returned: " + errCode);
+      }
 
-    if (errCode !== 0) {
-      setState("sdk", "init_failed");
-      showRetry(true, "sdk init failed");
-      logE("sdk", "initialize failed", { errCode });
-      if (window.updateLoadingProgress) window.updateLoadingProgress(0, "Hero Not Found :(");
-      return false;
+      setState("sdk", "initialized");
+      console.log("[Seeso] Preload Complete! Ready for Tracking.");
+      return true;
+    } catch (e) {
+      logE("sdk", "Preload Failed", e);
+      setState("sdk", "init_exception");
+      throw e;
     }
+  })();
 
-    setState("sdk", "initialized");
-    // [REMOVED] Intermediate Toast: "Focusing..."
+  return initPromise;
+}
+
+// Auto-start preload after short delay
+setTimeout(preloadSDK, 500);
+
+// Modified initSeeso (now just waits for preload)
+async function initSeeso() {
+  if (!initPromise) preloadSDK();
+  try {
+    await initPromise;
     return true;
   } catch (e) {
-    setState("sdk", "init_exception");
-    showRetry(true, "sdk init exception");
-    logE("sdk", "Exception during initialize()", e);
-    if (window.updateLoadingProgress) window.updateLoadingProgress(0, "Eye Closed :(");
     return false;
   }
 }
