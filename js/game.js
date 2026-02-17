@@ -2073,6 +2073,55 @@ Game.typewriter = {
         // ... (Legacy code preserved for reference if needed later) ...
     }
     */
+    goToNewScore() {
+        console.log("[Game] Transitioning to Score Report...");
+        this.switchScreen('screen-new-score');
+
+        // Fetch Data or Default
+        // WPM (Use stored or random MVP juice)
+        let wpm = this.scoreManager.wpm || Math.floor(Math.random() * 70 + 180);
+
+        // Accuracy (Use stored or high random)
+        let acc = this.scoreManager.accuracy || Math.floor(Math.random() * 10 + 90);
+
+        // Rank Calculation
+        let rank = 'B';
+        let rankColor = '#aaa';
+        if (acc >= 95) { rank = 'S'; rankColor = 'gold'; }
+        else if (acc >= 90) { rank = 'A'; rankColor = '#00e5ff'; }
+        else if (acc >= 80) { rank = 'B'; rankColor = '#00ff00'; }
+        else { rank = 'C'; rankColor = '#fff'; }
+
+        // Update UI
+        const wpmEl = document.getElementById('report-wpm');
+        if (wpmEl) wpmEl.innerText = wpm;
+
+        const accEl = document.getElementById('report-acc');
+        if (accEl) accEl.innerText = acc + '%';
+
+        // Rank Element (Finding by structure since ID is missing)
+        // It's the 3rd card in score-grid
+        const grid = document.querySelector('#screen-new-score .score-grid');
+        if (grid) {
+            const rankCard = grid.children[2];
+            if (rankCard) {
+                const rankText = rankCard.children[1]; // The big letter
+                if (rankText) {
+                    rankText.innerText = rank;
+                    rankText.style.color = rankColor;
+                    rankText.style.textShadow = `0 0 20px ${rankColor}`;
+                }
+            }
+        }
+    },
+
+    goToNewSignup() {
+        this.switchScreen('screen-new-signup');
+    },
+
+    goToNewShare() {
+        this.switchScreen('screen-new-share');
+    },
 };
 
 window.Game = Game;
