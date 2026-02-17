@@ -2194,14 +2194,46 @@ Game.typewriter = {
             btn.disabled = true;
         }
 
-        // 2. Store Data (Mock)
+        // Initialize Firebase if needed
+        if (window.firebase && window.FIREBASE_CONFIG && !firebase.apps.length) {
+            try {
+                firebase.initializeApp(window.FIREBASE_CONFIG);
+                console.log("[Firebase] Initialized");
+            } catch (e) {
+                console.error("[Firebase] Init Error:", e);
+            }
+        }
+
+        // Prepare Data
+        const score = (window.Game && window.Game.scoreManager) ? window.Game.scoreManager : {};
+        const wardenData = {
+            email: email,
+            wpm: score.wpm || 0,
+            ink: score.ink || 0,
+            runes: score.runes || 0,
+            gems: score.gems || 0,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            device: navigator.userAgent
+        };
+
+        // 2. Store Data (Firestore)
+        if (window.firebase) {
+            const db = firebase.firestore();
+            db.collection("wardens").add(wardenData)
+                .then((docRef) => {
+                    console.log("[Firebase] Document written with ID: ", docRef.id);
+                })
+                .catch((error) => {
+                    console.error("[Firebase] Error adding document: ", error);
+                    alert("Data Sync Warning: Could not save to cloud (Network Error?). Proceeding locally.");
+                });
+        }
+
         localStorage.setItem('warden_email', email);
         localStorage.setItem('chapter_1_unlocked', 'true');
 
-        // 3. Transition
+        // 3. Transition (Delayed)
         setTimeout(() => {
-            // alert(`Golden Key Bound!\n\nChapter 1 'The Rabbit Hole' is now accessible.\nWelcome, Warden.`);
-
             // [NEW] Transition to Social Share Screen
             if (typeof this.switchScreen === 'function') {
                 this.switchScreen('screen-new-share');
@@ -2214,9 +2246,6 @@ Game.typewriter = {
                     shareScreen.style.display = 'flex';
                 }
             }
-            // In a real app, redirect to chapter selection or lobby with unlocked state
-            // In a real app, redirect to chapter selection or lobby with unlocked state
-            // location.reload();
         }, 1500);
     },
 
