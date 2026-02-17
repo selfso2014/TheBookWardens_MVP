@@ -1,4 +1,4 @@
-class WardenManager {
+export class WardenManager {
     constructor(gameRef) {
         this.game = gameRef;
         this.email = localStorage.getItem('warden_email') || null;

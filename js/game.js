@@ -8,6 +8,9 @@ import { TextRenderer } from './TextRendererV2.js';
 import { WardenManager } from './managers/WardenManager.js';
 import { IntroManager } from './managers/IntroManager.js';
 import { VocabManager } from './managers/VocabManager.js';
+import { UIManager } from './core/UIManager.js';
+import { GameLogic } from './core/GameLogic.js';
+import { DOMManager } from './core/DOMManager.js';
 const Game = {
     // Initialized in init()
     scoreManager: null,
@@ -59,6 +62,16 @@ const Game = {
         this.vocabManager = new VocabManager(this);
         this.vocabManager.init(vocabList);
 
+        // [Moved UI Logic]
+        this.uiManager = new UIManager(this);
+
+        // [Moved Game Logic]
+        this.gameLogic = new GameLogic(this);
+
+        // [Moved DOM Bindings]
+        this.domManager = new DOMManager(this);
+        this.domManager.init();
+
         // 4. Session ID for Firebase
         this.sessionId = Math.random().toString(36).substring(2, 6).toUpperCase();
         console.log("Session ID:", this.sessionId);
@@ -92,7 +105,7 @@ const Game = {
         });
     },
 
-    // --- NEW: SDK Loading Feedback ---
+    // --- NEW: SDK Loading Feedback (Delegated) ---
     updateSDKProgress(progress, status) {
         // Init state if missing
         if (!this.state.sdkLoading) this.state.sdkLoading = { progress: 0, status: 'Idle', isReady: false };
@@ -101,53 +114,18 @@ const Game = {
         this.state.sdkLoading.status = status;
         this.state.sdkLoading.isReady = (progress >= 100);
 
-        // Update Modal if visible
-        const modal = document.getElementById("sdk-loading-modal");
-        if (modal && modal.style.display === "flex") {
-            const bar = modal.querySelector(".sdk-progress-bar");
-            const txt = modal.querySelector(".sdk-status-text");
-            if (bar) bar.style.width = `${progress}%`;
-            if (txt) txt.textContent = `${status} (${progress}%)`;
+        this.uiManager.updateLoadingProgress(progress, status);
+    },
 
-            // Auto-close if ready
-            if (this.state.sdkLoading.isReady) {
-                setTimeout(() => {
-                    modal.style.display = "none";
-                    // If we were waiting, retry the pending action (WPM selection)
-                    if (this.pendingWPMAction) {
-                        this.pendingWPMAction();
-                        this.pendingWPMAction = null;
-                    }
-                }, 500);
-            }
-        }
-        // ELSE: Show non-intrusive Toast feedback
-        else {
-            // Do NOT show "Connected" toast automatically to avoid overlap with Intro
-            if (progress < 100) {
-                this.showToast(`${status} (${progress}%)`, 2000);
-            }
+    onLoadingComplete() {
+        if (this.pendingWPMAction) {
+            this.pendingWPMAction();
+            this.pendingWPMAction = null;
         }
     },
 
     showToast(msg, duration = 3000) {
-        let toast = document.getElementById("game-toast");
-        if (!toast) {
-            toast = document.createElement("div");
-            toast.id = "game-toast";
-            document.body.appendChild(toast);
-        }
-
-        // Clear existing timer if updating
-        if (this.toastTimer) clearTimeout(this.toastTimer);
-
-        toast.textContent = msg;
-        toast.classList.add("show");
-
-        this.toastTimer = setTimeout(() => {
-            toast.classList.remove("show");
-            this.toastTimer = null;
-        }, duration);
+        this.uiManager.showToast(msg, duration);
     },
 
     onCalibrationFinish() {
@@ -160,35 +138,7 @@ const Game = {
     // --- Browser Detection Moved to IntroManager ---
 
     switchScreen(screenId) {
-        // [FIX] Force close overlay screens that might not be in SceneManager
-        // Added 'alice-battle-simple-container' and generic 'alice-screen'
-        const overlays = ['screen-new-share', 'screen-new-score', 'screen-final-boss', 'alice-final-screen', 'alice-battle-simple-container', 'alice-screen'];
-        overlays.forEach(id => {
-            const el = document.getElementById(id);
-            if (el && id !== screenId) {
-                el.style.display = 'none';
-                el.classList.remove('active');
-            }
-        });
-
-        if (this.sceneManager) {
-            this.sceneManager.show(screenId);
-        }
-
-        // [FIX] Ensure the new screen is clickable
-        const newScreen = document.getElementById(screenId);
-        if (newScreen) {
-            newScreen.style.pointerEvents = 'auto';
-            newScreen.style.zIndex = '9000'; // Make sure it's above canvas
-        }
-
-        if (screenId === "screen-read") {
-            // Reset Context Latching for new session to avoid carrying over old data
-            this.lastValidContext = null;
-
-            // [FIX] REMOVED typewriter.start() here to prevent resetting paragraph index.
-            // Screen transition handles layout, but game logic flows independently.
-        }
+        this.uiManager.switchScreen(screenId);
     },
 
     updateUI() {
@@ -292,162 +242,29 @@ const Game = {
         requestAnimationFrame(animate);
     },
 
-    // --- 1.2 WPM Selection ---
+    // --- 1.2 WPM Selection (Delegated) ---
     calculateWPMAttributes(wpm) {
-        // A. Constraints
-        let chunkSize = 4;
-        if (wpm <= 100) chunkSize = 3;
-        if (wpm >= 300) chunkSize = 6;
-
-        // B. Target Times (ms)
-        const msPerMinute = 60000;
-        // Target time for ONE chunk (including wait)
-        const targetChunkTotalTime = (msPerMinute / wpm) * chunkSize;
-
-        // C. System Constants (Overhead)
-        // 1. TextRenderer & EventLoop overhead (approx 200~250ms per chunk fixed cost)
-        const SYSTEM_BUFFER = 250;
-
-        // D. Snappy Interval Strategy (Top-Down)
-        // Instead of calculating interval from time, we FIX interval to be fast (50ms).
-        let interval = 50;
-
-        // E. Calculate Required Wait Time (Delay)
-        // Total = (Interval * Count) + Buffer + Delay
-        // Note: LINE_BREAK_AVG is removed because we handle it DYNAMICALLY in the tick() loop now.
-        let delay = targetChunkTotalTime - (interval * chunkSize) - SYSTEM_BUFFER;
-
-        // F. Adaptive Logic (High Speed Handling)
-        // If calculated delay is too short (< 150ms), we have no choice but to speed up interval further.
-        if (delay < 150) {
-            delay = 150; // Minimum pause for cognition
-            // Solve for Interval:
-            const availableRenderTime = targetChunkTotalTime - SYSTEM_BUFFER - 150;
-            interval = Math.floor(availableRenderTime / chunkSize);
-
-            // Safety: Min interval 20ms
-            if (interval < 20) interval = 20;
-        }
-
-        return { chunkSize, interval, delay: Math.floor(delay) };
+        return this.gameLogic.calculateWPMAttributes(wpm);
     },
 
     selectWPM(wpm, btnElement) {
-        // UI Reset
-        const buttons = document.querySelectorAll('.wpm-btn');
-        buttons.forEach(btn => {
-            btn.classList.remove('selected');
-            btn.style.borderColor = btn.style.borderColor.replace('1)', '0.3)');
-            btn.style.boxShadow = 'none';
-            btn.style.transform = 'scale(1)';
-        });
-
-        // UI Select
-        if (btnElement) {
-            btnElement.classList.add('selected');
-            btnElement.style.borderColor = btnElement.style.borderColor.replace('0.3', '1');
-            btnElement.style.boxShadow = `0 0 20px ${window.getComputedStyle(btnElement).color}`;
-            btnElement.style.transform = 'scale(1.05)';
-        }
-
-        this.wpm = wpm;
-
-        // [DSC Support] Re-render if currently reading? 
-        // For now, we assume this happens before reading. But if tweaked during reading:
-        if (Game.typewriter && Game.typewriter.renderer && Game.state.isTracking) {
-            // Optional: Trigger re-layout if live WPM change is needed
-            // const pIndex = Game.typewriter.currentParaIndex;
-            // const pData = Game.typewriter.paragraphs[pIndex];
-            // Game.typewriter.renderer.prepareDynamic({paragraphs:[pData]}, wpm);
-        }
-
-        // --- CORE LOGIC: Reverse Calculation for Exact Timing ---
-        this.wpmParams = this.calculateWPMAttributes(wpm);
-        Game.targetChunkSize = this.wpmParams.chunkSize;
-
-        console.log(`[Game] WPM Selected: ${wpm}`);
-        console.log(`[Game Logic] Params: Interval=${this.wpmParams.interval}ms, Delay=${this.wpmParams.delay}ms, Chunk=${this.wpmParams.chunkSize}`);
-
-        // Wait a bit then proceed
-        setTimeout(async () => {
-            // Check SDK Status (Optional guard)
-            if (this.state.sdkLoading && !this.state.sdkLoading.isReady) {
-                console.log("SDK not ready, showing modal...");
-                const modal = document.getElementById("sdk-loading-modal");
-                if (modal) modal.style.display = "flex";
-                // Retry logic could go here but let's assume it catches up or user waits
-                // Ideally we pause here. For now let's proceed to calibration screen which usually handles it.
-            }
-
-            // Ensure Tracking Init with Timeout (Max 3s)
-            if (this.trackingInitPromise) {
-                const timeout = new Promise(resolve => setTimeout(() => resolve(false), 3000));
-                try {
-                    await Promise.race([this.trackingInitPromise, timeout]);
-                } catch (e) {
-                    console.warn("[Game] Tracking init timeout or error", e);
-                }
-            }
-
-            this.switchScreen("screen-calibration");
-            setTimeout(() => {
-                let calStarted = false;
-                if (typeof window.startCalibrationRoutine === "function") {
-                    calStarted = window.startCalibrationRoutine();
-                }
-
-                if (!calStarted) {
-                    console.warn("[Game] Calibration failed to start, skipping to reading.");
-                    this.switchScreen("screen-read");
-                }
-            }, 500);
-
-        }, 500);
+        this.gameLogic.selectWPM(wpm, btnElement);
     },
 
-
-    // --- 1.5 Owl ---
+    // --- 1.5 Owl (Delegated) ---
     startOwlScene() {
-        this.state.isTracking = true;
-        this.state.isOwlTracker = true;
-        this.switchScreen("screen-owl");
-        // User Request: Make gaze dot transparent (invisible) but keep tracking active
-        if (typeof window.setGazeDotState === "function") {
-            window.setGazeDotState(false);
-        }
+        this.gameLogic.startOwlScene();
     },
 
     startReadingFromOwl() {
-        // Stop owl tracking and start reading
-        this.state.isOwlTracker = false;
-        this.switchScreen("screen-read");
-
-        // [FIX] Explicitly START the game engine here mostly ONCE.
-        if (this.typewriter && typeof this.typewriter.start === 'function') {
-            this.typewriter.start();
-        }
+        this.gameLogic.startReadingFromOwl();
     },
 
-    // --- 2. Reading Rift (Original Logic kept for reference, overlaid below) ---
-    startReadingSession_OLD() {
-        // ... existing logic ...
-    },
+    // --- 2. Reading Rift ---
+    // startReadingSession_OLD removed.
 
     confrontVillain() {
-        if (this.typewriter) this.typewriter.isPaused = true; // Stop typewriter logic
-        this.state.isTracking = false;
-
-        // [FIX] Clean up Reading Screen Artifacts
-        // 1. Hide Pang Markers (Clear Layer)
-        const pangLayer = document.getElementById("pang-marker-layer");
-        if (pangLayer) pangLayer.innerHTML = "";
-
-        // 2. Hide Reading Content (Prevent Flash/Ghosting on next load)
-        // By clearing this now, we ensure the next paragraph starts fresh without old text visible.
-        const bookContent = document.getElementById("book-content");
-        if (bookContent) bookContent.innerHTML = "";
-
-        this.switchScreen("screen-boss");
+        this.gameLogic.confrontVillain();
     },
 
     // Called by app.js (SeeSo overlay)
@@ -497,34 +314,7 @@ const Game = {
     // checkBoss(optionIndex) - DELETED (Deprecated feature: Direct call to Typewriter checkBossAnswer used instead)
 
 
-    // --- 4. Splash Screen Logic ---
-    dismissSplash() {
-        console.log("Splash Displayed. User interaction detected.");
-
-        // 1. Check In-App Browser IMMEDIATELY upon touch
-        if (this.isInAppBrowser()) {
-            // If In-App, redirect to System Browser (Chrome) immediately.
-            // This will reload the page in Chrome with ?skip_intro=1
-            this.openSystemBrowser();
-            return;
-        }
-
-        // 2. If Normal Browser, Transition to Lobby
-        // Audio interaction could go here
-
-        // Transition to Lobby
-        const splash = document.getElementById("screen-splash");
-        if (splash) {
-            splash.style.opacity = "0";
-            setTimeout(() => {
-                this.switchScreen("screen-home");
-                // Reset opacity for potential reuse or simply hide
-                splash.style.display = "none";
-            }, 500); // Match CSS transition if any, or just fast
-        } else {
-            this.switchScreen("screen-home");
-        }
-    },
+    // --- 4. Splash Screen Logic (Deprecated: IntroManager handles this) ---
 
     // --- NEW: Enriched Game Flow (Debug / Implementation) ---
     // --- NEW: Alice Battlefield Integration ---
@@ -573,22 +363,9 @@ const Game = {
     },
 
     // Utilities
+    // Utilities
     animateValue(id, start, end, duration, suffix = "") {
-        const obj = document.getElementById(id);
-        if (!obj) return;
-        let startTimestamp = null;
-        const step = (timestamp) => {
-            if (!startTimestamp) startTimestamp = timestamp;
-            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-            // Ease-out effect
-            const easeProgress = 1 - Math.pow(1 - progress, 3);
-
-            obj.innerHTML = Math.floor(easeProgress * (end - start) + start) + suffix;
-            if (progress < 1) {
-                window.requestAnimationFrame(step);
-            }
-        };
-        window.requestAnimationFrame(step);
+        this.uiManager.animateValue(id, start, end, duration, "", suffix);
     }
 };
 
@@ -1209,200 +986,22 @@ Game.typewriter = {
         }
     },
 
-    // [State] Simple Battle System
-    aliceBattleState: {
-        playerHp: 100,
-        villainHp: 100,
-        isPlayerTurn: true
-    },
+    // [State] Simple Battle System (Delegated to GameLogic)
 
     triggerFinalBossBattle() {
-        console.log("[Game] Alice Battle Mode Started (Target: #screen-alice-battle).");
-
-        // 1. Handle Blockers (Disable pointer events instead of removing)
-        const blockers = ['output', 'preview', 'calibration-overlay'];
-        blockers.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                // Keep element visible but pass-through clicks
-                el.style.pointerEvents = 'none';
-                // Ensure z-index is lower than battle screen
-                el.style.zIndex = '0';
-            }
-        });
-
-        const hud = document.getElementById('hud-top');
-        if (hud) hud.style.display = 'none';
-
-        // 2. Screen Switch
-        const allScreens = document.querySelectorAll('.screen');
-        allScreens.forEach(s => s.style.display = 'none');
-
-        // TARGET THE REAL SCREEN (Defined in index.html line ~1063)
-        const screen = document.getElementById("screen-alice-battle");
-
-        if (screen) {
-            screen.style.display = 'flex';
-            screen.classList.add('alice-battle-mode');
-            screen.style.opacity = '1';
-            screen.style.visibility = 'visible';
-            screen.style.backgroundColor = '#111';
-            screen.style.zIndex = '2147483647'; // Ensure top-most
-
-            // 3. Delayed Binding & Initialization
-            setTimeout(() => {
-                // Initialize Battle Module Logic
-                if (window.AliceBattleRef) {
-                    console.log("[Battle] AliceBattleRef FOUND. Calling init()...");
-
-                    // Expose to Game object for inline HTML handlers (if any remain active)
-                    if (window.Game) {
-                        window.Game.AliceBattle = window.AliceBattleRef;
-                    }
-
-                    // Canvas styling handled by CSS now (AliceBattle.css)
-                    const canvas = null; // document.getElementById('alice-canvas');
-                    if (canvas) {
-                        canvas.style.display = 'block';
-                        canvas.style.position = 'absolute';
-                        canvas.style.top = '0';
-                        canvas.style.left = '0';
-                        canvas.style.width = '100%';
-                        canvas.style.height = '100%';
-
-
-                        // Set resolution match
-                        canvas.width = window.innerWidth;
-                        canvas.height = window.innerHeight;
-                    }
-
-                    window.AliceBattleRef.init();
-
-                    // RE-APPLY POINTER EVENTS (Critical Fix)
-                    setTimeout(() => {
-                        const canvas = document.getElementById('alice-canvas');
-                        if (canvas) canvas.style.pointerEvents = 'none';
-
-                        const cards = screen.querySelectorAll('.warden .card');
-                        cards.forEach(c => {
-                            c.style.cursor = 'pointer';
-                            c.style.pointerEvents = 'auto';
-                        });
-
-                        // Ensure UI Container allows pass-through, but children take clicks
-                        const uiContainer = document.getElementById('alice-game-ui');
-                        if (uiContainer) {
-                            uiContainer.style.pointerEvents = 'none';
-                            const areas = uiContainer.querySelectorAll('.entity-area');
-                            areas.forEach(a => a.style.pointerEvents = 'auto');
-                        }
-                    }, 50);
-
-                } else {
-                    console.warn("[Battle] window.AliceBattleRef not found.");
-                }
-
-
-                // Force Event Binding (Safety Net)
-                const cards = screen.querySelectorAll('.warden .card');
-                console.log(`[Battle] Found ${cards.length} cards in REAL screen.`);
-
-                cards.forEach(card => {
-                    // Force interactive styles
-                    card.style.cursor = 'pointer';
-                    card.style.pointerEvents = 'auto'; // CRITICAL: Override parent's potential 'none'
-
-                    // We don't necessarily need to overwrite onclick if the module handles it,
-                    // but ensuring pointer-events is auto is crucial.
-                    // If the module's startBattle() attaches listeners or if HTML has onclick, we are good.
-                });
-
-                // Ensure the UI container allows clicks
-                const uiContainer = document.getElementById('alice-game-ui');
-                if (uiContainer) {
-                    uiContainer.style.pointerEvents = 'none'; // Container pass-through
-                    // But children (entity-area) need auto
-                    const areas = uiContainer.querySelectorAll('.entity-area');
-                    areas.forEach(area => area.style.pointerEvents = 'auto');
-                }
-
-            }, 100);
-
-        } else {
-            console.error("[Game] CRITICAL: #screen-alice-battle not found!");
-            return;
-        }
-
-        // 4. Reset Legacy State (Just in case)
-        this.aliceBattleState.playerHp = 100;
-        this.aliceBattleState.villainHp = 100;
-        this.aliceBattleState.isPlayerTurn = true;
-        this.updateBattleUI();
+        this.gameLogic.triggerFinalBossBattle();
     },
 
-
-
     updateBattleUI() {
-        const pBar = document.querySelector("#screen-final-boss .warden .hp");
-        if (pBar) pBar.style.width = `${this.aliceBattleState.playerHp}%`;
-        if (vBar) vBar.style.width = `${this.aliceBattleState.villainHp}%`;
+        this.gameLogic.updateBattleUI();
     },
 
     handleBattleAction(type) {
-        if (!this.aliceBattleState.isPlayerTurn) return;
-
-        // 1. Player Attack
-        console.log(`[Battle] Player used ${type}!`);
-        this.aliceBattleState.isPlayerTurn = false;
-
-        // Visual Feedback (Card Shake)
-        const cardIndex = ['ink', 'rune', 'gem'].indexOf(type);
-        const card = document.querySelectorAll("#screen-final-boss .warden .card")[cardIndex];
-        if (card) {
-            card.style.transform = "scale(0.9)";
-            setTimeout(() => card.style.transform = "scale(1)", 100);
-        }
-
-        // Damage Logic (Simplified)
-        let dmg = 20;
-        if (type === 'ink') dmg = 15; // Fast
-        if (type === 'rune') dmg = 25; // Strong
-        if (type === 'gem') dmg = 35; // Ultimate
-
-        this.aliceBattleState.villainHp = Math.max(0, this.aliceBattleState.villainHp - dmg);
-        this.updateBattleUI();
-
-        // 2. Check Win
-        if (this.aliceBattleState.villainHp <= 0) {
-            setTimeout(() => this.winBattle(), 500);
-            return;
-        }
-
-        // 3. Villain Turn (Simulated)
-        setTimeout(() => {
-            const vAction = document.querySelector("#screen-final-boss .villain .avatar");
-            if (vAction) {
-                vAction.style.transform = "scale(1.2)";
-                setTimeout(() => vAction.style.transform = "scale(1)", 200);
-            }
-
-            // Player takes minimal damage (scripted to win easily)
-            this.aliceBattleState.playerHp = Math.max(0, this.aliceBattleState.playerHp - 10);
-            this.updateBattleUI();
-            this.aliceBattleState.isPlayerTurn = true;
-        }, 800);
+        this.gameLogic.handleBattleAction(type);
     },
 
     winBattle() {
-        console.log("[Battle] VICTORY!");
-        // Visuals
-        const bossScreen = document.getElementById("screen-final-boss");
-        if (bossScreen) bossScreen.style.animation = "shake 0.5s ease-in-out";
-
-        // Delay then Score
-        setTimeout(() => {
-            Game.goToNewScore();
-        }, 1500);
+        this.gameLogic.winBattle();
     },
 
     /*
@@ -1411,123 +1010,7 @@ Game.typewriter = {
     }
     */
     goToNewScore() {
-        console.log("[Game] Transitioning to Score Report...");
-        this.switchScreen('screen-new-score');
-
-        // Scroll to Top Reset & Layout Fix
-        const screen = document.getElementById('screen-new-score');
-        if (screen) {
-            screen.scrollTop = 0;
-            screen.style.display = 'flex';
-            screen.style.flexDirection = 'column';
-            screen.style.justifyContent = 'space-between';
-
-            // [FIX] Ensure Score Screen is Clickable & On Top
-            screen.style.zIndex = "100000";
-            screen.style.pointerEvents = "auto";
-            screen.style.position = "absolute"; // or relative, depending on layout
-            screen.style.top = "0";
-            screen.style.left = "0";
-            screen.style.width = "100%";
-            screen.style.height = "100%";
-
-            // Force Input & Button interactive
-            const input = document.getElementById('warden-email');
-            if (input) {
-                input.style.pointerEvents = "auto";
-                input.style.zIndex = "100001";
-            }
-            const btn = document.querySelector('#bind-form button');
-            if (btn) {
-                // Just force styles, rely on inline onclick
-                btn.style.pointerEvents = "auto";
-                btn.style.zIndex = "100001";
-                btn.style.position = "relative";
-            }
-        }
-
-        // 1. Fetch Data (Direct Source: HUD Elements for Resources)
-        const score = this.scoreManager || {};
-
-        let wpm = score.wpm || 0;
-
-        // Read directly from HUD (The User's Reality)
-        const hudInk = document.getElementById('val-ink');
-        const hudRune = document.getElementById('val-rune');
-        const hudGem = document.getElementById('val-gem');
-
-        let ink = hudInk ? parseInt(hudInk.innerText) : (score.ink || 0);
-        let rune = hudRune ? parseInt(hudRune.innerText) : (score.runes || 0);
-        let gem = hudGem ? parseInt(hudGem.innerText) : (score.gems || 0);
-
-        // Demo Fallback (If HUD is empty or 0, maybe demo mode)
-        if (wpm === 0 && ink === 0 && rune === 0 && gem === 0) {
-            wpm = Math.floor(Math.random() * 50 + 150);
-            ink = 120; rune = 15; gem = 30;
-        }
-
-        // 2. Determine Rank
-        let rankText = 'Novice';
-        let rankColor = '#aaa';
-        // Simple logic based on WPM for now
-        if (wpm >= 250) { rankText = 'Master'; rankColor = 'gold'; }
-        else if (wpm >= 150) { rankText = 'Apprentice'; rankColor = '#00ff00'; }
-
-        // 3. Helper: Animate Value with Delay
-        const animateValue = (id, start, end, duration, prefix = "", suffix = "", startDelay = 0) => {
-            const obj = document.getElementById(id);
-            if (!obj) return;
-
-            setTimeout(() => {
-                let startTimestamp = null;
-                const step = (timestamp) => {
-                    if (!startTimestamp) startTimestamp = timestamp;
-                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                    // Easing (EaseOutQuad) for fun pop
-                    const ease = 1 - Math.pow(1 - progress, 3);
-                    const current = Math.floor(ease * (end - start) + start);
-
-                    obj.innerText = prefix + current.toLocaleString() + suffix;
-
-                    // Color shift effect for high scores
-                    if (progress > 0.8 && end > 0) {
-                        obj.style.textShadow = `0 0 10px ${rankColor}`;
-                    }
-
-                    if (progress < 1) {
-                        window.requestAnimationFrame(step);
-                    }
-                };
-                window.requestAnimationFrame(step);
-            }, startDelay);
-        };
-
-        // 4. Trigger Animations (Staggered for Fun)
-        animateValue("report-wpm", 0, wpm, 1500);
-
-        const rankEl = document.getElementById('report-rank-text');
-        if (rankEl) {
-            rankEl.innerText = rankText;
-            rankEl.style.color = rankColor;
-            // Delay Rank pop
-            setTimeout(() => {
-                rankEl.style.transition = "transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-                rankEl.style.transform = "scale(1.3)";
-            }, 800);
-            setTimeout(() => { rankEl.style.transform = "scale(1.0)"; }, 1200);
-        }
-
-        // Resources (Parallel Start)
-        animateValue("report-ink-count", 0, ink, 1000, "", "");
-        animateValue("report-ink-score", 0, ink * 10, 1500, "+", "");
-
-        animateValue("report-rune-count", 0, rune, 1000, "", "", 200);
-        animateValue("report-rune-score", 0, rune * 100, 1500, "+", "", 200);
-
-        animateValue("report-gem-count", 0, gem, 1000, "", "", 400);
-        animateValue("report-gem-score", 0, gem * 500, 1500, "+", "", 400);
-
-
+        this.gameLogic.goToNewScore();
     },
 
     bindKeyAndUnlock_V2() {
@@ -1546,11 +1029,11 @@ Game.typewriter = {
     },
 
     goToNewSignup() {
-        this.switchScreen('screen-new-signup');
+        this.gameLogic.goToNewSignup();
     },
 
     goToNewShare() {
-        this.switchScreen('screen-new-share');
+        this.gameLogic.goToNewShare();
     },
 };
 

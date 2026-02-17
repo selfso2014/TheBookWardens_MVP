@@ -389,7 +389,7 @@
     </header>
 
     <!-- SCREEN 0: SPLASH / TITLE -->
-    <section id="screen-splash" class="screen active" onclick="Game.dismissSplash()">
+    <section id="screen-splash" class="screen active">
       <div
         style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
         <img src="./Main_Intro.png" alt="The Book Wardens"
@@ -475,7 +475,7 @@
 
       <div style="display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 320px;">
         <!-- Novice: Cyan (Mystical/Beginner) -->
-        <button class="btn-secondary wpm-btn" onclick="Game.selectWPM(100, this)"
+        <button class="btn-secondary wpm-btn" data-wpm="100"
           style="padding: 20px; text-align: left; background: linear-gradient(90deg, rgba(0, 229, 255, 0.05), transparent); border: 1px solid rgba(0, 229, 255, 0.3); color: #00e5ff; transition: all 0.3s; box-shadow: 0 0 10px rgba(0, 229, 255, 0.05);">
           <span style="display:flex; justify-content: space-between; align-items: center;">
             <span
@@ -493,7 +493,7 @@
         </button>
 
         <!-- Apprentice: Amethyst (Magic/Intermediate) -->
-        <button class="btn-secondary wpm-btn" onclick="Game.selectWPM(200, this)"
+        <button class="btn-secondary wpm-btn" data-wpm="200"
           style="padding: 20px; text-align: left; background: linear-gradient(90deg, rgba(213, 0, 249, 0.05), transparent); border: 1px solid rgba(213, 0, 249, 0.3); color: #e040fb; transition: all 0.3s; box-shadow: 0 0 10px rgba(213, 0, 249, 0.05);">
           <span style="display:flex; justify-content: space-between; align-items: center;">
             <span
@@ -511,7 +511,7 @@
         </button>
 
         <!-- Master: Gold (Legendary/Fast) -->
-        <button class="btn-secondary wpm-btn" onclick="Game.selectWPM(300, this)"
+        <button class="btn-secondary wpm-btn" data-wpm="300"
           style="padding: 20px; text-align: left; background: linear-gradient(90deg, rgba(255, 215, 0, 0.05), transparent); border: 1px solid rgba(255, 215, 0, 0.3); color: #ffd700; transition: all 0.3s; box-shadow: 0 0 10px rgba(255, 215, 0, 0.05);">
           <span style="display:flex; justify-content: space-between; align-items: center;">
             <span
@@ -544,9 +544,9 @@
         <p style="color: #bbb; margin-bottom: 20px;">"The <b>luminous</b> mushroom lit up the dark cave."</p>
 
         <div id="vocab-options">
-          <button class="option-btn" onclick="Game.checkVocab(0)">A. Very heavy and dark</button>
-          <button class="option-btn" onclick="Game.checkVocab(1)">B. Full of light / Shining</button>
-          <button class="option-btn" onclick="Game.checkVocab(2)">C. Related to the moon</button>
+          <button class="option-btn" data-index="0">A. Very heavy and dark</button>
+          <button class="option-btn" data-index="1">B. Full of light / Shining</button>
+          <button class="option-btn" data-index="2">C. Related to the moon</button>
         </div>
       </div>
     </section>
@@ -570,7 +570,7 @@
         </div>
       </div>
 
-      <button class="btn-primary" onclick="Game.startReadingFromOwl()" style="margin-top: 60px;">
+      <button id="btn-owl-start" class="btn-primary" style="margin-top: 60px;">
         Follow the Rabbit
       </button>
     </section>
@@ -678,7 +678,7 @@
       </div>
 
       <button id="btn-confront-villain" class="btn-primary"
-        style="display: none; margin-top: 30px; background: #ff4444; width: 100%;" onclick="Game.confrontVillain()">
+        style="display: none; margin-top: 30px; background: #ff4444; width: 100%;">
         Confront the Ink Shadow
       </button>
     </section>
@@ -779,7 +779,7 @@
       </div>
 
       <!-- Click to Win Trigger Overlay (Functionality Placeholder) -->
-      <div onclick="Game.endFinalBossDummy()"
+      <div id="dummy-overlay-removed"
         style="position:absolute; top:0; left:0; width:100%; height:100%; z-index: 1000; cursor: pointer;"
         title="Click to Proceed (Dummy Mode)"></div>
 
@@ -794,7 +794,7 @@
 
       <p style="color: gold; margin-bottom: 30px;">"You are a true Warden of Words."</p>
 
-      <button class="btn-primary" onclick="Game.typewriter.showFullTextReview()">Review Reading</button>
+      <button id="btn-review" class="btn-primary">Review Reading</button>
     </section>
 
     <!-- SCREEN 5: VICTORY / STATS REVIEW -->
@@ -848,9 +848,8 @@
 
       <!-- Action Buttons -->
       <div style="display:flex; gap:15px; margin-top: 10px; z-index: 10;">
-        <button class="btn-primary" onclick="Game.typewriter.showSummaryShare()">Share Victory</button>
-        <button class="btn-primary" style="background:#444;"
-          onclick="if(window.gazeDataManager) window.gazeDataManager.exportCSV()">Export Data</button>
+        <button id="btn-share-summary" class="btn-primary">Share Victory</button>
+        <button id="btn-export" class="btn-primary" style="background:#444;">Export Data</button>
       </div>
     </section>
 
@@ -862,8 +861,8 @@
         <img src="./alice_summary_card.png" alt="Summary Card" style="width: 100%; border-radius: 5px; display: block;">
       </div>
       <div style="display: flex; gap: 15px;">
-        <button class="btn-primary" onclick="Game.typewriter.shareResult()">Share to Friends</button>
-        <button class="btn-primary" style="background: #555;" onclick="location.reload()">Home</button>
+        <button id="btn-share-final" class="btn-primary">Share to Friends</button>
+        <button id="btn-home" class="btn-primary" style="background: #555;">Home</button>
       </div>
     </section>
 
@@ -941,7 +940,7 @@
           <input type="email" id="warden-email" placeholder="Enter Email to Claim Reward"
             style="width: 100%; padding: 12px; margin-bottom: 10px; background: rgba(255,255,255,0.05); border: 1px solid #555; color: #fff; border-radius: 5px; text-align: center; font-size: 1rem;">
 
-          <button onclick="if(window.WardenManager) new window.WardenManager(window.Game).bindWarden();"
+          <button id="btn-claim-reward"
             style="width:100%; height: 50px; background:#ffd700; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size: 1.1rem; box-shadow: 0 0 15px rgba(255,215,0,0.5); transition: transform 0.1s;">
             CLAIM REWARD
           </button>
@@ -968,11 +967,10 @@
           I agree to receive the Warden's chronicles (Newsletter)
         </label>
 
-        <button class="btn-primary" onclick="Game.goToNewShare()"
-          style="width: 100%; margin-bottom: 15px; font-size: 1.2rem;">
+        <button id="btn-signup-now" class="btn-primary" style="width: 100%; margin-bottom: 15px; font-size: 1.2rem;">
           Sign Up Now
         </button>
-        <button onclick="Game.goToNewShare()"
+        <button id="btn-signup-skip"
           style="background: transparent; border: none; color: #666; cursor: pointer; text-decoration: underline;">
           Skip for now
         </button>
@@ -1051,8 +1049,7 @@
         <span style="font-size: 1.2rem;">🔗</span> Copy Game Link
       </button>
 
-      <button class="btn-primary"
-        onclick="document.getElementById('screen-new-share').style.display='none'; Game.switchScreen('screen-home'); location.reload();">
+      <button id="btn-return-lobby" class="btn-primary">
         Return to Lobby
       </button>
     </section>
@@ -1182,21 +1179,21 @@
 
         <!-- Warden Cards (No Avatar) -->
         <div class="card-container" style="display: flex; gap: 15px; justify-content: center;">
-          <div id="card-ink" class="card" onclick="window.AliceBattleRef.triggerAttack('ink')"
+          <div id="card-ink" class="card"
             style="cursor: pointer; border-radius: 12px; border: 1px solid #b300ff; background: rgba(20, 0, 40, 0.85); box-shadow: 0 4px 12px rgba(179, 0, 255, 0.3); transition: transform 0.1s, box-shadow 0.1s;">
             <img src="./ink.png"
               style="width: 30px; height: 30px; margin-bottom: 5px; filter: drop-shadow(0 0 5px cyan);">
             <span>INK</span>
             <div class="power-val" id="val-ink">190</div>
           </div>
-          <div id="card-rune" class="card" onclick="window.AliceBattleRef.triggerAttack('rune')"
+          <div id="card-rune" class="card"
             style="cursor: pointer; border-radius: 12px; border: 1px solid #00f2ff; background: rgba(0, 40, 40, 0.85); box-shadow: 0 4px 12px rgba(0, 242, 255, 0.3); transition: transform 0.1s, box-shadow 0.1s;">
             <img src="./rune.png"
               style="width: 30px; height: 30px; margin-bottom: 5px; filter: drop-shadow(0 0 5px cyan);">
             <span>RUNE</span>
             <div class="power-val" id="val-rune">30</div>
           </div>
-          <div id="card-gem" class="card" onclick="window.AliceBattleRef.triggerAttack('gem')"
+          <div id="card-gem" class="card"
             style="cursor: pointer; border-radius: 12px; border: 1px solid #ffffff; background: rgba(40, 40, 50, 0.85); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3); transition: transform 0.1s, box-shadow 0.1s;">
             <img src="./gem.png"
               style="width: 30px; height: 30px; margin-bottom: 5px; filter: drop-shadow(0 0 5px cyan);">
@@ -1216,7 +1213,7 @@
       <div id="story-display" class="story-container"
         style="max-width: 600px; text-align: center; color: #ddd; font-family: serif; font-size: 1.2rem; line-height: 1.6; padding: 20px;">
       </div>
-      <button id="alice-restart-btn" onclick="window.AliceBattleRef.init()"
+      <button id="alice-restart-btn"
         style="margin-top: 30px; padding: 10px 25px; background: transparent; border: 1px solid #555; color: #fff; cursor: pointer; transition: all 0.3s; font-family: 'Cinzel', serif;">
         Play Again
       </button>
@@ -1228,18 +1225,10 @@
   <script type="module" src="./js/app.js?v=CLOSURE_FIX"></script>
   <!-- Alice Battle Logic (Simplifed Global) -->
   <script src="./js/alice-battle-simple.js?v=Alice_Battle_Conquest_V31_ScorchedDefeat"></script>
-  <script>
-    // Ensure Game.AliceBattle is linked if needed
-    window.addEventListener('load', () => {
-      if (window.Game && window.AliceBattleRef) {
-        window.Game.AliceBattle = window.AliceBattleRef;
-        console.log("Linked Game.AliceBattle to AliceBattleRef");
-      }
-    });
-  </script>
+  <!-- Linked Game.AliceBattle to AliceBattleRef Logic moved to GameLogic -->
   <!-- 2. Game Logic -->
   <script src="./js/calibration.js?v=DEBUG_FORCE_INIT"></script>
-  <script src="./js/managers/WardenManager.js?v=GLOBAL_WARDEN_V2"></script>
+  <!-- WardenManager removed (Imported by game.js) -->
   <script type="module" src="./js/game.js?v=GLOBAL_WARDEN_V2"></script>
 
   <!-- 3. Explicit Event Binding for Debug Button (With STANDALONE BATTLE LOGIC) -->
