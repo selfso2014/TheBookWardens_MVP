@@ -587,12 +587,12 @@
 
                     // FIXED POSITIONING (Force Visibility)
                     parentBar.style.position = 'absolute';
-                    parentBar.style.top = '25%'; // Below Villain Image
+                    parentBar.style.top = '36%'; // Between Villain and Text
                     parentBar.style.left = '50%';
                     parentBar.style.transform = 'translateX(-50%)';
-                    parentBar.style.width = '80%';
-                    parentBar.style.zIndex = '950'; // Very high
-                    parentBar.style.marginTop = '0'; // Clear previous margin
+                    parentBar.style.width = '90%'; // Wider
+                    parentBar.style.zIndex = '950';
+                    parentBar.style.marginTop = '0';
                     parentBar.style.boxShadow = '0 0 15px rgba(0,0,0,0.8)';
                     parentBar.style.overflow = 'visible';
 
@@ -602,24 +602,24 @@
                         wLbl.className = 'lbl-warden';
                         wLbl.innerText = "WARDEN";
                         wLbl.style.position = 'absolute';
-                        wLbl.style.left = '-80px';
-                        wLbl.style.top = '0';
+                        wLbl.style.left = '0'; // Inside or close
+                        wLbl.style.top = '-20px'; // Above bar
                         wLbl.style.color = '#2962FF';
                         wLbl.style.fontWeight = 'bold';
-                        wLbl.style.lineHeight = '24px';
+                        wLbl.style.fontSize = '0.8rem'; // Small
                         wLbl.style.fontFamily = 'Cinzel, serif';
                         wLbl.style.textShadow = '0 0 5px #000';
                         parentBar.appendChild(wLbl);
 
                         const vLbl = document.createElement('div');
                         vLbl.className = 'lbl-villain';
-                        vLbl.innerText = "FINAL VILLAIN";
+                        vLbl.innerText = "VILLAIN";
                         vLbl.style.position = 'absolute';
-                        vLbl.style.right = '-110px';
-                        vLbl.style.top = '0';
+                        vLbl.style.right = '0'; // Inside or close
+                        vLbl.style.top = '-20px'; // Above bar
                         vLbl.style.color = '#D50000';
                         vLbl.style.fontWeight = 'bold';
-                        vLbl.style.lineHeight = '24px';
+                        vLbl.style.fontSize = '0.8rem'; // Small
                         vLbl.style.fontFamily = 'Cinzel, serif';
                         vLbl.style.textShadow = '0 0 5px #000';
                         parentBar.appendChild(vLbl);
@@ -629,19 +629,25 @@
                 // Adjust Layout compactness
                 const villainArea = container.querySelector('.entity-area.villain');
                 if (villainArea) {
-                    villainArea.style.height = '30vh'; // Reduce slightly
+                    villainArea.style.height = '35vh'; // Give space
                     villainArea.style.minHeight = '200px';
                 }
 
                 // Move Text Field Up (Remove Gap)
                 if (ui.textField) {
-                    // Reset margin/padding to pull it up
-                    ui.textField.parentElement.style.marginTop = '0px';
-                    ui.textField.parentElement.style.paddingTop = '10vh'; // Push down just enough below HP Bar
-                    ui.textField.parentElement.style.zIndex = '800';
+                    const tfParent = ui.textField.parentElement;
+                    tfParent.style.marginTop = '0';
+                    tfParent.style.paddingTop = '60px'; // Space for Bar
+                    tfParent.style.zIndex = '800';
+
+                    // WIDER TEXT FIELD
+                    ui.textField.style.width = '120%';
+                    ui.textField.style.marginLeft = '-10%'; // Center alignment
+                    ui.textField.style.minHeight = '300px'; // More lines (~7 lines)
                 }
 
                 if (ui.wardenHp) ui.wardenHp.parentElement.style.display = 'none';
+
                 if (ui.gameUi) ui.gameUi.style.opacity = '1';
                 if (ui.finalScreen) {
                     ui.finalScreen.style.display = 'none';
@@ -654,8 +660,8 @@
                 const vCards = container.querySelector('.villain-cards');
                 if (vCards) {
                     vCards.style.transform = 'scale(0.8)';
-                    vCards.style.transformOrigin = 'top center';
-                    vCards.style.marginTop = '-20px'; // Pull up
+                    vCards.style.transformOrigin = 'bottom center'; // Anchor to bottom
+                    vCards.style.marginTop = '0';
                 }
 
                 initTextBattlefield();
