@@ -659,37 +659,37 @@
                     ui.textField.style.maxHeight = '150px'; // FIXED
                     ui.textField.style.overflowY = 'auto'; // SCROLLABLE
                 }
-            }
+
 
                 if (ui.wardenHp) ui.wardenHp.parentElement.style.display = 'none';
 
-            if (ui.gameUi) ui.gameUi.style.opacity = '1';
-            if (ui.finalScreen) {
-                ui.finalScreen.style.display = 'none';
-                ui.finalScreen.style.opacity = '0';
-            }
+                if (ui.gameUi) ui.gameUi.style.opacity = '1';
+                if (ui.finalScreen) {
+                    ui.finalScreen.style.display = 'none';
+                    ui.finalScreen.style.opacity = '0';
+                }
 
-            cardValues.ink = 190; cardValues.rune = 30; cardValues.gem = 50;
+                cardValues.ink = 190; cardValues.rune = 30; cardValues.gem = 50;
 
-            // Compact Villain Cards
-            const vCards = container.querySelector('.villain-cards');
-            if (vCards) {
-                vCards.style.transform = 'scale(0.8)';
-                vCards.style.transformOrigin = 'bottom center'; // Anchor to bottom
-                vCards.style.marginTop = '0';
-            }
+                // Compact Villain Cards
+                const vCards = container.querySelector('.villain-cards');
+                if (vCards) {
+                    vCards.style.transform = 'scale(0.8)';
+                    vCards.style.transformOrigin = 'bottom center'; // Anchor to bottom
+                    vCards.style.marginTop = '0';
+                }
 
-            initTextBattlefield();
-            updateCardDisplay();
+                initTextBattlefield();
+                updateCardDisplay();
 
-            if (animFrameId) cancelAnimationFrame(animFrameId);
-            animateLoop(); // Loop runs but does nothing if paused
+                if (animFrameId) cancelAnimationFrame(animFrameId);
+                animateLoop(); // Loop runs but does nothing if paused
 
-            // SHOW INTRO MODAL
-            showIntroModal();
+                // SHOW INTRO MODAL
+                showIntroModal();
 
-        } catch(e) { console.error(e); }
-    },
+            } catch (e) { console.error(e); }
+        },
 
         triggerAttack: function (type) {
             if (gameState !== 'playing' || cardValues[type] <= 0) return;
@@ -765,82 +765,82 @@
             lastVillainAttackTime = Date.now(); // Reset villain timer
         },
 
-    triggerVillainAttack: function () {
-        if (gameState !== 'playing') return;
+        triggerVillainAttack: function () {
+            if (gameState !== 'playing') return;
 
-        // Decide Attack Type
-        const rand = Math.random();
-        let type = 'joker'; let cardId = 'v-card-joker'; let color = '#ff00aa';
-        if (rand > 0.6) { type = 'king'; cardId = 'v-card-king'; color = '#ff0055'; }
-        if (rand > 0.9) { type = 'queen'; cardId = 'v-card-queen'; color = '#ff0000'; }
+            // Decide Attack Type
+            const rand = Math.random();
+            let type = 'joker'; let cardId = 'v-card-joker'; let color = '#ff00aa';
+            if (rand > 0.6) { type = 'king'; cardId = 'v-card-king'; color = '#ff0055'; }
+            if (rand > 0.9) { type = 'queen'; cardId = 'v-card-queen'; color = '#ff0000'; }
 
-        const sourceEl = document.getElementById(cardId) || document.getElementById('villain-visual-container');
-        const targetChars = getTargetCharsForVillain(type);
+            const sourceEl = document.getElementById(cardId) || document.getElementById('villain-visual-container');
+            const targetChars = getTargetCharsForVillain(type);
 
-        // Visual Tell
-        if (document.getElementById(cardId)) {
-            const cEl = document.getElementById(cardId);
-            cEl.style.boxShadow = `0 0 20px 10px ${color}`;
-            setTimeout(() => cEl.style.boxShadow = 'none', 500);
-        }
+            // Visual Tell
+            if (document.getElementById(cardId)) {
+                const cEl = document.getElementById(cardId);
+                cEl.style.boxShadow = `0 0 20px 10px ${color}`;
+                setTimeout(() => cEl.style.boxShadow = 'none', 500);
+            }
 
-        // NO LOGGING
+            // NO LOGGING
 
-        const sBox = sourceEl.getBoundingClientRect();
-        let startX = sBox.left + sBox.width / 2;
-        let startY = sBox.bottom - 50;
+            const sBox = sourceEl.getBoundingClientRect();
+            let startX = sBox.left + sBox.width / 2;
+            let startY = sBox.bottom - 50;
 
-        // FALLBACK FOR VILLAIN SOURCE
-        if (sBox.width === 0 && sBox.height === 0) {
-            startX = window.innerWidth / 2;
-            startY = 100; // Top Center fallback
-        }
+            // FALLBACK FOR VILLAIN SOURCE
+            if (sBox.width === 0 && sBox.height === 0) {
+                startX = window.innerWidth / 2;
+                startY = 100; // Top Center fallback
+            }
 
-        // If no letters to corrupt, we just wait (or could shake the screen)
-        if (targetChars.length === 0) {
-            // No target logic needed, victory is handled by updateVillainHP
-            return;
-        }
+            // If no letters to corrupt, we just wait (or could shake the screen)
+            if (targetChars.length === 0) {
+                // No target logic needed, victory is handled by updateVillainHP
+                return;
+            }
 
-        // Corrupt Text
-        targetChars.forEach((charEl, idx) => {
-            setTimeout(() => {
-                const tBox = charEl.getBoundingClientRect();
-                let targetX = tBox.left + tBox.width / 2;
-                let targetY = tBox.top + tBox.height / 2;
-
-                // FALLBACK FOR TARGET
-                if (tBox.width === 0 && tBox.height === 0) {
-                    targetX = window.innerWidth / 2 + (Math.random() - 0.5) * 200;
-                    targetY = window.innerHeight / 2 + (Math.random() - 0.5) * 100;
-                }
-
-                lightnings.push(new Lightning(startX, startY, targetX, targetY, false, 0, color));
-
+            // Corrupt Text
+            targetChars.forEach((charEl, idx) => {
                 setTimeout(() => {
-                    changeCharState(charEl, 'gray');
-                    updateVillainHP();
-                }, 150);
+                    const tBox = charEl.getBoundingClientRect();
+                    let targetX = tBox.left + tBox.width / 2;
+                    let targetY = tBox.top + tBox.height / 2;
 
-            }, idx * 30);
-        });
-    }
-};
+                    // FALLBACK FOR TARGET
+                    if (tBox.width === 0 && tBox.height === 0) {
+                        targetX = window.innerWidth / 2 + (Math.random() - 0.5) * 200;
+                        targetY = window.innerHeight / 2 + (Math.random() - 0.5) * 100;
+                    }
 
-// Alias
-window.AliceBattle = window.AliceBattleRef;
+                    lightnings.push(new Lightning(startX, startY, targetX, targetY, false, 0, color));
 
-// AUTO-LINKER
-const linkInterval = setInterval(() => {
-    if (window.Game && window.AliceBattleRef) {
-        if (window.Game.AliceBattle !== window.AliceBattleRef) {
-            window.Game.AliceBattle = window.AliceBattleRef;
+                    setTimeout(() => {
+                        changeCharState(charEl, 'gray');
+                        updateVillainHP();
+                    }, 150);
+
+                }, idx * 30);
+            });
         }
-    }
-    const debugBtn = document.getElementById('btn-debug-alice');
-    if (debugBtn && !debugBtn.onclick) {
-        debugBtn.onclick = function () { window.AliceBattleRef.init(); };
-    }
-}, 1000);
+    };
 
-}) ();
+    // Alias
+    window.AliceBattle = window.AliceBattleRef;
+
+    // AUTO-LINKER
+    const linkInterval = setInterval(() => {
+        if (window.Game && window.AliceBattleRef) {
+            if (window.Game.AliceBattle !== window.AliceBattleRef) {
+                window.Game.AliceBattle = window.AliceBattleRef;
+            }
+        }
+        const debugBtn = document.getElementById('btn-debug-alice');
+        if (debugBtn && !debugBtn.onclick) {
+            debugBtn.onclick = function () { window.AliceBattleRef.init(); };
+        }
+    }, 1000);
+
+})();
