@@ -131,12 +131,26 @@ const Game = {
     // --- Browser Detection Moved to IntroManager ---
 
     switchScreen(screenId) {
-        this.uiManager.switchScreen(screenId);
+        // [FIX] Ensure clean state transition
+        document.querySelectorAll('.screen').forEach(el => {
+            el.classList.remove('active');
+            el.style.display = 'none';
+        });
+
+        const target = document.getElementById(screenId);
+        if (target) {
+            target.style.display = 'flex'; // Force flex
+            // Use timeout to allow display change to register before adding class (for transitions)
+            requestAnimationFrame(() => {
+                target.classList.add('active');
+            });
+        }
 
         // [FIX] HUD Visibility Control
         const topHud = document.querySelector(".hud-container");
         if (topHud) {
-            if (screenId === "screen-new-score" || screenId === "screen-home") {
+            // Hide HUD on Score and Share screens
+            if (screenId === "screen-new-score" || screenId === "screen-home" || screenId === "screen-new-share") {
                 topHud.style.opacity = "0";
                 topHud.style.pointerEvents = "none";
             } else {
