@@ -52,6 +52,19 @@ export class IntroManager {
     }
 
     // --- Rift Intro Sequence (Cinematic 20s) ---
+    // --- Rift Intro Sequence (Cinematic 20s) ---
+    // Alias for Game Proxy call
+    dismissSplash() {
+        // 1. Check In-App Browser (Critical for Eye Tracking)
+        if (this.isInAppBrowser()) {
+            this.openSystemBrowser();
+            return;
+        }
+
+        // 2. Start Intro
+        this.startRiftIntro();
+    }
+
     async startRiftIntro() {
         console.log("[IntroManager] Starting Rift Intro Sequence...");
 

@@ -1,16 +1,16 @@
-import { storyParagraphs } from './data/StoryContent.js?v=1';
-import { storyChapter1 } from './data/StoryContent_Dynamic.js?v=1';
-import { vocabList, midBossQuizzes, finalBossQuiz } from './data/QuizData.js?v=1';
-import { ScoreManager } from './managers/ScoreManager.js?v=1';
-import { SceneManager } from './managers/SceneManager.js?v=1';
-import { bus } from './core/EventBus.js?v=1';
-import { TextRenderer } from './TextRendererV2.js?v=1';
-import { WardenManager } from './managers/WardenManager.js?v=1';
-import { IntroManager } from './managers/IntroManager.js?v=2'; // Force Update
-import { VocabManager } from './managers/VocabManager.js?v=1';
-import { UIManager } from './core/UIManager.js?v=1';
-import { GameLogic } from './core/GameLogic.js?v=1';
-import { DOMManager } from './core/DOMManager.js?v=1';
+import { storyParagraphs } from './data/StoryContent.js?v=2';
+import { storyChapter1 } from './data/StoryContent_Dynamic.js?v=2';
+import { vocabList, midBossQuizzes, finalBossQuiz } from './data/QuizData.js?v=2';
+import { ScoreManager } from './managers/ScoreManager.js?v=2';
+import { SceneManager } from './managers/SceneManager.js?v=2';
+import { bus } from './core/EventBus.js?v=2';
+import { TextRenderer } from './TextRendererV2.js?v=2';
+import { WardenManager } from './managers/WardenManager.js?v=2';
+import { IntroManager } from './managers/IntroManager.js?v=2';
+import { VocabManager } from './managers/VocabManager.js?v=2';
+import { UIManager } from './core/UIManager.js?v=2';
+import { GameLogic } from './core/GameLogic.js?v=2';
+import { DOMManager } from './core/DOMManager.js?v=2';
 const Game = {
     // Initialized in init()
     scoreManager: null,
