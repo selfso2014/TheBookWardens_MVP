@@ -487,7 +487,7 @@
 
         // Story Text
         const p = document.createElement('p');
-        p.innerHTML = "You have traveled far, Warden.<br>Now, face the <b>Red Queen</b>!<br><br>She is trying to erase the story.<br>Use your magic to bring the words back!";
+        p.innerHTML = "You have traveled far, Warden.<br>Now, face <b>the Final Villain</b>!<br><br>It is trying to erase the story.<br>Use your magic to bring the words back!";
         p.style.fontSize = '1.1rem';
         p.style.lineHeight = '1.6';
         p.style.color = '#ddd';
@@ -586,7 +586,8 @@
                     parentBar.style.height = '24px';
                     parentBar.style.position = 'relative'; // For labels
                     parentBar.style.overflow = 'visible'; // Allow labels outside
-                    parentBar.style.marginTop = '60px'; // MOVE DOWN 4.
+                    parentBar.style.marginTop = '80px'; // MOVE DOWN MORE
+                    parentBar.style.zIndex = '900'; // FORCE ON TOP
 
                     // Add Labels if missing
                     if (!parentBar.querySelector('.lbl-warden')) {
@@ -604,7 +605,7 @@
 
                         const vLbl = document.createElement('div');
                         vLbl.className = 'lbl-villain';
-                        vLbl.innerText = "FINAL BOSS";
+                        vLbl.innerText = "FINAL VILLAIN";
                         vLbl.style.position = 'absolute';
                         vLbl.style.right = '-110px';
                         vLbl.style.top = '0';
@@ -618,7 +619,8 @@
 
                 // Move Text Field Down
                 if (ui.textField) {
-                    ui.textField.parentElement.style.marginTop = '40px';
+                    ui.textField.parentElement.style.marginTop = '100px';
+                    ui.textField.parentElement.style.zIndex = '800'; // Lower than HP bar
                 }
 
                 if (ui.wardenHp) ui.wardenHp.parentElement.style.display = 'none';
