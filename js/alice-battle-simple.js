@@ -425,6 +425,108 @@
         animFrameId = requestAnimationFrame(animateLoop);
     }
 
+    function showIntroModal() {
+        const container = document.getElementById('screen-alice-battle');
+        if (!container) return;
+
+        // Check if modal already exists
+        let modal = document.getElementById('alice-intro-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            return;
+        }
+
+        modal = document.createElement('div');
+        modal.id = 'alice-intro-modal';
+        modal.style.position = 'absolute';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.backgroundColor = 'rgba(0,0,0,0.85)';
+        modal.style.zIndex = '500';
+        modal.style.display = 'flex';
+        modal.style.flexDirection = 'column';
+        modal.style.justifyContent = 'center';
+        modal.style.alignItems = 'center';
+        modal.style.backdropFilter = 'blur(5px)';
+        modal.style.opacity = '0';
+        modal.style.transition = 'opacity 0.5s';
+
+        const card = document.createElement('div');
+        card.style.background = 'linear-gradient(135deg, #1a0505 0%, #000 100%)';
+        card.style.border = '2px solid #D50000';
+        card.style.borderRadius = '15px';
+        card.style.padding = '30px';
+        card.style.maxWidth = '500px';
+        card.style.textAlign = 'center';
+        card.style.boxShadow = '0 0 30px rgba(213, 0, 0, 0.4)';
+        card.style.color = '#fff';
+
+        // Villain Image
+        const img = document.createElement('img');
+        img.src = 'finalredvillain.png'; // Using existing asset
+        img.style.width = '80px';
+        img.style.height = '80px';
+        img.style.objectFit = 'contain';
+        img.style.borderRadius = '50%';
+        img.style.border = '2px solid #D50000';
+        img.style.marginBottom = '20px';
+        img.style.backgroundColor = '#000';
+        card.appendChild(img);
+
+        // Title
+        const title = document.createElement('h2');
+        title.innerText = "FINAL CHALLENGE";
+        title.style.fontFamily = "'Cinzel', serif";
+        title.style.color = '#D50000';
+        title.style.fontSize = '2rem';
+        title.style.marginBottom = '10px';
+        title.style.marginTop = '0';
+        card.appendChild(title);
+
+        // Story Text
+        const p = document.createElement('p');
+        p.innerHTML = "You have traveled far, Warden.<br>Now, face the <b>Red Queen</b>!<br><br>She is trying to erase the story.<br>Use your magic to bring the words back!";
+        p.style.fontSize = '1.1rem';
+        p.style.lineHeight = '1.6';
+        p.style.color = '#ddd';
+        p.style.marginBottom = '30px';
+        card.appendChild(p);
+
+        // Button
+        const btn = document.createElement('button');
+        btn.innerText = "START BATTLE";
+        btn.style.padding = '12px 40px';
+        btn.style.fontSize = '1.2rem';
+        btn.style.backgroundColor = '#D50000';
+        btn.style.color = '#fff';
+        btn.style.border = 'none';
+        btn.style.borderRadius = '30px';
+        btn.style.cursor = 'pointer';
+        btn.style.fontFamily = "'Cinzel', serif";
+        btn.style.boxShadow = '0 0 15px rgba(213, 0, 0, 0.6)';
+        btn.style.transition = 'transform 0.2s';
+
+        btn.onmouseover = () => btn.style.transform = 'scale(1.05)';
+        btn.onmouseout = () => btn.style.transform = 'scale(1)';
+        btn.onclick = () => {
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.style.display = 'none';
+                gameState = 'playing';
+                lastVillainAttackTime = Date.now();
+            }, 500);
+        };
+        card.appendChild(btn);
+
+        modal.appendChild(card);
+        container.appendChild(modal);
+
+        // Fade In
+        setTimeout(() => modal.style.opacity = '1', 10);
+    }
+
     // Expose Global Object
     window.AliceBattleRef = {
         init: function () {
@@ -467,28 +569,59 @@
                 window.addEventListener('resize', resize);
                 resize();
 
-                // Reset Game State
-                gameState = 'playing';
+                // RESET & SETUP
+                wardenHP = 100;
+                gameState = 'paused'; // Start PAUSED for Intro
                 lightnings = [];
                 lastVillainAttackTime = Date.now();
 
-                // SETUP UNIFIED BAR (TUG OF WAR)
+                // SETUP UNIFIED BAR (TUG OF WAR) & LABELS
                 if (ui.villainHp) {
-                    ui.villainHp.style.width = '50%'; // Start at 50%
-                    ui.villainHp.style.backgroundColor = '#2962FF'; // Vivid Blue (Warden)
+                    ui.villainHp.style.width = '50%';
+                    ui.villainHp.style.backgroundColor = '#2962FF';
 
-                    // Parent is Red (Villain)
                     const parentBar = ui.villainHp.parentElement;
-                    parentBar.style.backgroundColor = '#D50000'; // Vivid Red
+                    parentBar.style.backgroundColor = '#D50000';
                     parentBar.style.border = '2px solid #fff';
-                    parentBar.style.height = '24px'; // Thicker Bar
+                    parentBar.style.height = '24px';
+                    parentBar.style.position = 'relative'; // For labels
+                    parentBar.style.overflow = 'visible'; // Allow labels outside
+                    parentBar.style.marginTop = '60px'; // MOVE DOWN 4.
+
+                    // Add Labels if missing
+                    if (!parentBar.querySelector('.lbl-warden')) {
+                        const wLbl = document.createElement('div');
+                        wLbl.className = 'lbl-warden';
+                        wLbl.innerText = "WARDEN";
+                        wLbl.style.position = 'absolute';
+                        wLbl.style.left = '-80px';
+                        wLbl.style.top = '0';
+                        wLbl.style.color = '#2962FF';
+                        wLbl.style.fontWeight = 'bold';
+                        wLbl.style.lineHeight = '24px';
+                        wLbl.style.fontFamily = 'Cinzel, serif';
+                        parentBar.appendChild(wLbl);
+
+                        const vLbl = document.createElement('div');
+                        vLbl.className = 'lbl-villain';
+                        vLbl.innerText = "FINAL BOSS";
+                        vLbl.style.position = 'absolute';
+                        vLbl.style.right = '-110px';
+                        vLbl.style.top = '0';
+                        vLbl.style.color = '#D50000';
+                        vLbl.style.fontWeight = 'bold';
+                        vLbl.style.lineHeight = '24px';
+                        vLbl.style.fontFamily = 'Cinzel, serif';
+                        parentBar.appendChild(vLbl);
+                    }
                 }
 
-                // Hide Old Warden HP Bar
-                if (ui.wardenHp) {
-                    ui.wardenHp.parentElement.style.display = 'none';
+                // Move Text Field Down
+                if (ui.textField) {
+                    ui.textField.parentElement.style.marginTop = '40px';
                 }
 
+                if (ui.wardenHp) ui.wardenHp.parentElement.style.display = 'none';
                 if (ui.gameUi) ui.gameUi.style.opacity = '1';
                 if (ui.finalScreen) {
                     ui.finalScreen.style.display = 'none';
@@ -497,12 +630,15 @@
 
                 cardValues.ink = 190; cardValues.rune = 30; cardValues.gem = 50;
 
-                // Initialize Text Battlefield
                 initTextBattlefield();
                 updateCardDisplay();
 
                 if (animFrameId) cancelAnimationFrame(animFrameId);
-                animateLoop();
+                animateLoop(); // Loop runs but does nothing if paused
+
+                // SHOW INTRO MODAL
+                showIntroModal();
+
             } catch (e) { console.error(e); }
         },
 
