@@ -9,6 +9,8 @@ import { WardenManager } from './managers/WardenManager.js?v=2';
 import { IntroManager } from './managers/IntroManager.js?v=2';
 import { VocabManager } from './managers/VocabManager.js?v=2';
 import { UIManager } from './core/UIManager.js?v=2';
+// game.js - Using ES Modules for structured logic
+console.log("[game.js] Script START execution");
 import { GameLogic } from './core/GameLogic.js?v=2';
 import { DOMManager } from './core/DOMManager.js?v=2';
 const Game = {
@@ -1061,6 +1063,13 @@ Game.typewriter = {
 };
 
 window.Game = Game;
+
+// [DEBUG] Shortcut
+window.debugJump = (idx = 2) => {
+    console.log(`[Debug] Jumping to MidBoss Battle ${idx}`);
+    Game.currentParaIndex = idx;
+    Game.triggerMidBossBattle();
+};
 
 // [SAFETY FIX] Module timing protection
 const initGame = () => {
