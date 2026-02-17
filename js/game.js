@@ -7,6 +7,7 @@ import { bus } from './core/EventBus.js';
 import { TextRenderer } from './TextRendererV2.js';
 import { WardenManager } from './managers/WardenManager.js';
 import { IntroManager } from './managers/IntroManager.js';
+import { VocabManager } from './managers/VocabManager.js';
 const Game = {
     // Initialized in init()
     scoreManager: null,
@@ -53,6 +54,10 @@ const Game = {
         // [Moved Intro Logic]
         this.introManager = new IntroManager(this);
         this.introManager.init();
+
+        // [Moved Vocab Logic]
+        this.vocabManager = new VocabManager(this);
+        this.vocabManager.init(vocabList);
 
         // 4. Session ID for Firebase
         this.sessionId = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -201,290 +206,14 @@ const Game = {
 
     // --- 1. Word Forge ---
     // --- 1. Word Forge ---
-    vocabList: vocabList,
+    // --- 1. Word Forge (Delegated to VocabManager) ---
 
     loadVocab(index) {
-        if (index >= this.vocabList.length) return;
-        const data = this.vocabList[index];
-
-        // Update Title and Sentence
-        const titleEl = document.getElementById("vocab-word");
-        if (titleEl) titleEl.textContent = data.word;
-
-        // Update Image
-        const imgPlaceholder = document.querySelector(".word-image-placeholder");
-        if (imgPlaceholder) {
-            imgPlaceholder.innerHTML = ""; // Clear text
-            if (data.image) {
-                const img = document.createElement("img");
-                img.src = data.image;
-                img.alt = data.word;
-                img.style.maxWidth = "100%";
-                img.style.maxHeight = "100%";
-                img.style.objectFit = "contain";
-                img.style.filter = "drop-shadow(0 0 10px rgba(255, 215, 0, 0.5))";
-                img.onerror = () => {
-                    img.style.display = "none";
-                    let icon = "📜";
-                    // Fallback Icons based on word context
-                    if (data.word === "Luminous") icon = "✨";
-                    if (data.word === "Peculiar") icon = "🎩";
-                    if (data.word === "Vanish") icon = "💨";
-
-                    imgPlaceholder.style.display = "flex";
-                    imgPlaceholder.style.justifyContent = "center";
-                    imgPlaceholder.style.alignItems = "center";
-                    imgPlaceholder.innerHTML = `<div style="font-size: 80px; text-shadow: 0 0 20px rgba(255,215,0,0.5); animation: float 3s infinite ease-in-out;">${icon}</div>`;
-                };
-                imgPlaceholder.appendChild(img);
-            } else {
-                imgPlaceholder.textContent = "[Magic Image Placeholder]";
-            }
-        }
-
-        // Find the sentence paragraph - assuming it's the <p> after title
-        const card = document.querySelector(".word-card");
-        if (card) {
-            const p = card.querySelector("p");
-            if (p) p.innerHTML = data.sentence;
-        }
-
-        // Update Counter (1/3)
-        const counterDiv = document.querySelector("#screen-word > div:first-child");
-        if (counterDiv) counterDiv.textContent = `WORD FORGE (${index + 1}/${this.vocabList.length})`;
-
-        // Update Options
-        const optionsDiv = document.getElementById("vocab-options");
-        if (optionsDiv) {
-            optionsDiv.innerHTML = ""; // Clear existing
-            data.options.forEach((optText, idx) => {
-                const btn = document.createElement("button");
-                btn.className = "option-btn";
-                btn.textContent = optText;
-                btn.onclick = (e) => Game.checkVocab(idx, e); // Pass event for coordinates
-                optionsDiv.appendChild(btn);
-            });
-        }
+        this.vocabManager.loadVocab(index);
     },
 
-    async checkVocab(optionIndex, event) {
-        // Prevent re-entry if already processing (simple lock)
-        if (this.isProcessingVocab) return;
-        this.isProcessingVocab = true;
-
-        const currentIndex = this.state.vocabIndex || 0;
-        const currentData = this.vocabList[currentIndex];
-        // Use 'answer' property as per data structure
-        const isCorrect = (optionIndex === currentData.answer);
-
-        // Find the button element that was clicked
-        const optionsDiv = document.getElementById("vocab-options");
-        const btns = optionsDiv ? optionsDiv.querySelectorAll(".option-btn") : [];
-        const selectedBtn = btns[optionIndex];
-
-        // Disable ALL buttons immediately to prevent multi-click
-        btns.forEach(btn => btn.disabled = true);
-
-        if (isCorrect) {
-            // --- JUICY SUCCESS ---
-            if (selectedBtn) {
-                selectedBtn.classList.add("correct");
-                this.spawnFloatingText(selectedBtn, "+10 Runes!", "bonus");
-
-                // Trigger Rune Particle Animation
-                const rect = selectedBtn.getBoundingClientRect();
-                const startX = event ? event.clientX : (rect.left + rect.width / 2);
-                const startY = event ? event.clientY : (rect.top + rect.height / 2);
-                this.spawnRuneParticles(startX, startY);
-            }
-
-            // Wait for animation
-            await new Promise(r => setTimeout(r, 1200));
-
-            // Progress
-            this.state.vocabIndex++;
-            this.isProcessingVocab = false; // Release lock
-
-            if (this.state.vocabIndex < this.vocabList.length) {
-                this.loadVocab(this.state.vocabIndex);
-            } else {
-                console.log("Word Forge Complete. Proceeding to WPM Selection...");
-                this.switchScreen("screen-wpm");
-            }
-        } else {
-            // --- JUICY FAIL ---
-            this.addRunes(-5); // -5 Rune (Penalty Reduced)
-            if (selectedBtn) {
-                selectedBtn.classList.add("wrong");
-                this.spawnFloatingText(selectedBtn, "-5 Rune", "error");
-            }
-
-            // Allow Retry? Or Move On?
-            // "맞든 틀리든 1회로 끝나야 한다" -> Move on anyway?
-            // Usually games let you retry or just mark wrong and move on.
-            // Let's implement: Re-enable others so they can find the right one (Learning), 
-            // BUT penalty applied. 
-            // If strictly "1 attempt", we should move on.
-            // User requirement ambiguity: "1회로 끝나야 한다" -> likely implies "processing done in one go".
-            // Let's keep retry logic for now as it's better for learning.
-            btns.forEach((btn, idx) => {
-                if (idx !== optionIndex) btn.disabled = false;
-            });
-
-            this.isProcessingVocab = false; // Release lock
-        }
-    },
-
-    // --- NEW: Rune Particle Animation (Curve to HUD) ---
-    spawnRuneParticles(startX, startY) {
-        const targetEl = document.getElementById("rune-count"); // HUD Rune Icon
-        if (!targetEl) return;
-
-        const targetRect = targetEl.getBoundingClientRect();
-        // Target center coordinates
-        const targetX = targetRect.left + targetRect.width / 2;
-        const targetY = targetRect.top + targetRect.height / 2;
-
-        const particleCount = 12; // Increased from 6
-        const colors = ["#ffd700", "#ffae00", "#ffffff", "#e0ffff"]; // Gold, Orange, White, Cyan Tint
-
-        for (let i = 0; i < particleCount; i++) {
-            const p = document.createElement("div");
-            p.className = "rune-particle";
-
-            // Random size for variety
-            const size = 5 + Math.random() * 8;
-            p.style.width = size + "px";
-            p.style.height = size + "px";
-            p.style.borderRadius = "50%";
-            p.style.position = "fixed";
-            p.style.zIndex = "10000";
-
-            // Initial Position (Fixed to start point)
-            p.style.left = startX + "px";
-            p.style.top = startY + "px";
-
-            const color = colors[Math.floor(Math.random() * colors.length)];
-            p.style.backgroundColor = color;
-            p.style.boxShadow = "0 0 10px " + color;
-
-            // Bezier Control Point (Random curve direction)
-            // Midpoint between start and target
-            const midX = (startX + targetX) / 2;
-            const midY = (startY + targetY) / 2;
-            // Offset for curve
-            const curveStrength = 150 + Math.random() * 200; // Strong curve
-            const curveAngle = Math.random() * Math.PI * 2;
-            const cpX = midX + Math.cos(curveAngle) * curveStrength;
-            const cpY = midY + Math.sin(curveAngle) * curveStrength;
-
-            // Generate Keyframes for Bezier Curve
-            const keyframes = [];
-            const steps = 30; // Smoothness
-            for (let s = 0; s <= steps; s++) {
-                const t = s / steps;
-                // Quadratic Bezier Formula: B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
-                const xx = (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * cpX + t * t * targetX;
-                const yy = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * cpY + t * t * targetY;
-
-                // Scale & Opacity Logic for Impact
-                let scale = 1;
-                let opacity = 1;
-
-                // 1. Burst Start (t: 0 -> 0.2)
-                if (t < 0.2) {
-                    scale = 0.5 + (t * 5); // 0.5 -> 1.5 (Pop out)
-                }
-                // 2. Flight (t: 0.2 -> 0.8)
-                else if (t < 0.8) {
-                    scale = 1.5 - ((t - 0.2) * 0.5); // 1.5 -> 1.2 (Slight shrink)
-                }
-                // 3. Arrival Impact (t: 0.8 -> 1.0)
-                else {
-                    // Do NOT fade out. Accelerate into target.
-                    scale = 1.2 - ((t - 0.8) * 4); // 1.2 -> 0.4 (Collapse into icon)
-                    opacity = 1; // Keep fully visible until impact
-                }
-
-                // Append to keyframes
-                keyframes.push({
-                    left: `${xx}px`,
-                    top: `${yy}px`,
-                    transform: `scale(${scale})`,
-                    opacity: opacity,
-                    offset: t
-                });
-            }
-
-            document.body.appendChild(p);
-
-            // Animation: Bezier Curve
-            const duration = 1200 + Math.random() * 600;
-
-            const anim = p.animate(keyframes, {
-                duration: duration,
-                easing: "linear", // Keyframes handle easing via spacing if needed, but linear t allows consistent curve
-                fill: "forwards"
-            });
-
-            anim.onfinish = () => {
-                p.remove();
-                // Pump Effect on Target (Trigger on first few for impact)
-                if (i === 0) {
-                    // Add Score HERE (On Arrival)
-                    this.addRunes(10);
-                    targetEl.style.transition = "transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-                    targetEl.style.transform = "scale(1.8)";
-                    targetEl.style.filter = "brightness(2.5) drop-shadow(0 0 20px gold)";
-
-                    // Reset quickly
-                    setTimeout(() => {
-                        targetEl.style.transform = "scale(1)";
-                        targetEl.style.filter = "brightness(1)";
-                    }, 200);
-                }
-            };
-        }
-    },
-
-    // FX Helpers
-    spawnFloatingText(targetEl, text, type) {
-        const rect = targetEl.getBoundingClientRect();
-        const floatEl = document.createElement("div");
-        floatEl.className = `feedback-text ${type}`;
-        floatEl.innerText = text;
-        floatEl.style.left = (rect.left + rect.width / 2) + "px";
-        floatEl.style.top = (rect.top) + "px"; // Start slightly above
-        document.body.appendChild(floatEl);
-
-        // Cleanup
-        setTimeout(() => floatEl.remove(), 1000);
-    },
-
-    spawnParticles(targetEl, count) {
-        const rect = targetEl.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-
-        for (let i = 0; i < count; i++) {
-            const p = document.createElement("div");
-            p.className = "particle";
-
-            // Random scatter
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * 60 + 20; // 20px to 80px out
-            const tx = Math.cos(angle) * dist + "px";
-            const ty = Math.sin(angle) * dist + "px";
-
-            p.style.setProperty("--tx", tx);
-            p.style.setProperty("--ty", ty);
-            p.style.left = centerX + "px";
-            p.style.top = centerY + "px";
-            p.style.backgroundColor = `hsl(${Math.random() * 50 + 40}, 100%, 50%)`; // Gold/Yellow range
-
-            document.body.appendChild(p);
-            setTimeout(() => p.remove(), 800);
-        }
+    checkVocab(optionIndex, event) {
+        this.vocabManager.checkVocab(optionIndex, event);
     },
 
     // --- [NEW] Flying Resource Effect (Passage 123 Style) ---
