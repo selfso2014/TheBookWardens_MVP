@@ -7,6 +7,7 @@ export class WardenManager {
 
     // --- Core Function: Soul Bind (Email Capture) ---
     bindWarden() {
+        alert("[DEBUG] WardenManager: bindWarden called");
         console.log("[WardenManager] Soul Binding Initiated...");
 
         const emailInput = document.getElementById('warden-email');
@@ -17,6 +18,7 @@ export class WardenManager {
             console.warn("[WardenManager] No email provided. Using anonymous placeholder.");
             email = "anonymous_warden@test.com";
         }
+        alert(`[DEBUG] Email captured: ${email}`);
 
         this.email = email;
         localStorage.setItem('warden_email', email);
@@ -44,11 +46,13 @@ export class WardenManager {
 
     _transitionToShareScreen() {
         setTimeout(() => {
+            alert("[DEBUG] _transitionToShareScreen Executing...");
             console.log("[WardenManager] Transitioning to Share Screen...");
 
             // Use Game's SceneManager or direct DOM manipulation if SceneManager lacks this screen
             const shareScreen = document.getElementById('screen-new-share');
             if (shareScreen) {
+                alert("[DEBUG] Found Share Screen! Activating...");
                 // Reset styles first
                 shareScreen.style.display = 'flex';
                 shareScreen.classList.add('active');
@@ -64,6 +68,7 @@ export class WardenManager {
                     // this.game.sceneManager.currentScreen = 'screen-new-share'; 
                 }
             } else {
+                alert("[ERROR] Share Screen Not Found Logic!");
                 console.error("[WardenManager] Share Screen Not Found!");
             }
         }, 500);
