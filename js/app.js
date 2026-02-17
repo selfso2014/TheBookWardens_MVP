@@ -719,8 +719,8 @@ function startCalibration() {
   try {
     // Force High Accuracy (2) to ensure sufficient data collection (prevents 0% finish)
     // On Mobile, use Medium (1) or Low (0) to avoid getting stuck.
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const criteria = isMobile ? 1 : 2;
+    // Force criteria to 1 (Medium) for ALL devices to prevent Laptop freeze
+    const criteria = 1;
 
     // 5-point calibration (mode 5 is standard usually, check docs. Here current code sends 1?)
     // Actually mode 1 might be 1-point? The user mentioned 5-point.
