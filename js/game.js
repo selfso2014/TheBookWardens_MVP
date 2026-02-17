@@ -9,7 +9,7 @@ import { WardenManager } from './managers/WardenManager.js?v=2';
 import { IntroManager } from './managers/IntroManager.js?v=2';
 import { VocabManager } from './managers/VocabManager.js?v=2';
 import { UIManager } from './core/UIManager.js?v=2';
-import { GameLogic } from './core/GameLogic.js?v=v14.1.25';
+import { GameLogic } from './core/GameLogic.js?v=v14.1.26';
 import { DOMManager } from './core/DOMManager.js?v=2';
 const Game = {
     // Initialized in init()

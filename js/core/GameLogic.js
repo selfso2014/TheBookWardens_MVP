@@ -134,6 +134,7 @@ export class GameLogic {
     // --- Alice Battle Logic (Final Boss) ---
     triggerFinalBossBattle() {
         console.log("[GameLogic] Triggering Alice Battle...");
+        alert("GameLogic: Triggering Alice Battle!"); // Diagnostic
 
         // 1. Blockers
         ['output', 'preview', 'calibration-overlay'].forEach(id => {
