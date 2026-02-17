@@ -320,56 +320,181 @@
     }
 
     function endGame(result) {
+        if (gameState === 'victory' || gameState === 'defeat') return; // Prevent double call
         gameState = result;
-        if (ui.gameUi) ui.gameUi.style.opacity = '0';
+
+        // Hide Main UI
+        if (ui.gameUi) {
+            ui.gameUi.style.transition = 'opacity 1s';
+            ui.gameUi.style.opacity = '0';
+        }
+
+        // Disable interactions
+        if (ui.textField) ui.textField.style.pointerEvents = 'none';
+
         setTimeout(() => {
-            if (ui.finalScreen) {
-                ui.finalScreen.style.display = 'flex'; // Ensure flex
-                setTimeout(() => ui.finalScreen.style.opacity = '1', 10); // Fade in
-            }
+            const container = document.getElementById('screen-alice-battle');
+
             if (result === 'victory') {
-                if (ui.resultHeader) { ui.resultHeader.innerText = "VICTORY"; ui.resultHeader.style.color = "#4da6ff"; }
-                if (ui.storyDisplay) ui.storyDisplay.innerHTML = `<div class="story-clean" style="color:#fff;">${aliceStory}</div>`;
-                createFireworks();
+                createFireworks(container);
+                showVictoryModal(container);
             } else {
-                if (ui.resultHeader) { ui.resultHeader.innerText = "DEFEAT"; ui.resultHeader.style.color = "#ff4d4d"; }
-                if (ui.storyDisplay) ui.storyDisplay.innerHTML = `<div class="story-corrupted" style="color:#888;">${corruptText(aliceStory)}</div>`;
-                createRifts();
+                createRifts(container);
+                showDefeatModal(container);
             }
         }, 1000);
     }
 
-    function createFireworks() {
-        // Simple visual effect
-        if (!ui.finalScreen) return;
-        for (let i = 0; i < 20; i++) {
+    function showVictoryModal(container) {
+        const modal = createBaseModal();
+
+        const content = document.createElement('div');
+        content.style.textAlign = 'center';
+        content.style.color = '#fff';
+        content.innerHTML = `
+            <h1 style="font-family:'Cinzel',serif; font-size:3rem; color:#4da6ff; text-shadow:0 0 20px blue; margin-bottom:20px;">VICTORY</h1>
+            <p style="font-size:1.2rem; margin-bottom:30px; color:#ddd;">The story has been restored!<br>The rift is sealed.</p>
+        `;
+
+        const btn = document.createElement('button');
+        btn.innerText = "SCORE REPORT";
+        styleModalButton(btn, '#4da6ff');
+        btn.onclick = () => {
+            if (window.Game && window.Game.goToNewScore) {
+                window.Game.goToNewScore();
+            } else {
+                alert("Score Screen not linked! (Check console)");
+                console.error("Game.goToNewScore missing");
+            }
+        };
+
+        content.appendChild(btn);
+        modal.appendChild(content);
+        container.appendChild(modal);
+        setTimeout(() => modal.style.opacity = '1', 50);
+    }
+
+    function showDefeatModal(container) {
+        const modal = createBaseModal();
+
+        const content = document.createElement('div');
+        content.style.textAlign = 'center';
+        content.style.color = '#fff';
+        content.innerHTML = `
+            <h1 style="font-family:'Cinzel',serif; font-size:3rem; color:#ff4d4d; text-shadow:0 0 20px red; margin-bottom:20px;">DEFEATED</h1>
+            <p style="font-size:1.2rem; margin-bottom:30px; color:#bbb;">The words have faded away...<br>The Villain was too strong.</p>
+        `;
+
+        const btn = document.createElement('button');
+        btn.innerText = "RETRY TRAINING";
+        styleModalButton(btn, '#ff4d4d');
+        btn.onclick = () => {
+            if (window.Game && window.Game.switchScreen) {
+                // Reset state if needed?
+                // For now, just go back to Word Forge to practice
+                window.Game.switchScreen('screen-word');
+            } else {
+                alert("Navigation failed! (Check console)");
+            }
+        };
+
+        content.appendChild(btn);
+        modal.appendChild(content);
+        container.appendChild(modal);
+        setTimeout(() => modal.style.opacity = '1', 50);
+    }
+
+    function createBaseModal() {
+        const modal = document.createElement('div');
+        modal.style.position = 'absolute';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.backgroundColor = 'rgba(0,0,0,0.9)';
+        modal.style.zIndex = '200000'; // Very high
+        modal.style.display = 'flex';
+        modal.style.flexDirection = 'column';
+        modal.style.justifyContent = 'center';
+        modal.style.alignItems = 'center';
+        modal.style.opacity = '0';
+        modal.style.transition = 'opacity 0.5s';
+        return modal;
+    }
+
+    function styleModalButton(btn, color) {
+        btn.style.padding = '15px 40px';
+        btn.style.fontSize = '1.3rem';
+        btn.style.backgroundColor = 'transparent';
+        btn.style.color = color;
+        btn.style.border = `2px solid ${color}`;
+        btn.style.borderRadius = '30px';
+        btn.style.cursor = 'pointer';
+        btn.style.fontFamily = "'Cinzel', serif";
+        btn.style.boxShadow = `0 0 15px ${color}40`;
+        btn.style.transition = 'all 0.2s';
+        btn.style.fontWeight = 'bold';
+
+        btn.onmouseover = () => {
+            btn.style.backgroundColor = color;
+            btn.style.color = '#000';
+            btn.style.boxShadow = `0 0 30px ${color}`;
+            btn.style.transform = 'scale(1.05)';
+        };
+        btn.onmouseout = () => {
+            btn.style.backgroundColor = 'transparent';
+            btn.style.color = color;
+            btn.style.boxShadow = `0 0 15px ${color}40`;
+            btn.style.transform = 'scale(1)';
+        };
+    }
+
+    function createFireworks(container) {
+        if (!container) return;
+        for (let i = 0; i < 30; i++) {
             const fw = document.createElement('div');
             fw.style.position = 'absolute';
-            fw.style.left = Math.random() * 100 + '%';
-            fw.style.top = Math.random() * 100 + '%';
-            fw.style.width = '10px'; fw.style.height = '10px';
+            fw.style.left = (20 + Math.random() * 60) + '%';
+            fw.style.top = (20 + Math.random() * 60) + '%';
+            fw.style.width = '8px';
+            fw.style.height = '8px';
             fw.style.borderRadius = '50%';
-            fw.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
-            fw.style.boxShadow = `0 0 20px 5px currentColor`;
-            fw.style.animation = `popOut 1s ease-out forwards`;
-            ui.finalScreen.appendChild(fw);
+            fw.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 70%)`;
+            fw.style.boxShadow = `0 0 15px currentColor`;
+            // Simple expansion animation using creating style tag or modify existing
+            // CSS animation 'popOut' assumed present or we inline it?
+            // Let's use simple transition
+            fw.style.opacity = '0';
+            fw.style.transition = 'transform 1s ease-out, opacity 1s ease-out';
+            fw.style.transform = 'scale(0)';
+
+            container.appendChild(fw);
+
+            setTimeout(() => {
+                fw.style.opacity = '1';
+                fw.style.transform = `translate(${(Math.random() - 0.5) * 200}px, ${(Math.random() - 0.5) * 200}px) scale(2)`;
+                setTimeout(() => fw.style.opacity = '0', 800);
+            }, i * 100);
         }
     }
 
-    function createRifts() {
-        if (!ui.finalScreen) return;
-        for (let i = 0; i < 35; i++) {
+    function createRifts(container) {
+        // Red cracks for defeat
+        if (!container) return;
+        for (let i = 0; i < 15; i++) {
             const rift = document.createElement('div');
-            rift.className = 'alice-rift';
-            const isVertical = Math.random() > 0.5;
-            rift.style.width = isVertical ? '2px' : (Math.random() * 400 + 100) + 'px';
-            rift.style.height = isVertical ? (Math.random() * 400 + 100) + 'px' : '2px';
-            rift.style.left = Math.random() * 100 + 'vw';
-            rift.style.top = Math.random() * 100 + 'vh';
-            rift.style.transform = `rotate(${Math.random() * 360}deg)`;
-            rift.style.background = '#f00';
             rift.style.position = 'absolute';
-            ui.finalScreen.appendChild(rift);
+            rift.style.left = Math.random() * 100 + '%';
+            rift.style.top = Math.random() * 100 + '%';
+            rift.style.width = (100 + Math.random() * 200) + 'px';
+            rift.style.height = '2px';
+            rift.style.backgroundColor = '#ff0000';
+            rift.style.boxShadow = '0 0 10px red';
+            rift.style.transform = `rotate(${Math.random() * 360}deg)`;
+            rift.style.opacity = '0';
+            rift.style.transition = 'opacity 0.5s';
+            container.appendChild(rift);
+            setTimeout(() => rift.style.opacity = '0.7', i * 200);
         }
     }
 
