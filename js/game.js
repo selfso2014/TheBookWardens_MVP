@@ -2200,9 +2200,23 @@ Game.typewriter = {
 
         // 3. Transition
         setTimeout(() => {
-            alert(`Golden Key Bound!\n\nChapter 1 'The Rabbit Hole' is now accessible.\nWelcome, Warden.`);
+            // alert(`Golden Key Bound!\n\nChapter 1 'The Rabbit Hole' is now accessible.\nWelcome, Warden.`);
+
+            // [NEW] Transition to Social Share Screen
+            if (typeof this.switchScreen === 'function') {
+                this.switchScreen('screen-new-share');
+            } else {
+                console.error("switchScreen function not found in Game object.");
+                // Fallback if switchScreen is missing
+                const shareScreen = document.getElementById('screen-new-share');
+                if (shareScreen) {
+                    shareScreen.classList.add('active');
+                    shareScreen.style.display = 'flex';
+                }
+            }
             // In a real app, redirect to chapter selection or lobby with unlocked state
-            location.reload();
+            // In a real app, redirect to chapter selection or lobby with unlocked state
+            // location.reload();
         }, 1500);
     },
 
