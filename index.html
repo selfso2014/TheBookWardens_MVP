@@ -470,6 +470,40 @@
       <!-- Debug Button Removed -->
     </section>
 
+    <!-- SCREEN 0.4: FACE CHECK (NEW) -->
+    <section id="screen-face-check" class="screen">
+      <div style="text-align: center; color: white; width: 100%; max-width: 400px;">
+        <h2 style="font-family: 'Cinzel', serif; margin-bottom: 30px; line-height: 1.4;">
+          Adjust your device angle<br>to fit your face in the frame.
+        </h2>
+
+        <!-- Face Frame Container -->
+        <div class="face-frame"
+          style="width: 200px; height: 200px; border: 3px dashed rgba(255, 255, 255, 0.3); border-radius: 20px; margin: 0 auto 30px auto; position: relative; display: flex; align-items: center; justify-content: center; transition: border-color 0.3s;">
+
+          <!-- Guide Icon (Initially Hidden) -->
+          <img id="face-guide-icon" src="./detection_guide_face.png" alt="Face Guide"
+            style="width: 60%; opacity: 0; transition: opacity 0.3s ease; filter: drop-shadow(0 0 10px #00ff00);">
+
+        </div>
+
+        <!-- Status Text -->
+        <p id="face-check-status" style="color: #aaa; font-size: 1.1rem; margin-bottom: 40px; min-height: 1.5em;">
+          Face not detected...
+        </p>
+
+        <!-- Next Button (Initially Disabled) -->
+        <button id="btn-face-next" class="btn-primary" disabled
+          style="padding: 15px 50px; opacity: 0.5; cursor: not-allowed; transition: all 0.3s;">
+          Next
+        </button>
+
+        <p class="tip" style="color: #666; font-size: 0.9rem; margin-top: 20px;">
+          If detection fails, check your front camera or lighting.
+        </p>
+      </div>
+    </section>
+
     <!-- SCREEN 0.5: CALIBRATION -->
     <section id="screen-calibration" class="screen">
       <div

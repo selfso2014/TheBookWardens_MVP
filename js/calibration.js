@@ -32,31 +32,127 @@ export class CalibrationManager {
      * Called when the user clicks "Start Point" button.
      * We start a strict timer here. If calibration doesn't finish in 8-10s, we force finish.
      */
+    // --- FACE CHECK LOGIC ---
+    startFaceCheck() {
+        this.ctx.logI("cal", "Starting Face Check Mode");
+
+        const faceScreen = document.getElementById("screen-face-check");
+        const calScreen = document.getElementById("screen-calibration");
+
+        if (faceScreen) {
+            faceScreen.classList.add("active");
+            faceScreen.style.display = "flex"; // Ensure flex display
+        }
+        if (calScreen) {
+            calScreen.classList.remove("active");
+            calScreen.style.display = "none";
+        }
+
+        // Reset UI
+        this.updateFaceCheckUI(false);
+
+        // Bind Next Button
+        const btnNext = document.getElementById("btn-face-next");
+        if (btnNext) {
+            btnNext.onclick = () => {
+                this.ctx.logI("cal", "Face Check Passed. Proceeding to Calibration.");
+                // Hide Face Check
+                if (faceScreen) {
+                    faceScreen.classList.remove("active");
+                    faceScreen.style.display = "none";
+                }
+                // Show Calibration Screen
+                if (calScreen) {
+                    calScreen.classList.add("active");
+                    calScreen.style.display = "block";
+                }
+
+                // Start Actual Calibration
+                // This will trigger 'startCalibration' in app.js if wired correctly,
+                // But here we might need to callback to app.js or call seeso directly.
+                // Better pattern: The 'Start Game' button in app.js should call this manager,
+                // and this manager calculates when to call app.startCalibration().
+                if (this.ctx.onFaceCheckSuccess) {
+                    this.ctx.onFaceCheckSuccess();
+                }
+            };
+        }
+    }
+
+    handleFaceCheckGaze(trackingState) {
+        // trackingState: 0 (TRACKING), 1 (FILTER), 2 (FACE_MISSING) usually.
+        // We consider 0 as success.
+        const isTracking = (trackingState === 0);
+        this.updateFaceCheckUI(isTracking);
+    }
+
+    updateFaceCheckUI(isTracking) {
+        const icon = document.getElementById("face-guide-icon");
+        const status = document.getElementById("face-check-status");
+        const btn = document.getElementById("btn-face-next");
+        const frame = document.querySelector(".face-frame");
+
+        if (isTracking) {
+            // Success
+            if (icon) icon.style.opacity = "1";
+            if (status) {
+                status.textContent = "Perfect! Hold this position.";
+                status.style.color = "#00ff00";
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+                btn.style.cursor = "pointer";
+                btn.style.boxShadow = "0 0 15px #00e5ff";
+            }
+            if (frame) frame.style.borderColor = "#00ff00";
+        } else {
+            // Fail
+            if (icon) icon.style.opacity = "0";
+            if (status) {
+                status.textContent = "Face not detected...";
+                status.style.color = "#aaa";
+            }
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = "0.5";
+                btn.style.cursor = "not-allowed";
+                btn.style.boxShadow = "none";
+            }
+            if (frame) frame.style.borderColor = "rgba(255, 255, 255, 0.3)";
+        }
+    }
+
+    /**
+     * Called when calibration starts (after Face Check).
+     */
     startCollection() {
         this.ctx.logI("cal", "startCollection: Starting strict watchdog (10s)");
 
         // Clear old
         if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
 
-        // 5 seconds max wait for 1 point (Emergency Reduction)
+        // 10 seconds max wait for the whole calibration or single point?
+        // Let's allow 10s per point to be safe.
         this.state.maxWaitTimer = setTimeout(() => {
             if (this.state.running) {
-                this.ctx.logW("cal", "Calibration timed out (5s limit). Showing fail popup.");
+                this.ctx.logW("cal", "Calibration timed out (10s limit). Showing fail popup.");
                 this.showFailPopup();
             }
-        }, 5000);
+        }, 10000);
     }
 
     showFailPopup() {
-        // Stop visual updates but keep session alive?
-        // Ideally we want to let user choose.
         const popup = document.getElementById("cal-fail-popup");
         if (popup) {
             popup.style.display = "flex";
 
-            // Bind buttons if not already (simple way: onclick property)
+            // Re-bind buttons dynamically to ensure they work even after DOM updates
             const btnRetry = document.getElementById("btn-cal-retry");
             const btnSkip = document.getElementById("btn-cal-skip");
+
+            // Remove old listeners (cloning is a quick hack, or just reassign onclick)
+            // Assigning onclick overrides previous handlers, which is safer here.
 
             if (btnRetry) {
                 btnRetry.onclick = () => {
@@ -67,30 +163,39 @@ export class CalibrationManager {
             if (btnSkip) {
                 btnSkip.onclick = () => {
                     popup.style.display = "none";
-                    this.finishSequence();
+                    this.ctx.logW("cal", "User skipped calibration via popup.");
+                    this.finishSequence(); // Proceed to game
                 };
             }
+        } else {
+            this.ctx.logE("cal", "Fail popup not found in DOM!");
+            // Fallback: Just finish if UI is broken
+            this.finishSequence();
         }
     }
 
     retryPoint() {
         this.ctx.logI("cal", "Retrying calibration point...");
-        // Reset local state for this point
-        this.state.running = true; // Keep running or wait for button?
+        // Reset local state
+        this.state.running = true;
         this.state.progress = 0;
         this.state.displayProgress = 0;
 
-        // Strategy: Show the "Start Point" button again so user can position themselves and click.
+        // Restart timeout
+        this.startCollection();
+
+        // If we need to trigger SDK again:
+        // In some SDK versions, you just need to wait. In others, you might re-call startCollectSamples.
+        // For SeeSo, if collection timed out, we might need to restart it.
+        // We'll rely on app.js or the user clicking "Start Point" again if we reset UI.
+
+        // Let's reset the UI button to "Retry" so user can physically click it again
         const btn = document.getElementById("btn-calibration-start");
         if (btn) {
             btn.style.display = "inline-block";
             btn.textContent = "Retry Point";
             btn.style.pointerEvents = "auto";
         }
-
-        // We technically interrupt the current "collection" (visual only). 
-        // SDK might still be thinking it's collecting. 
-        // When user clicks "Start", we call `seeso.startCollectSamples()` again. This usually resets collection for the point.
     }
 
     /**
@@ -111,11 +216,11 @@ export class CalibrationManager {
                     clearTimeout(this.state.watchdogTimer);
                     this.state.watchdogTimer = null;
                 }
-                // Clear safety timer
-                if (this.state.safetyTimer) {
-                    clearTimeout(this.state.safetyTimer);
-                    this.state.safetyTimer = null;
-                }
+
+                // Clear wait timer (will re-start in startCollection if manual, or here?)
+                // Actually startCollection is called manually by button click usually.
+                // But for Point 2+, it's automatic?
+                // For 1-point, this is called once.
 
                 this.state.point = { x, y };
                 this.state.running = true;
@@ -127,33 +232,23 @@ export class CalibrationManager {
                 // Update UI
                 const statusEl = document.getElementById("calibration-status");
                 if (statusEl) {
-                    statusEl.textContent = `Look at the Magic Orb! (${this.state.pointCount}/1)`;
+                    statusEl.style.display = 'block';
+                    statusEl.textContent = "Look at the Magic Orb!";
                     statusEl.style.color = "#0f0";
                     statusEl.style.textShadow = "0 0 10px #0f0";
                 }
 
                 const btn = document.getElementById("btn-calibration-start");
                 if (btn) {
+                    // Show button for user to 'Start Collection'
                     btn.style.display = "inline-block";
-                    btn.textContent = (this.state.pointCount === 1) ? "Look At The Dot" : "Next Point";
+                    btn.textContent = "Start";
+                    btn.style.pointerEvents = "auto";
 
-                    // [FIX] Reset Position to CSS Default (Bottom Center)
-                    // Removing absolute overrides that placed it near the dot
+                    // Reset styling
                     btn.style.position = '';
                     btn.style.left = '';
                     btn.style.top = '';
-
-                    /* Legacy: Placed near the dot
-                    btn.style.position = 'absolute';
-                    btn.style.left = (x - 40) + 'px'; // Center roughly (assuming button width ~80px)
-                    btn.style.top = (y + 30) + 'px'; // Below the dot
-                    */
-
-                    btn.style.pointerEvents = "auto";
-
-                    // Add delay logic to button click in index.html or here?
-                    // Currently index.html calls seeso.startCollectSamples().
-                    // We should override it here/ensure it works.
                 }
             });
             logI("sdk", "addCalibrationNextPointCallback bound (CalibrationManager)");
@@ -166,37 +261,12 @@ export class CalibrationManager {
 
                 this.state.progress = progress;
                 const pct = Math.round(progress * 100);
-                setStatus(`Calibrating... ${pct}% (Point ${this.state.pointCount}/1)`);
+                setStatus(`Calibrating... ${pct}%`);
                 setState("cal", `running (${pct}%)`);
 
-                // (Old safety timer logic removed - we now strictly use startCollection timer)
-
                 if (progress >= 1.0) {
-                    // If progress reaches 1.0, clear the maxWaitTimer as we're proceeding to finish
+                    // Clear timeout on success
                     if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
-                    if (this.state.watchdogTimer) clearTimeout(this.state.watchdogTimer);
-                    if (this.state.softFinishTimer) clearTimeout(this.state.softFinishTimer);
-
-                    this.state.watchdogTimer = setTimeout(() => {
-                        this.state.watchdogTimer = null;
-                        if (this.state.running && this.state.pointCount >= 1) {
-                            this.ctx.logW("cal", "Force finishing calibration (watchdog 100%)");
-                            this.finishSequence();
-                        }
-                    }, 700);
-                } else {
-                    if (this.state.watchdogTimer) {
-                        clearTimeout(this.state.watchdogTimer);
-                        this.state.watchdogTimer = null;
-                    }
-
-                    // Soft Finish Guard: If we are > 85% done, don't let it hang forever.
-                    if (progress > 0.85 && !this.state.softFinishTimer) {
-                        this.state.softFinishTimer = setTimeout(() => {
-                            this.ctx.logW("cal", "Soft finish triggered (>85% stuck)");
-                            this.finishSequence();
-                        }, 2500);
-                    }
                 }
 
                 // Trigger render update
@@ -210,8 +280,11 @@ export class CalibrationManager {
         if (typeof seeso.addCalibrationFinishCallback === "function") {
             seeso.addCalibrationFinishCallback((calibrationData) => {
                 logI("cal", "onCalibrationFinished - Success");
+
+                // Clear timeouts
+                if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
+
                 this.state.isFinishing = true;
-                // Force visual 100%
                 this.state.progress = 1.0;
                 this.state.displayProgress = 1.0;
                 requestRender();
@@ -219,10 +292,10 @@ export class CalibrationManager {
                 setStatus("Calibration Complete!");
                 setState("cal", "finished");
 
-                // Wait 2s then finish
+                // Wait 1.5s then finish
                 setTimeout(() => {
                     this.finishSequence();
-                }, 2000);
+                }, 1500);
             });
             logI("sdk", "addCalibrationFinishCallback bound (CalibrationManager)");
         }
@@ -242,6 +315,9 @@ export class CalibrationManager {
         const stage = document.getElementById("stage");
         if (stage) stage.classList.remove("visible");
 
+        const calScreen = document.getElementById("screen-calibration");
+        if (calScreen) calScreen.style.display = 'none';
+
         if (this.ctx.onCalibrationFinish) {
             this.ctx.onCalibrationFinish();
         }
@@ -249,6 +325,7 @@ export class CalibrationManager {
 
     // Draw Logic
     render(ctx, width, height, toCanvasLocalPoint) {
+        // ... (Keep existing renderer)
         if (!this.state.running || !this.state.point) return;
 
         const pt = toCanvasLocalPoint(this.state.point.x, this.state.point.y) || this.state.point;
@@ -306,14 +383,5 @@ export class CalibrationManager {
         ctx.arc(cx, cy, 3, 0, Math.PI * 2); // 2 * 1.5 = 3
         ctx.fillStyle = "white";
         ctx.shadowBlur = 0; // Reset shadow for crisp dot
-        ctx.fill();
-
-        // Text (Optional - kept commented out as per original)
-        /*
-        ctx.fillStyle = "white";
-        ctx.font = "bold 12px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(`${Math.round(p * 100)}%`, cx, cy - 20);
-        */
     }
 }

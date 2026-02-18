@@ -302,6 +302,7 @@ const overlay = {
   gazeRaw: null, // {x,y,trackingState,confidence}
 };
 
+// [FIXED] calManager initialization with Face Check callback
 const calManager = new CalibrationManager({
   logI, logW, logE, setStatus, setState,
   requestRender: () => renderOverlay(),
@@ -309,6 +310,10 @@ const calManager = new CalibrationManager({
     if (typeof window.Game !== "undefined") {
       window.Game.onCalibrationFinish();
     }
+  },
+  onFaceCheckSuccess: () => {
+    logI("cal", "Face Check Success -> Triggering Real Calibration");
+    startActualCalibration();
   }
 });
 
@@ -388,7 +393,6 @@ function renderOverlay() {
   frameCount++;
   clearCanvas();
 
-  // --- Calibration: Magic Orb Style (Arcane Focus) ---
   // --- Calibration: Magic Orb Style (Arcane Focus) ---
   calManager.render(els.canvas.getContext("2d"), els.canvas.width, els.canvas.height, toCanvasLocalPoint);
 
@@ -610,6 +614,11 @@ function attachSeesoCallbacks() {
       const xRaw = gazeInfo?.x;
       const yRaw = gazeInfo?.y;
 
+      // [NEW] Face Check Logic
+      if (calManager && calManager.handleFaceCheckGaze) {
+        calManager.handleFaceCheckGaze(gazeInfo?.trackingState);
+      }
+
       overlay.gazeRaw = {
         x: xRaw,
         y: yRaw,
@@ -735,7 +744,22 @@ function startTracking() {
   }
 }
 
+/**
+ * Entry Point for Game: Enters Face Check Mode.
+ */
 function startCalibration() {
+  if (!seeso) return false;
+
+  // Start tracking first if not already
+  logI("cal", "Entering Face Check Mode...");
+  calManager.startFaceCheck();
+  return true;
+}
+
+/**
+ * Internal: Actually calls Seeso Calibration after Face Check passes.
+ */
+function startActualCalibration() {
   if (!seeso) return false;
 
   // Make canvas layer visible for calibration dots
@@ -754,9 +778,9 @@ function startCalibration() {
     // 5-point calibration (mode 5 is standard usually, check docs. Here current code sends 1?)
     // Actually mode 1 might be 1-point? The user mentioned 5-point.
     // Changing to 5 for better accuracy if supported, but sticking to existing logic first.
-    // Assuming 5 is standard, let's use 5. Or keep 1 if that's what was working.
     // The previous code had `seeso.startCalibration(1, criteria)`. Let's stick to 5 for game.
-    // 1-point calibration (mode 1) - User mandated
+    // [Request] 1-point calibration (mode 1)
+
     calManager.reset();
     const mode = 1;
 
@@ -789,14 +813,14 @@ function startCalibration() {
       */
     }
 
-    logI("cal", "startCalibration returned", { ok, criteria });
+    logI("cal", "startActualCalibration returned", { ok, criteria });
     setState("cal", ok ? "running" : "failed");
     setStatus("Calibrating... Look at the dots!");
 
     return !!ok;
   } catch (e) {
     setState("cal", "failed");
-    logE("cal", "startCalibration threw", e);
+    logE("cal", "startActualCalibration threw", e);
     return false;
   }
 }
