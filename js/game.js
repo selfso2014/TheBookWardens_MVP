@@ -515,6 +515,7 @@ const Game = {
                     email: email,
                     timestamp: kstStr,
                     wpm: finalWPM,
+                    rank: rank,
                     ink: finalInk,
                     rune: finalRune,
                     gem: finalGem,
