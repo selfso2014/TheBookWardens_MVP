@@ -353,6 +353,7 @@ export class CalibrationManager {
                 if (statusEl) statusEl.style.display = 'none';
 
                 // 1. Start Watchdog FIRST
+                this.state.running = true; // [FIX] Ensure running=true so watchdog works
                 this.startCollection();
 
                 // 2. Trigger SDK Collection
@@ -374,11 +375,10 @@ export class CalibrationManager {
                 this.state.isFinishing = false;
                 this.state.pointCount = (this.state.pointCount || 0) + 1;
 
-                // Clear previous watchdog
-                if (this.state.watchdogTimer) {
-                    clearTimeout(this.state.watchdogTimer);
-                    this.state.watchdogTimer = null;
-                }
+                // Clear previous watchdogs
+                if (this.state.maxWaitTimer) { clearTimeout(this.state.maxWaitTimer); this.state.maxWaitTimer = null; }
+                if (this.state.progressWatchdog) { clearInterval(this.state.progressWatchdog); this.state.progressWatchdog = null; }
+                if (this.state.watchdogTimer) { clearTimeout(this.state.watchdogTimer); this.state.watchdogTimer = null; } // Legacy cleanup
 
                 // Clear wait timer (will re-start in startCollection if manual, or here?)
                 // Actually startCollection is called manually by button click usually.
