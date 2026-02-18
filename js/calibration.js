@@ -327,20 +327,24 @@ export class CalibrationManager {
         const btnStart = document.getElementById("btn-calibration-start");
         if (btnStart) {
             btnStart.onclick = () => {
-                logI("cal", "User clicked Start Point -> seeso.startCollectSamples()");
+                logI("cal", "User clicked Start Point -> Starting Watchdog & SDK");
 
                 // Hide button immediately to prevent double clicks
                 btnStart.style.display = "none";
 
-                // Trigger SDK Collection
-                if (typeof seeso.startCollectSamples === "function") {
-                    seeso.startCollectSamples();
-                } else {
-                    logE("cal", "seeso.startCollectSamples is not a function!");
-                }
-
-                // Start Watchdog
+                // 1. Start Watchdog FIRST
                 this.startCollection();
+
+                // 2. Trigger SDK Collection
+                try {
+                    if (typeof seeso.startCollectSamples === "function") {
+                        seeso.startCollectSamples();
+                    } else {
+                        logE("cal", "seeso.startCollectSamples is not a function!");
+                    }
+                } catch (e) {
+                    logE("cal", "SDK startCollectSamples threw error", e);
+                }
             };
         }
 
@@ -368,13 +372,23 @@ export class CalibrationManager {
 
                 logI("cal", `onCalibrationNextPoint (#${this.state.pointCount}) x=${x} y=${y}`);
 
-                // Update UI
+                // Update UI: Text ABOVE Button
                 const statusEl = document.getElementById("calibration-status");
                 if (statusEl) {
-                    statusEl.style.display = 'block';
                     statusEl.textContent = "Look at the Magic Orb!";
+                    statusEl.style.display = 'block';
                     statusEl.style.color = "#0f0";
                     statusEl.style.textShadow = "0 0 10px #0f0";
+
+                    // Force Absolute Position (Above Button)
+                    statusEl.style.position = 'absolute';
+                    statusEl.style.left = '50%';
+                    statusEl.style.transform = 'translateX(-50%)';
+                    statusEl.style.top = (y + 80) + 'px'; // Button is at y+150
+                    statusEl.style.width = "auto";
+                    statusEl.style.whiteSpace = "nowrap";
+                    statusEl.style.textAlign = "center";
+                    statusEl.style.pointerEvents = "none";
                 }
 
                 const btn = document.getElementById("btn-calibration-start");
