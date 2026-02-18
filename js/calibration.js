@@ -135,12 +135,20 @@ export class CalibrationManager {
                 const btn = document.getElementById("btn-calibration-start");
                 if (btn) {
                     btn.style.display = "inline-block";
-                    btn.textContent = (this.state.pointCount === 1) ? "Start Check" : "Next Point";
+                    btn.textContent = (this.state.pointCount === 1) ? "Look At The Dot" : "Next Point";
 
-                    // [FIX] Move button to the point location so user looks at it!
+                    // [FIX] Reset Position to CSS Default (Bottom Center)
+                    // Removing absolute overrides that placed it near the dot
+                    btn.style.position = '';
+                    btn.style.left = '';
+                    btn.style.top = '';
+
+                    /* Legacy: Placed near the dot
                     btn.style.position = 'absolute';
                     btn.style.left = (x - 40) + 'px'; // Center roughly (assuming button width ~80px)
                     btn.style.top = (y + 30) + 'px'; // Below the dot
+                    */
+
                     btn.style.pointerEvents = "auto";
 
                     // Add delay logic to button click in index.html or here?
