@@ -478,6 +478,7 @@ window.addEventListener("resize", () => {
 async function ensureCamera() {
   setState("perm", "requesting");
   try {
+    // 1st Attempt: Ideal constraints
     mediaStream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "user",
@@ -487,7 +488,26 @@ async function ensureCamera() {
       },
       audio: false,
     });
+  } catch (e1) {
+    console.warn("[Camera] 1st attempt failed (constraints). Retrying with basic constraints...");
+    try {
+      // 2nd Attempt: Basic constraints (Laptop Friendly)
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+    } catch (e2) {
+      // Final Failure
+      setState("perm", "denied");
+      showRetry(true, "camera permission denied");
+      logE("camera", "getUserMedia all attempts failed", e2);
+      alert("Camera access failed! Please check permissions or close other apps using the camera.");
+      return false;
+    }
+  }
 
+  // Success Handling
+  try {
     setState("perm", "granted");
 
     if (els.video) {
@@ -506,9 +526,7 @@ async function ensureCamera() {
 
     return true;
   } catch (e) {
-    setState("perm", "denied");
-    showRetry(true, "camera permission denied");
-    logE("camera", "getUserMedia failed", e);
+    logE("camera", "Video setup failed", e);
     return false;
   }
 }
