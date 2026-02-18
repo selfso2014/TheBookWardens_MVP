@@ -5,6 +5,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SeeSo Eye Tracking Web Demo</title>
+  <script>
+    if (location.hostname !== "localhost" && location.hostname !== "127.0.0.1" && location.protocol !== "https:") {
+      location.replace(`https:${location.href.substring(location.protocol.length)}`);
+    }
+  </script>
   <link rel="stylesheet" href="./css/style.css?v=v14.1.0" />
   <link rel="stylesheet" href="./css/rune-game.css" />
   <link rel="stylesheet" href="./css/rabbit.css" />
@@ -450,6 +455,10 @@
       </p>
 
       <!-- DEBUG BUTTONS REMOVED -->
+      <button id="btn-start-game" class="btn-primary"
+        style="margin-top: 40px; padding: 20px 40px; font-size: 1.5rem; animation: pulse 2s infinite;">
+        Start Game
+      </button>
 
       <!-- NEW DIRECT DEBUG BUTTON (ID-based binding) -->
       <button id="btn-debug-alice"

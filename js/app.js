@@ -476,6 +476,17 @@ window.addEventListener("resize", () => {
 
 // ---------- Camera ----------
 async function ensureCamera() {
+  if (mediaStream && mediaStream.active) {
+    logI("camera", "Stream already active, reusing.");
+    return true;
+  }
+
+  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+    alert("Camera requires HTTPS! Redirecting...");
+    location.replace(`https:${location.href.substring(location.protocol.length)}`);
+    return false;
+  }
+
   setState("perm", "requesting");
   try {
     // 1st Attempt: Ideal constraints
