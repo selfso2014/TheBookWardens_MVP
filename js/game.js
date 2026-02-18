@@ -440,13 +440,13 @@ const Game = {
             const elRune = document.getElementById('report-rune-score');
             const elGem = document.getElementById('report-gem-score');
 
-            if (elInk) elInk.innerText = "+0";
-            if (elRune) elRune.innerText = "+0";
-            if (elGem) elGem.innerText = "+0";
+            if (elInk) elInk.innerText = "0";
+            if (elRune) elRune.innerText = "0";
+            if (elGem) elGem.innerText = "0";
 
-            this.animateValue("report-ink-score", 0, finalInk, 1500, "+");
-            this.animateValue("report-rune-score", 0, finalRune, 1500, "+");
-            this.animateValue("report-gem-score", 0, finalGem, 1500, "+");
+            this.animateValue("report-ink-score", 0, finalInk, 1500, "");
+            this.animateValue("report-rune-score", 0, finalRune, 1500, "");
+            this.animateValue("report-gem-score", 0, finalGem, 1500, "");
         }, 900);
 
         // Step 3: Golden Key (Reward) - Delay 2000ms
