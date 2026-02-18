@@ -237,13 +237,13 @@ export class CalibrationManager {
 
         this.state.lastProgressUpdate = performance.now(); // Init timestamp
 
-        // 1. Overall Max Wait (10s)
+        // 1. Overall Max Wait (8s) [ADJUSTED]
         this.state.maxWaitTimer = setTimeout(() => {
             if (this.state.running) {
-                this.ctx.logW("cal", "Calibration timed out (10s limit). Showing fail popup.");
+                this.ctx.logW("cal", "Calibration timed out (8s limit). Showing fail popup.");
                 this.showFailPopup();
             }
-        }, 10000);
+        }, 8000);
 
         // 2. Progress Stuck Monitor (Check every 1s)
         this.state.progressWatchdog = setInterval(() => {
