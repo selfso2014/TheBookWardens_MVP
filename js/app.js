@@ -775,28 +775,18 @@ function startCalibration() {
       };
       tick();
 
-      // [EMERGENCY] Add a Skip Button after 3 seconds if user stuck
+      // [EMERGENCY SKIP REMOVED FOR PRODUCTION]
+      /*
       setTimeout(() => {
         if (overlay.calRunning) {
           const skipBtn = document.createElement('button');
           skipBtn.innerText = "⚠️ Emergency Skip";
-          skipBtn.style.position = 'fixed';
-          skipBtn.style.top = '10px';
-          skipBtn.style.right = '10px';
-          skipBtn.style.zIndex = '999999';
-          skipBtn.style.padding = '10px';
-          skipBtn.style.background = 'red';
-          skipBtn.style.color = 'white';
-          skipBtn.onclick = () => {
-            calManager.finishSequence();
-            skipBtn.remove();
-          };
+           // ... (removed)
           document.body.appendChild(skipBtn);
-
-          // Remove button automatically after 10s if not clicked
           setTimeout(() => skipBtn.remove(), 10000);
         }
       }, 3000);
+      */
     }
 
     logI("cal", "startCalibration returned", { ok, criteria });
