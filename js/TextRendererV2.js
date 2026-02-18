@@ -891,21 +891,21 @@ export class TextRenderer {
         setTimeout(() => {
             clearInterval(safetyInterval);
 
-            // [NEW] CRITICAL FIX: Re-Lock Layout to get EXACT current coordinates
-            // This handles any shifts, reflows, or scroll changes that happened since reading.
-            // We measure the text AS IT IS NOW, ensuring 0px error.
-            if (this.words.length > 0) {
-                console.log("[TextRenderer] Zero-Error Mapping: Re-calculating layout...");
-                this.lockLayout();
-            }
+            // [NEW] CRITICAL FIX: Do NOT Re-Lock Layout.
+            // We use the ORIGINAL coordinates from the reading session.
+            // Re-locking causes micro-shifts if the browser layout engine decided to reflow.
+            // if (this.words.length > 0) {
+            //    console.log("[TextRenderer] Zero-Error Mapping: Re-calculating layout...");
+            //    this.lockLayout();
+            // }
 
-            // Use the freshly calculated lines
+            // Use the freshly calculated lines (or existing ones)
             const visualLines = this.lines || [];
 
             if (visualLines.length === 0) {
-                console.warn("[TextRenderer] No visual lines available for mapping.");
-                if (onComplete) onComplete();
-                return;
+                console.warn("[TextRenderer] No visual lines available for mapping. Forcing one-time lock.");
+                // Emergency Fallback only
+                this.lockLayout();
             }
 
             console.log(`[TextRenderer] Starting Pang-Log Driven Replay...`);
