@@ -127,19 +127,35 @@ export class CalibrationManager {
      * Called when calibration starts (after Face Check).
      */
     startCollection() {
-        this.ctx.logI("cal", "startCollection: Starting strict watchdog (10s)");
+        this.ctx.logI("cal", "startCollection: Starting strict watchdog (10s) & Progress Monitor");
 
         // Clear old
         if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
+        if (this.state.progressWatchdog) clearInterval(this.state.progressWatchdog);
 
-        // 10 seconds max wait for the whole calibration or single point?
-        // Let's allow 10s per point to be safe.
+        this.state.lastProgressUpdate = performance.now(); // Init timestamp
+
+        // 1. Overall Max Wait (10s)
         this.state.maxWaitTimer = setTimeout(() => {
             if (this.state.running) {
                 this.ctx.logW("cal", "Calibration timed out (10s limit). Showing fail popup.");
                 this.showFailPopup();
             }
         }, 10000);
+
+        // 2. Progress Stuck Monitor (Check every 1s)
+        this.state.progressWatchdog = setInterval(() => {
+            if (!this.state.running) return;
+
+            const now = performance.now();
+            if (now - this.state.lastProgressUpdate > 5000) {
+                // No progress update for 5 seconds
+                this.ctx.logW("cal", "Calibration progress STUCK for 5s. Showing fail popup.");
+                clearInterval(this.state.progressWatchdog);
+                this.state.progressWatchdog = null;
+                this.showFailPopup();
+            }
+        }, 1000);
     }
 
     showFailPopup() {
@@ -240,16 +256,19 @@ export class CalibrationManager {
 
                 const btn = document.getElementById("btn-calibration-start");
                 if (btn) {
-                    // Show button for user to 'Start Collection'
-                    // Restore Legacy UI: Place button near the dot
+                    // Update Button Text & Position per User Request
+                    btn.textContent = "Look At The Dot";
+
+                    // Style: Center horizontally, placed well below the dot
                     btn.style.display = "inline-block";
                     btn.style.position = 'absolute';
-                    // Center roughly (assuming button width ~80px or dynamic)
-                    // If button is wider, this might be slightly off, but restores "old behavior".
-                    btn.style.left = (x - 40) + 'px';
-                    btn.style.top = (y + 40) + 'px'; // Below the dot
+                    btn.style.left = '50%';
+                    btn.style.transform = 'translateX(-50%)';
 
-                    btn.textContent = "Start Point"; // Matches index.html default
+                    // Place it 150px below the dot (or fixed at bottom if preferred, but user said "below point")
+                    // Since it's 1-point (Center), y is likely window.innerHeight/2.
+                    // Let's use a safe margin.
+                    btn.style.top = (y + 150) + 'px';
                     btn.style.pointerEvents = "auto";
                 }
             });
@@ -261,13 +280,17 @@ export class CalibrationManager {
             seeso.addCalibrationProgressCallback((progress) => {
                 if (this.state.isFinishing) return;
 
+                // Update Progress Timestamp for Watchdog
+                this.state.lastProgressUpdate = performance.now();
+
                 this.state.progress = progress;
                 const pct = Math.round(progress * 100);
                 setStatus(`Calibrating... ${pct}%`);
                 setState("cal", `running (${pct}%)`);
 
                 if (progress >= 1.0) {
-                    // Clear timeout on success
+                    // Clear watchdog on success
+                    if (this.state.progressWatchdog) clearInterval(this.state.progressWatchdog);
                     if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
                 }
 
@@ -285,6 +308,7 @@ export class CalibrationManager {
 
                 // Clear timeouts
                 if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
+                if (this.state.progressWatchdog) clearInterval(this.state.progressWatchdog);
 
                 this.state.isFinishing = true;
                 this.state.progress = 1.0;
