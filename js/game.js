@@ -4,7 +4,7 @@ import { vocabList, midBossQuizzes, finalBossQuiz } from './data/QuizData.js?v=F
 import { ScoreManager } from './managers/ScoreManager.js?v=FINAL_FIX_NOW';
 import { SceneManager } from './managers/SceneManager.js?v=FINAL_FIX_NOW';
 import { bus } from './core/EventBus.js?v=FINAL_FIX_NOW';
-import { TextRenderer } from './TextRendererV2.js?v=FINAL_FIX_NOW';
+import { VirtualTextRenderer } from './VirtualTextRendererV3.js?v=FINAL_FIX_NOW'; // [OPTIMIZATION] Virtual DOM
 import { WardenManager } from './managers/WardenManager.js?v=FINAL_FIX_NOW';
 import { IntroManager } from './managers/IntroManager.js?v=FINAL_FIX_NOW';
 import { VocabManager } from './managers/VocabManager.js?v=FINAL_FIX_NOW';
@@ -670,7 +670,7 @@ Game.typewriter = {
                 container.style.position = "relative";
                 container.style.overflow = "visible"; // Allow overflow for debugging visibility
 
-                this.renderer = new TextRenderer("book-content", {
+                this.renderer = new VirtualTextRenderer("book-content", {
                     fontSize: window.innerWidth <= 768 ? "1.0rem" : "1.3rem",
                     lineHeight: "2.8",
                     wordSpacing: "0.4em",
