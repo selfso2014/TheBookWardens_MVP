@@ -616,9 +616,13 @@ function attachSeesoCallbacks() {
       lastGazeAt = performance.now();
 
       // [CRITICAL PERFORMANCE GUARD]
-      // If Game logic explicitly requests pause (e.g. heavy rendering), abort immediately.
-      // This saves CPU for the main thread (iOS Crash Prevention).
-      if (window.Game && window.Game.state &&
+      // 1. Whitelist: Always allow Face Check & Calibration (Priority over Game State)
+      // These phases occur BEFORE Game.state.isTracking becomes true.
+      if (calManager && (calManager.isFaceCheckMode || calManager.isCalibrating)) {
+        // PASS: Allow data flow for calibration
+      }
+      // 2. Blacklist: If Game explicitly pauses tracking (e.g. heavy rendering), BLOCK.
+      else if (window.Game && window.Game.state &&
         !window.Game.state.isTracking && !window.Game.state.isOwlTracker) {
         return;
       }

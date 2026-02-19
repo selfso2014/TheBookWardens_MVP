@@ -15,9 +15,14 @@ export class CalibrationManager {
             isFinishing: false,
             watchdogTimer: null,
             inFailPopup: false, // [NEW] Flag to stop rendering when popup is open
+            isFaceCheck: false, // [NEW] Track Face Check Mode
         };
         this.seeso = null; // [NEW] Store SDK reference
     }
+
+    // [New] Public Getters for State Access
+    get isCalibrating() { return this.state.running; }
+    get isFaceCheckMode() { return this.state.isFaceCheck; }
 
     reset() {
         this.state.pointCount = 0;
@@ -26,6 +31,7 @@ export class CalibrationManager {
         this.state.isFinishing = false;
         this.state.running = false;
         this.state.inFailPopup = false;
+        this.state.isFaceCheck = false;
         if (this.state.watchdogTimer) clearTimeout(this.state.watchdogTimer);
         if (this.state.safetyTimer) clearTimeout(this.state.safetyTimer);
         if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
@@ -137,6 +143,8 @@ export class CalibrationManager {
     // --- FACE CHECK LOGIC ---
     startFaceCheck() {
         this.ctx.logI("cal", "Starting Face Check Mode");
+        this.reset(); // Clear any lingering state
+        this.state.isFaceCheck = true; // [NEW] Flag Face Check Active
 
         const faceScreen = document.getElementById("screen-face-check");
         const calScreen = document.getElementById("screen-calibration");
