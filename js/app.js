@@ -776,30 +776,38 @@ function startCalibration() {
 /**
  * Internal: Actually calls Seeso Calibration after Face Check passes.
  */
-function startActualCalibration() {
+async function startActualCalibration() {
   if (!seeso) return false;
+
+  // [MEMORY] Phase 1: Clean Slate
+  // Stop Face Check loop immediately
+  if (calManager) calManager.reset();
+
+  // Nuke Canvas Buffer (Force GPU Memory Release)
+  if (els.canvas) {
+    const ctx = els.canvas.getContext("2d");
+    ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
+    // Resize to 1x1 to force texture destruction
+    els.canvas.width = 1;
+    els.canvas.height = 1;
+    els.canvas.style.display = 'none'; // Detach from render tree
+  }
+
+  // [MEMORY] Phase 2: Sleep for GC (Crucial for iOS Chrome)
+  await new Promise(r => setTimeout(r, 200));
+
+  // [MEMORY] Phase 3: Re-initialize Canvas
+  if (els.canvas) els.canvas.style.display = 'block';
+  resizeCanvas(); // Restore size
 
   // Make canvas layer visible for calibration dots
   const stage = document.getElementById("stage");
   if (stage) stage.classList.add("visible");
 
-  // Force resize in case layout changed
-  resizeCanvas();
-
   try {
-    // Force High Accuracy (2) to ensure sufficient data collection (prevents 0% finish)
-    // On Mobile, use Medium (1) or Low (0) to avoid getting stuck.
-    // Force criteria to 0 (Low) for ALL devices to prevent Laptop freeze (Emergency)
+    // Force Low Strictness for mobile safety
     const criteria = 0;
-
-    // 5-point calibration (mode 5 is standard usually, check docs. Here current code sends 1?)
-    // Actually mode 1 might be 1-point? The user mentioned 5-point.
-    // Changing to 5 for better accuracy if supported, but sticking to existing logic first.
-    // The previous code had `seeso.startCalibration(1, criteria)`. Let's stick to 5 for game.
-    // [Request] 1-point calibration (mode 1)
-
-    calManager.reset();
-    const mode = 1;
+    const mode = 1; // 1-point or 5-point as configured
 
     const ok = seeso.startCalibration(mode, criteria);
 
@@ -815,19 +823,6 @@ function startActualCalibration() {
         requestAnimationFrame(tick);
       };
       tick();
-
-      // [EMERGENCY SKIP REMOVED FOR PRODUCTION]
-      /*
-      setTimeout(() => {
-        if (overlay.calRunning) {
-          const skipBtn = document.createElement('button');
-          skipBtn.innerText = "⚠️ Emergency Skip";
-           // ... (removed)
-          document.body.appendChild(skipBtn);
-          setTimeout(() => skipBtn.remove(), 10000);
-        }
-      }, 3000);
-      */
     }
 
     logI("cal", "startActualCalibration returned", { ok, criteria });
