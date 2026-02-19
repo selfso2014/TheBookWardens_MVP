@@ -655,15 +655,28 @@ export class TextRenderer {
     }
 
     activateRuneWord(word) {
+        if (word.activated) return;
         word.activated = true;
-        word.element.classList.add('active-rune'); // CSS Animation
+
+        // [PERF] Use lightweight style change to prevent GPU Crash on iOS
+        // Avoid 'filter', 'box-shadow', 'text-shadow' during scrolling/reading
+        word.element.style.color = "#ffeb3b"; // Bright Yellow
+        word.element.style.fontWeight = "bold";
+        word.element.style.textShadow = "none";
+
+        // Remove old heavy class if present
+        if (word.element.classList.contains('active-rune')) {
+            word.element.classList.remove('active-rune');
+        }
 
         console.log(`[RGT] Rune Word Triggered: "${word.text}" (ID: ${word.runeId})`);
 
         // Emit Event for Game Logic (Score, FX)
-        // We use a small timeout to prevent blocking render loop
         setTimeout(() => {
-            bus.emit('rune_touched', word.runeId);
+            // [FIX] Ensure event is emitted (Try local bus -> global Game.bus)
+            if (typeof bus !== 'undefined' && bus.emit) bus.emit('rune_touched', word.runeId);
+            else if (window.Game && window.Game.bus) window.Game.bus.emit('rune_touched', word.runeId);
+            else console.warn("[TextRenderer] Bus not found for Rune Event");
         }, 0);
     }
 
@@ -763,7 +776,7 @@ export class TextRenderer {
             this.impactElement.style.position = "fixed";
             this.impactElement.style.borderRadius = "50%";
             this.impactElement.style.backgroundColor = "magenta";
-            this.impactElement.style.boxShadow = "0 0 15px magenta";
+            this.impactElement.style.boxShadow = "none"; // [PERF] No Shadow
             this.impactElement.style.zIndex = "999999";
             this.impactElement.style.pointerEvents = "none";
             this.impactElement.style.opacity = "0";
@@ -1112,11 +1125,11 @@ export class TextRenderer {
                     if (head && !head.isJump) {
                         ctx.beginPath();
                         ctx.fillStyle = '#00ff00';
-                        ctx.shadowColor = '#00ff00';
-                        ctx.shadowBlur = 10;
+                        // ctx.shadowColor = '#00ff00'; // [PERF] Kill Shadow
+                        // ctx.shadowBlur = 10;
                         ctx.arc(head.x, head.y, 8, 0, Math.PI * 2);
                         ctx.fill();
-                        ctx.shadowBlur = 0;
+                        // ctx.shadowBlur = 0;
                     }
                 }
                 requestAnimationFrame(animate);
