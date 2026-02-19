@@ -421,9 +421,14 @@ export class GazeDataManager {
     }
 
     async uploadToCloud(sessionId) {
+        // [PERF] Disable Cloud Upload for Reading Phase to prevent iOS Crash
+        // Heavy JSON serialization + Network during gameplay causes memory spikes and UI freeze.
+        // Data will only reside in memory (or local storage if needed later).
+        console.log("[GazeDataManager] Cloud Upload Skipped (Performance Optimization)");
+        return;
+
         if (!window.firebase || !window.FIREBASE_CONFIG) {
             console.error("[Firebase] SDK or Config not loaded.");
-            // alert("Firebase not configured. Cannot upload."); // Silence alert for background sync
             return;
         }
 
