@@ -32,6 +32,55 @@ export class IntroManager {
                 this.startRiftIntro();
             };
         }
+
+        // --- DEBUG: Mission Report Shortcut ---
+        this.createDebugReportButton();
+    }
+
+    createDebugReportButton() {
+        // Prevent duplicate button
+        if (document.getElementById("btn-debug-report")) return;
+
+        const container = document.getElementById("screen-home");
+        if (!container) return;
+
+        const debugBtn = document.createElement("button");
+        debugBtn.id = "btn-debug-report";
+        debugBtn.innerText = "🛠 Test Report";
+        debugBtn.style.cssText = `
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid red;
+            color: white;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            z-index: 10000;
+            border-radius: 4px;
+        `;
+
+        debugBtn.onclick = (e) => {
+            e.stopPropagation(); // Prevent other clicks
+            console.log("[Debug] Jumping to Mission Report with Mock Data...");
+
+            // Mock Data for Scoring Animation Check
+            const mockScoreData = {
+                wpm: 245,      // Target WPM
+                ink: 135,      // Ink Collected
+                rune: 12,      // Runes Deciphered
+                gem: 5         // Gems Earned
+            };
+
+            if (this.game && typeof this.game.goToNewScore === 'function') {
+                this.game.goToNewScore(mockScoreData);
+            } else {
+                console.error("[Debug] Game.goToNewScore not found!");
+            }
+        };
+
+        container.appendChild(debugBtn);
     }
 
     checkAutoStart() {

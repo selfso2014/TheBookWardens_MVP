@@ -402,25 +402,64 @@ const Game = {
 
         this.switchScreen("screen-new-score");
 
-        // 2. Update UI Elements directly
-        const elInk = document.getElementById('report-ink-score');
-        const elRune = document.getElementById('report-rune-score');
-        const elGem = document.getElementById('report-gem-score');
-        const elInkCount = document.getElementById('report-ink-count');
-        const elRuneCount = document.getElementById('report-rune-count');
-        const elGemCount = document.getElementById('report-gem-count');
+        // 2. Reset Animation States (Invisible initially)
+        const rowStats = document.getElementById("report-stats-row");
+        const rowResources = document.getElementById("report-resource-row");
+        const secReward = document.getElementById("reward-section");
 
-        if (elInk) elInk.innerText = "+" + finalInk;
-        if (elRune) elRune.innerText = "+" + finalRune;
-        if (elGem) elGem.innerText = "+" + finalGem;
+        [rowStats, rowResources, secReward].forEach(el => {
+            if (el) {
+                el.style.opacity = "0";
+                el.style.transform = "translateY(30px)";
+                el.style.transition = "none"; // Disable transition for reset
+            }
+        });
 
-        // Show totals
-        if (elInkCount) elInkCount.innerText = "Current: " + finalInk;
-        if (elRuneCount) elRuneCount.innerText = "Current: " + finalRune;
-        if (elGemCount) elGemCount.innerText = "Current: " + finalGem;
+        // 3. Start Sequence
+        // Force reflow
+        if (rowStats) void rowStats.offsetHeight;
 
-        // 3. Animate WPM
-        this.animateValue("report-wpm", 0, finalWPM, 1500);
+        // Restore transitions
+        [rowStats, rowResources, secReward].forEach(el => {
+            if (el) el.style.transition = "all 0.8s cubic-bezier(0.22, 1, 0.36, 1)";
+        });
+
+        // Step 1: Speed & Rank (Start immediately)
+        setTimeout(() => {
+            if (rowStats) {
+                rowStats.style.opacity = "1";
+                rowStats.style.transform = "translateY(0)";
+            }
+            this.animateValue("report-wpm", 0, finalWPM, 1500);
+        }, 100);
+
+        // Step 2: Resources (Ink, Rune, Gem) - Delay 800ms
+        setTimeout(() => {
+            if (rowResources) {
+                rowResources.style.opacity = "1";
+                rowResources.style.transform = "translateY(0)";
+            }
+            const elInk = document.getElementById('report-ink-score');
+            const elRune = document.getElementById('report-rune-score');
+            const elGem = document.getElementById('report-gem-score');
+
+            if (elInk) elInk.innerText = "0";
+            if (elRune) elRune.innerText = "0";
+            if (elGem) elGem.innerText = "0";
+
+            this.animateValue("report-ink-score", 0, finalInk, 1500, "");
+            this.animateValue("report-rune-score", 0, finalRune, 1500, "");
+            this.animateValue("report-gem-score", 0, finalGem, 1500, "");
+        }, 900);
+
+        // Step 3: Golden Key (Reward) - Delay 2000ms
+        setTimeout(() => {
+            if (secReward) {
+                secReward.style.opacity = "1";
+                secReward.style.transform = "translateY(0)";
+            }
+        }, 2200);
+
 
         // 4. Calculate Rank based on total score (Simple Mock Logic)
         const totalScore = finalInk + (finalRune * 10) + (finalGem * 5);
@@ -441,23 +480,135 @@ const Game = {
             if (btnClaim.parentNode) btnClaim.parentNode.replaceChild(newBtn, btnClaim);
 
             newBtn.onclick = () => {
-                const email = emailInput ? emailInput.value : "";
+                const email = emailInput ? emailInput.value.trim() : "";
+
                 if (!email || !email.includes("@")) {
                     alert("Please enter a valid email address.");
                     return;
                 }
 
-                // Simulate API Call
-                newBtn.innerText = "Sending...";
-                newBtn.disabled = true;
+                // 1. Initialize Firebase if needed
+                if (typeof firebase === "undefined") {
+                    alert("System Error: Firebase SDK not loaded.");
+                    return;
+                }
 
-                setTimeout(() => {
-                    alert("Reward Claimed! Check your email.");
-                    // Go to Share Screen
-                    Game.switchScreen("screen-new-share");
-                }, 1500);
+                if (!firebase.apps.length) {
+                    if (window.FIREBASE_CONFIG) {
+                        try {
+                            firebase.initializeApp(window.FIREBASE_CONFIG);
+                        } catch (e) {
+                            console.error("Firebase Init Error:", e);
+                            alert("Database Connection Failed.");
+                            return;
+                        }
+                    } else {
+                        alert("System Error: Firebase Config missing.");
+                        return;
+                    }
+                }
+
+                // 2. Prepare Data
+                const now = new Date();
+                // KST (UTC+9) formatting
+                const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+                const kstStr = kstDate.toISOString().replace('T', ' ').slice(0, 19);
+
+                const reportData = {
+                    email: email,
+                    timestamp: kstStr,
+                    wpm: finalWPM,
+                    rank: rank,
+                    ink: finalInk,
+                    rune: finalRune,
+                    gem: finalGem,
+                    device: navigator.userAgent
+                };
+
+                // 3. Save to Realtime Database
+                const originalText = "CLAIM REWARD";
+                newBtn.disabled = true;
+                newBtn.innerText = "⏳ SAVING...";
+                newBtn.style.opacity = "0.7";
+
+                // Use Realtime Database "warden_leads"
+                const db = firebase.database();
+                const leadsRef = db.ref("warden_leads");
+                const newLeadRef = leadsRef.push(); // Generate key first
+
+                // Add Session ID reference to report data
+                reportData.sessionId = newLeadRef.key;
+
+                // Promise Array for Parallel saving
+                const promises = [];
+
+                // 1. Save Lead Data (Summary)
+                promises.push(newLeadRef.set(reportData));
+
+                // 2. Save Full Gaze Data (Detail) - if available
+                if (window.gazeDataManager) {
+                    newBtn.innerText = "⏳ DATA SYNC...";
+                    console.log("[Firebase] Starting Gaze Data Upload for Session:", newLeadRef.key);
+                    // Upload to separate path 'sessions/{key}' to keep leads light
+                    promises.push(window.gazeDataManager.uploadToCloud(newLeadRef.key));
+                }
+
+                Promise.all(promises)
+                    .then(() => {
+                        // REPLACED: window.alert -> Custom Modal
+                        this.showSuccessModal(() => {
+                            // On Confirm action
+                            // Game.switchScreen("screen-new-share"); 
+                            // Or refresh, or whatever the next step is.
+                            // Assuming "screen-new-share" is next based on context.
+                            this.goToNewShare();
+                        });
+
+                        newBtn.innerText = "✅ CLAIMED";
+                        newBtn.style.background = "#4CAF50";
+                        if (emailInput) emailInput.disabled = true;
+                    })
+                    .catch((error) => {
+                        console.error("Firebase Save Error:", error);
+                        window.alert("Transmission Failed: " + error.message);
+                        newBtn.disabled = false;
+                        newBtn.innerText = originalText;
+                        newBtn.style.opacity = "1";
+                    });
             };
         }
+    },
+
+    // NEW: Custom Success Modal Logic
+    showSuccessModal(onConfirm) {
+        const modal = document.getElementById("success-modal");
+        const btn = document.getElementById("btn-modal-confirm");
+        if (!modal || !btn) {
+            window.alert("Access Granted! (Modal Missing)");
+            if (onConfirm) onConfirm();
+            return;
+        }
+
+        // Show
+        modal.style.display = "flex";
+        // Force Reflow
+        void modal.offsetHeight;
+
+        modal.style.opacity = "1";
+        const content = modal.firstElementChild;
+        if (content) content.style.transform = "scale(1)";
+
+        // Bind Action
+        btn.onclick = () => {
+            // Hide Animation
+            modal.style.opacity = "0";
+            if (content) content.style.transform = "scale(0.9)";
+
+            setTimeout(() => {
+                modal.style.display = "none";
+                if (onConfirm) onConfirm();
+            }, 300);
+        };
     },
 
     goToNewSignup() {
@@ -475,9 +626,8 @@ const Game = {
     },
 
     // Utilities
-    // Utilities
-    animateValue(id, start, end, duration, suffix = "") {
-        this.uiManager.animateValue(id, start, end, duration, "", suffix);
+    animateValue(id, start, end, duration, prefix = "", suffix = "") {
+        this.uiManager.animateValue(id, start, end, duration, prefix, suffix);
     }
 };
 
