@@ -26,6 +26,8 @@ export class VirtualTextRenderer {
         this.allWords = []; // Plain JS Objects { text, index, isRune, runeId, ... }
         this.chunks = [];   // Array of word indices arrays
         this.lines = [];    // Array of { startIndex, endIndex, top, bottom }
+        this.pages = [];    // Compatibility
+        this.isLayoutLocked = false;
 
         // State
         this.activeAnimations = [];
@@ -253,6 +255,8 @@ export class VirtualTextRenderer {
             this.allWords.forEach(w => {
                 w.tempDom = null; // Detach
             });
+
+            this.isLayoutLocked = true; // [COMPAT]
 
             console.log(`[VirtualRenderer] Layout Locked: ${this.lines.length} lines.`);
             resolve();
