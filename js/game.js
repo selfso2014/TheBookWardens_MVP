@@ -137,6 +137,8 @@ const Game = {
 
         // DEBUG: Manual Export Button (Removed per user request)
 
+        // 5. Global Events
+        this.bindEvents();
     },
 
     bindEvents() {
