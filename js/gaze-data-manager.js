@@ -55,13 +55,6 @@ export class GazeDataManager {
     processGaze(gazeInfo) {
         if (!gazeInfo) return;
 
-        // [iOS OPTIMIZATION] Downsample to 30fps to reduce Main Thread load
-        // This effectively halves the CPU usage for Gaze Logic on iPhones.
-        if (navigator.userAgent && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            this._downsampleTick = (this._downsampleTick || 0) + 1;
-            if (this._downsampleTick % 2 !== 0) return; // Skip odd frames
-        }
-
         // EMERGENCY CHECK: Ensure storage exists
         if (!this.data || !Array.isArray(this.data)) {
             console.warn("[GazeDataManager] Data array missing/corrupt. Re-initializing.");
