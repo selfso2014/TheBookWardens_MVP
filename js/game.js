@@ -56,28 +56,47 @@ const Game = {
             console.warn("[Game] iOS Chrome Detected: Enabling Low-Spec Mode");
             document.body.classList.add("ios-chrome-mode");
 
-            // Inject Safe Styles (No Filters)
+            // Inject Safe Styles (No Filters, No Gradients, No Complex Animations)
             const style = document.createElement('style');
             style.innerHTML = `
+                /* [CRITICAL] Global GPU Killer Disable */
                 .ios-chrome-mode * {
                     filter: none !important;
                     backdrop-filter: none !important;
                     box-shadow: none !important;
                     text-shadow: none !important;
+                    
+                    /* Block Gradients & Masks (Luminous Effect Killer) */
+                    background-image: none !important; 
+                    mask: none !important;
+                    -webkit-mask: none !important;
+                    clip-path: none !important;
                 }
+
+                /* Block Animations on everything EXCEPT Meteors */
+                .ios-chrome-mode *:not(.meteor) {
+                    animation: none !important;
+                    transition: none !important;
+                }
+
+                /* [SAFE RUNE] Simple Gold Text */
                 .ios-chrome-mode .rune-word.revealed {
-                    color: gold !important; 
-                    background: rgba(255, 215, 0, 0.1);
-                    border-bottom: 2px solid gold;
+                    color: #ffd700 !important; 
+                    background-color: rgba(255, 215, 0, 0.1) !important;
+                    border-bottom: 2px solid #ffd700 !important;
+                    transform: none !important; 
                 }
+                
                 .ios-chrome-mode .vocab-card {
                     border: 1px solid #444 !important;
-                    background: #222 !important;
+                    background-color: #222 !important;
                 }
-                /* Ensure particles don't kill GPU */
+                
+                /* [SAFE PARTICLES] Cheap Meteors */
                 .ios-chrome-mode .meteor {
                     box-shadow: none !important;
-                    background: rgba(255,255,255,0.8) !important;
+                    background-color: rgba(255,255,255,0.8) !important;
+                    /* Animation preserved by :not() exclusion above */
                 }
             `;
             document.head.appendChild(style);
