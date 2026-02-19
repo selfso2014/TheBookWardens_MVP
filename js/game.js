@@ -1349,8 +1349,64 @@ if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initGame);
 } else {
     // Document already interactive/complete
+    // Document already interactive/complete
     initGame();
 }
+
+// [URGENT FIX] Independent Splash Handler
+(function () {
+    const splash = document.getElementById('screen-splash');
+    if (!splash) return;
+
+    // 1. Force Clickable
+    splash.style.pointerEvents = 'auto';
+
+    // 2. Define Handler
+    const forceStart = () => {
+        console.log("[Splash] User tapped. Attempting to start...");
+
+        // A. If Game is Ready (IntroManager handles it)
+        if (window.Game && window.Game.introManager) {
+            // Check if dismissSplash exists on IntroManager (it should)
+            if (typeof window.Game.introManager.dismissSplash === 'function') {
+                window.Game.introManager.dismissSplash();
+                return;
+            }
+        }
+
+        // B. If Game NOT Ready but initGame exists
+        if (typeof initGame === 'function' && (!window.Game || !window.Game.isInitialized)) {
+            console.warn("[Splash] Game not ready. Forcing init...");
+
+            // Show Feedback
+            let loader = document.getElementById('splash-loader-msg');
+            if (!loader) {
+                loader = document.createElement('div');
+                loader.id = 'splash-loader-msg';
+                loader.innerText = "Initializing Magic... Tap again.";
+                loader.style.cssText = "position:absolute; bottom:20%; width:100%; text-align:center; color:rgba(255,255,255,0.8); font-size:1.0rem; pointer-events:none;";
+                splash.appendChild(loader);
+            }
+
+            initGame(); // Force Init
+            return;
+        }
+
+        // C. Last Resort (Hide Splash Manually)
+        console.error("[Splash] Critical State. Forcing screen switch.");
+        splash.style.display = 'none';
+        const home = document.getElementById('screen-home');
+        if (home) {
+            home.style.display = 'flex';
+            home.classList.add('active');
+            // Try to init anyway
+            if (typeof initGame === 'function') initGame();
+        }
+    };
+
+    // 3. Bind Immediately
+    splash.onclick = forceStart;
+})();
 
 
 // End of file
