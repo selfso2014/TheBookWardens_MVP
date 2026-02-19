@@ -253,6 +253,13 @@ export class IntroManager {
 
         console.log("[IntroManager] Rift Intro Done. Moving to Word Forge.");
 
+        // [MEMORY] Critical Clean: Purge Intro Assets ASAP to prevent Calibration Crash
+        if (meteorLayer) meteorLayer.innerHTML = ""; // Kill all particles
+        if (villainContainer) {
+            villainContainer.style.opacity = "0";
+            // Optional: if complex children
+        }
+
         // Final Transition logic
         this.game.state.vocabIndex = 0;
         this.game.loadVocab(0);

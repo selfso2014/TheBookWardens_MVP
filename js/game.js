@@ -49,6 +49,40 @@ const Game = {
     init() {
         console.log("Game Init");
 
+        // [OPTIMIZATION] Detect iOS Chrome (CriOS) for Memory Safety
+        // Caps visual effects to prevent GPU Crashes
+        const ua = navigator.userAgent || "";
+        if (/CriOS/i.test(ua) && /iPhone|iPad|iPod/i.test(ua)) {
+            console.warn("[Game] iOS Chrome Detected: Enabling Low-Spec Mode");
+            document.body.classList.add("ios-chrome-mode");
+
+            // Inject Safe Styles (No Filters)
+            const style = document.createElement('style');
+            style.innerHTML = `
+                .ios-chrome-mode * {
+                    filter: none !important;
+                    backdrop-filter: none !important;
+                    box-shadow: none !important;
+                    text-shadow: none !important;
+                }
+                .ios-chrome-mode .rune-word.revealed {
+                    color: gold !important; 
+                    background: rgba(255, 215, 0, 0.1);
+                    border-bottom: 2px solid gold;
+                }
+                .ios-chrome-mode .vocab-card {
+                    border: 1px solid #444 !important;
+                    background: #222 !important;
+                }
+                /* Ensure particles don't kill GPU */
+                .ios-chrome-mode .meteor {
+                    box-shadow: none !important;
+                    background: rgba(255,255,255,0.8) !important;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
         // 1. Core Managers (Must be first)
         this.scoreManager = new ScoreManager();
         this.sceneManager = new SceneManager();
