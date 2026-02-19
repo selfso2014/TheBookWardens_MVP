@@ -254,7 +254,20 @@ export class GazeDataManager {
     }
 
     setReplayData(data) {
-        this.replayData = data;
+        // [iOS OPTIMIZATION] Limit Replay Data Size for Memory Safety
+        // Massive replay arrays cause crashes during JSON.stringify or rendering
+        if (data && data.length > 1000) {
+            const maxPoints = 1000;
+            const step = Math.ceil(data.length / maxPoints);
+            const optimized = [];
+            for (let i = 0; i < data.length; i += step) {
+                optimized.push(data[i]);
+            }
+            console.log(`[GazeDataManager] Optimized Replay Data: ${data.length} -> ${optimized.length}`);
+            this.replayData = optimized;
+        } else {
+            this.replayData = data;
+        }
     }
 
     getFixations() {
