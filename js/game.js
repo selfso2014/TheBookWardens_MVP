@@ -11,6 +11,8 @@ import { VocabManager } from './managers/VocabManager.js?v=FINAL_FIX_NOW';
 import { UIManager } from './core/UIManager.js?v=FINAL_FIX_NOW';
 import { GameLogic } from './core/GameLogic.js?v=FINAL_FIX_NOW';
 import { DOMManager } from './core/DOMManager.js?v=FINAL_FIX_NOW';
+import { memoryManager } from './managers/MemoryManager.js';
+
 const Game = {
     // Initialized in init()
     scoreManager: null,
@@ -46,6 +48,61 @@ const Game = {
 
     init() {
         console.log("Game Init");
+
+        // [OPTIMIZATION] Detect iOS (All iOS browsers struggle)
+        const ua = navigator.userAgent || "";
+        const isIOS = /iPhone|iPad|iPod/i.test(ua);
+
+        if (isIOS) {
+            console.warn("[Game] iOS Detected: Activating Stability Mode");
+            document.body.classList.add("ios-optimization");
+
+            const style = document.createElement('style');
+            style.innerHTML = `
+                /* 1. Global Kill Switch for Heavy GPU Effects */
+                .ios-optimization *:not(canvas) { /* Don't nuke canvas rendering */
+                    box-shadow: none !important;
+                    filter: none !important;
+                    backdrop-filter: none !important;
+                    text-shadow: none !important;
+                    
+                    /* Block Gradient Masking (Luminous Effect) */
+                    background-image: none !important;
+                    mask: none !important;
+                    -webkit-mask: none !important;
+                    clip-path: none !important;
+                }
+
+                /* 2. CRITICAL: Allow smooth transitions for Text and Cursor only */
+                .ios-optimization .tr-word, 
+                .ios-optimization .text-cursor,
+                .ios-optimization #gaze-cursor {
+                    /* Allow opacity/transform transitions */
+                    transition: opacity 0.2s ease, transform 0.1s linear !important;
+                }
+                
+                /* 3. Disable other irrelevant animations to save GPU cycles */
+                .ios-optimization *:not(.tr-word):not(.text-cursor):not(#gaze-cursor):not(.meteor) {
+                    animation: none !important;
+                    /* Ensure transform is not killed if not needed */
+                }
+
+                /* 4. Safe Visuals for Rune Words */
+                .ios-optimization .rune-word.revealed {
+                    color: #ffd700 !important;
+                    background-color: rgba(255, 215, 0, 0.1) !important;
+                    border-bottom: 2px solid #ffd700 !important;
+                    transform: none !important; 
+                }
+                
+                /* 5. Safe Vocab Cards */
+                .ios-optimization .vocab-card {
+                    border: 1px solid #444 !important;
+                    background-color: #222 !important;
+                }
+            `;
+            document.head.appendChild(style);
+        }
 
         // 1. Core Managers (Must be first)
         this.scoreManager = new ScoreManager();
@@ -139,6 +196,29 @@ const Game = {
     // --- Browser Detection Moved to IntroManager ---
 
     switchScreen(screenId) {
+        console.log(`[Game] Switching to ${screenId}`);
+
+        // [MEMORY] 1. Identify & Purge Previous Screen
+        const prevScreen = document.querySelector('.screen.active');
+        if (prevScreen) {
+            const prevId = prevScreen.id;
+            // console.log(`[Game] Leaving ${prevId}...`); // Reduce log spam
+
+            // A. Intro Purge (Heavy Particles)
+            if (prevId === 'screen-rift-intro') {
+                const meteorLayer = document.getElementById("meteor-layer");
+                if (meteorLayer) {
+                    meteorLayer.innerHTML = ""; // Kill 100+ DOM nodes
+                    meteorLayer.style.display = 'none';
+                }
+                const villain = document.getElementById("rift-villain-container");
+                if (villain) {
+                    // villain.innerHTML = ""; // Keep container, remove content if needed
+                    villain.style.display = 'none';
+                }
+            }
+        }
+
         // [FIX] Ensure clean state transition
         document.querySelectorAll('.screen').forEach(el => {
             el.classList.remove('active');
