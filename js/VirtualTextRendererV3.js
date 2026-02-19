@@ -36,6 +36,18 @@ export class VirtualTextRenderer {
         this.activeElements = new Map(); // wordIndex -> DOM Element
         this.pool = []; // Recycled spans
 
+        // Cursor (Compatibility & Rift Focus)
+        this.cursor = document.createElement("div");
+        this.cursor.className = "text-cursor";
+        this.cursor.style.position = "absolute";
+        this.cursor.style.width = "10px";
+        this.cursor.style.height = "2px";
+        this.cursor.style.background = "transparent"; // Visual handled by SceneManager
+        this.cursor.style.pointerEvents = "none";
+        this.cursor.style.display = "none";
+
+        if (this.container) this.container.appendChild(this.cursor);
+
         // Metrics
         this.containerWidth = 0;
         this.containerHeight = 0;
@@ -104,6 +116,14 @@ export class VirtualTextRenderer {
         // Re-init basics after dispose
         this.activeElements = new Map();
         this.pool = [];
+
+        // Re-append Cursor (cleared by dispose innerHTML="")
+        if (this.container && this.cursor) {
+            if (!this.cursor.parentNode) this.container.appendChild(this.cursor);
+            this.cursor.style.display = "block";
+            this.cursor.style.opacity = "0";
+        }
+
         if (this.container) this.resizeObserver.observe(this.container);
 
         if (!chapterData || !chapterData.paragraphs) return;
