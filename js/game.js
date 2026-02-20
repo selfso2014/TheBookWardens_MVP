@@ -1140,6 +1140,15 @@ Game.typewriter = {
 
             console.log(`[Replay] Found ${sessionData.length} points.`);
 
+            // [FIX] Cancel all pending fadeOut timers before replay starts.
+            // During reading, tick() schedules scheduleFadeOut(chunkIndex, 3000) for every chunk.
+            // Without this call, those timers fire mid-replay and erase visible text
+            // (especially the last 3-4 lines which are revealed latest and time out soonest).
+            if (this.renderer && typeof this.renderer.cancelAllAnimations === 'function') {
+                this.renderer.cancelAllAnimations();
+                console.log('[Replay] Cleared all pending fadeOut timers before replay.');
+            }
+
             // Hide Cursor during replay for cleaner view
             if (this.renderer && this.renderer.cursor) this.renderer.cursor.style.opacity = "0";
 

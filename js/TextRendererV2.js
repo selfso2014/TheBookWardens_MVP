@@ -624,7 +624,10 @@ export class TextRenderer {
     }
 
     scheduleFadeOut(chunkIndex, delayMs) {
-        setTimeout(() => this.fadeOutChunk(chunkIndex), delayMs);
+        // [FIX] Track in activeAnimations so cancelAllAnimations() can cancel pending fadeOuts.
+        // Previously untracked: fadeOut timers fired during replay, wiping visible text.
+        const tid = setTimeout(() => this.fadeOutChunk(chunkIndex), delayMs);
+        this.activeAnimations.push(tid);
     }
 
     // --- RGT (Relative Gaze Trigger) Logic ---
