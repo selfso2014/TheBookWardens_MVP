@@ -30,9 +30,13 @@ const LICENSE_KEY = window.location.hostname === "selfso2014.github.io"
   : "dev_1ntzip9admm6g0upynw3gooycnecx0vl93hz8nox";
 
 const DEBUG_LEVEL = (() => {
-  const v = new URLSearchParams(location.search).get("debug");
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0; // Default: 0 (Hidden)
+  const params = new URLSearchParams(location.search);
+  // [MOD] Default: 1 (Enabled) if no param, or ?debug=1
+  // If ?debug=0, then 0 (Hidden)
+  if (!params.has("debug")) return 1;
+
+  const n = Number(params.get("debug"));
+  return Number.isFinite(n) ? n : 0;
 })();
 
 // --- [NEW] Debug Meter: Memory Leak Tracker ---
