@@ -88,18 +88,15 @@ export class GazeDataManager {
             if (gazeInfo.eyemovementState === 0) type = 'Fixation';
             else if (gazeInfo.eyemovementState === 2) type = 'Saccade';
 
+            // [FIX-iOS] Data Diet: Keep only essential fields to minimize memory footprint.
+            // Removed: gx, gy (calculated later), vx, vy (calculated later), 
+            // sdkFixationX, sdkFixationY (redundant), rsState, rsTriggerType (only for debug).
             const entry = {
                 t, x, y,
-                gx: null, gy: null,
-                vx: null, vy: null,
-                targetY: null, avgY: null,
-                type,
-                sdkFixationX: gazeInfo.fixationX,
-                sdkFixationY: gazeInfo.fixationY,
-                ...(this.context || {}),
-                // New Debug Fields
-                rsState: null,     // 'Pending', 'Immediate', 'Delayed', 'Missed', 'Timeout'
-                rsTriggerType: null // 'Immediate', 'Delayed'
+                line: this.context.lineIndex,
+                pIdx: this.context.paraIndex,
+                wIdx: this.context.wordIndex,
+                type: (gazeInfo.eyemovementState === 0 ? 0 : (gazeInfo.eyemovementState === 2 ? 2 : 1)) // Use numbers instead of strings
             };
 
             // CRITICAL: Always push raw data
@@ -124,7 +121,7 @@ export class GazeDataManager {
             }
 
             // [NEW] Capture Start of Content (First valid Line Index)
-            if (this.firstContentTime === null && typeof entry.lineIndex === 'number' && entry.lineIndex >= 0) {
+            if (this.firstContentTime === null && typeof entry.line === 'number' && entry.line >= 0) {
                 this.firstContentTime = entry.t;
                 // [RGT] Initial Line Start Collection
                 this.isCollectingLineStart = true;
@@ -163,11 +160,10 @@ export class GazeDataManager {
                 // We use this.prevLineIndex which holds the state from the PREVIOUS frame loop.
                 const isContextRestored = (this.prevLineIndex === null || this.prevLineIndex === undefined || this.prevLineIndex === -1);
 
-                if (this.pendingReturnSweep && entry.lineIndex !== undefined && entry.lineIndex !== null && isContextRestored) {
+                if (this.pendingReturnSweep && entry.line !== undefined && entry.line !== null && isContextRestored) {
                     // Check if the pending sweep is still fresh (< 1000ms)
                     if ((t - this.pendingReturnSweep.t) < 1000) {
                         this._fireEffect("Delayed", this.pendingReturnSweep.vx);
-                        if (this.data.length > 0) this.data[this.data.length - 1].rsState = "Delayed_Success";
                         this.pendingReturnSweep = null;
                         // console.log("[RS] ✅ Delayed Trigger Fired (Context Restored)");
                     } else {
@@ -277,14 +273,22 @@ export class GazeDataManager {
     }
 
     setContext(ctx) {
-        this.context = { ...this.context, ...ctx };
+        // [FIX-iOS] Mutate in-place instead of spread-creating a new object.
+        // Old code: this.context = {...this.context, ...ctx} = new obj every call.
+        // Called 30x/sec from updateGazeStats → 30 allocs/sec eliminated.
+        if (ctx) {
+            for (const key in ctx) {
+                this.context[key] = ctx[key];
+            }
+        }
     }
 
     setLineMetadata(lineIndex, metadata) {
         if (!this.lineMetadata[lineIndex]) {
             this.lineMetadata[lineIndex] = {};
         }
-        this.lineMetadata[lineIndex] = { ...this.lineMetadata[lineIndex], ...metadata };
+        // [FIX-iOS] Mutate in-place via Object.assign instead of spread.
+        Object.assign(this.lineMetadata[lineIndex], metadata);
     }
 
     setReplayData(data) {
@@ -374,7 +378,7 @@ export class GazeDataManager {
         const targetYMap = {};
         if (window.Game && window.Game.typewriter && window.Game.typewriter.lineYData) {
             window.Game.typewriter.lineYData.forEach(item => {
-                targetYMap[item.lineIndex] = item.y;
+                targetYMap[item.line] = item.y;
             });
         }
 
@@ -383,7 +387,7 @@ export class GazeDataManager {
         const lineYAvg = {};
         this.data.forEach(d => {
             if (d.t < startTime || d.t > endTime) return;
-            const lIdx = d.lineIndex;
+            const lIdx = d.line;
             if (lIdx !== undefined && lIdx !== null) {
                 if (d.gy !== undefined && d.gy !== null) {
                     if (!lineYSum[lIdx]) { lineYSum[lIdx] = 0; lineYCount[lIdx] = 0; }
@@ -400,7 +404,7 @@ export class GazeDataManager {
         let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,DidFire,ReturnSweepState,TriggerType,Debug_Median,Debug_Threshold,Debug_RealtimeVX\n";
         this.data.forEach(d => {
             if (d.t < startTime || d.t > endTime) return;
-            const lIdx = d.lineIndex;
+            const lIdx = d.line;
             let targetY = "";
             let avgY = "";
             if (lIdx !== undefined && lIdx !== null) {
@@ -418,7 +422,7 @@ export class GazeDataManager {
                 d.vx ? d.vx.toFixed(4) : "", d.vy ? d.vy.toFixed(4) : "",
                 d.type,
                 (d.isReturnSweep ? "TRUE" : ""),
-                (d.lineIndex !== undefined && d.lineIndex !== null) ? d.lineIndex : "",
+                (d.line !== undefined && d.line !== null) ? d.line : "",
                 (d.charIndex !== undefined && d.charIndex !== null) ? d.charIndex : "",
                 (d.inkY !== undefined && d.inkY !== null) ? d.inkY.toFixed(0) : "",
                 (d.detectedLineIndex !== undefined) ? d.detectedLineIndex : "",
@@ -550,7 +554,7 @@ export class GazeDataManager {
             RawX: chartData.map(d => d.x), RawY: chartData.map(d => d.y),
             SmoothX: chartData.map(d => d.gx), SmoothY: chartData.map(d => d.gy),
             VelX: chartData.map(d => d.vx), VelY: chartData.map(d => d.vy),
-            LineIndex: chartData.map(d => d.lineIndex || null),
+            LineIndex: chartData.map(d => d.line || null),
             AlgoLineIndex: chartData.map(d => d.detectedLineIndex || null)
         };
 
@@ -722,24 +726,24 @@ export class GazeDataManager {
 
                     // -- STEP D: LOGIC GUARD (V10.0 - SMART & SIMPLE) --
 
-                    if (d0.lineIndex !== undefined && d0.lineIndex !== null) {
+                    if (d0.line !== undefined && d0.line !== null) {
 
                         // Rule 1: START LINE BLOCK
-                        if (d0.lineIndex === 0) {
+                        if (d0.line === 0) {
                             return false;
                         }
 
                         // Rule 2: Max Reach Check (Monotonic)
-                        if (d0.lineIndex <= this.maxLineIndexReached) {
+                        if (d0.line <= this.maxLineIndexReached) {
                             // DEBUG: Log rejection
-                            // console.log(`[RS Reject] Line ${d0.lineIndex} <= Max ${this.maxLineIndexReached}`);
+                            // console.log(`[RS Reject] Line ${d0.line} <= Max ${this.maxLineIndexReached}`);
                             return false;
                         }
 
                         // Legacy Rule 3 Removed.
 
                     } else {
-                        // If lineIndex is null (transition), we act conservatively and DO NOT fire.
+                        // If line is null (transition), we act conservatively and DO NOT fire.
                         // console.log("[RS Reject] Null Line Index");
                         return false;
                     }
@@ -750,7 +754,7 @@ export class GazeDataManager {
 
                     // Update Guard State (New High Score)
                     this.lastPosPeakTime = 0;
-                    this.maxLineIndexReached = d0.lineIndex;
+                    this.maxLineIndexReached = d0.line;
 
                     return true;
                 }
@@ -775,7 +779,7 @@ export class GazeDataManager {
 
         // Determine Target Line (The line just finished)
         // Return Sweep means we moved FROM line N TO line N+1. We want to mark line N.
-        const targetLine = (d0.lineIndex > 0) ? d0.lineIndex - 1 : 0;
+        const targetLine = (d0.line > 0) ? d0.line - 1 : 0;
 
         // [CRITICAL for Replay] Log this pang event.
         // playGazeReplay() uses pangLog as its sole data source for:
@@ -783,7 +787,7 @@ export class GazeDataManager {
         //   - when to trigger combo + score animations
         // This is a tiny 4-field object — negligible memory cost.
         if (this.pangLog) {
-            this.pangLog.push({ t: d0.t, lineIndex: targetLine, type, vx });
+            this.pangLog.push({ t: d0.t, line: targetLine, type, vx });
         }
 
         // 1. Visual Effect — purple dot (lightweight, single RAF one-shot)
@@ -797,10 +801,8 @@ export class GazeDataManager {
             }
         }
 
-        // 2. Game Reward (Ink +10) via Event Bus — decoupled
-        if (bus) {
-            bus.emit('pang');
-        }
+        // 2. Game Reward (Ink) — handled directly in TextRenderer._animateScoreToHud() via window.Game.addInk(score).
+        // bus.emit('pang') was removed: no listener (bus.on('pang')) existed anywhere in the codebase — dead code.
 
         // --- RGT: Update 'b' (Global Max X) & Reset 'a' ---
         if (d0.x > this.globalMaxX) {
@@ -844,8 +846,8 @@ export class GazeDataManager {
             let startTime = now;
             for (let i = this.data.length - 1; i >= limit; i--) {
                 const d = this.data[i];
-                if (d.lineIndex === targetLine) { startTime = d.t; }
-                else if (d.lineIndex < targetLine) break;
+                if (d.line === targetLine) { startTime = d.t; }
+                else if (d.line < targetLine) break;
             }
             if (startTime === now && targetLine === 0 && this.firstContentTime) {
                 startTime = this.firstContentTime;
@@ -866,8 +868,8 @@ export class GazeDataManager {
             this.wpm = Math.round(this.validWordSum / minutes);
             if (!this.wpmData) this.wpmData = [];
             this.wpmData.push({
-                paraIndex: (this.context && this.context.paraIndex !== undefined) ? this.context.paraIndex : -1,
-                lineIndex: targetLine,
+                paraIndex: (this.context && this.context.pIdx !== undefined) ? this.context.pIdx : (this.context.paraIndex || -1),
+                line: targetLine,
                 duration,
                 words: wordCount,
                 wpm: this.wpm
