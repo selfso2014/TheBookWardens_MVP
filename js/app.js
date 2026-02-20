@@ -250,6 +250,15 @@ function ensureLogPanel() {
     }
 
     try {
+      // [FIX] Ensure Firebase App is initialized
+      if (!firebase.apps.length) {
+        if (window.FIREBASE_CONFIG) {
+          firebase.initializeApp(window.FIREBASE_CONFIG);
+        } else {
+          throw new Error("Missing window.FIREBASE_CONFIG");
+        }
+      }
+
       const db = firebase.database();
       const sessionId = "session_" + Date.now();
       // Test Auth first (optional, logging only)
@@ -264,7 +273,7 @@ function ensureLogPanel() {
       });
 
       alert(`✅ Upload Success!\nSession ID: ${sessionId}`);
-      panel.textContent += `\n[System] Uploaded to: logs/${sessionId}`;
+      panel.textContent += `\n[System] Uploaded to: logs/${sessionId}`; // Appended confirmation
     } catch (e) {
       console.error(e);
       alert("❌ Upload Failed: " + e.message + "\n\n[Check Firebase Console -> Start Collection if first time, or Rules]");
