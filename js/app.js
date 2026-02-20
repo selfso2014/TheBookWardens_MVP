@@ -107,6 +107,74 @@ setInterval(() => {
 
 }, 1000);
 
+// ---------- iOS Visibility Guard ----------
+// [FIX-iOS] When user backgrounds the tab (notification, home button, social app switch),
+// iOS does NOT suspend JS immediately — RAF loops keep running, burning CPU & memory.
+// iOS may then kill the WebContent process after a short period of high memory pressure.
+// This handler pauses all known RAF loops on hide and resumes on return.
+// This covers ALL 4 crash cases: whether the crash happened before or after calibration.
+(function attachVisibilityGuard() {
+  let wasCalRunning = false;
+  let wasTracking = false;
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // ── TAB HIDDEN ──────────────────────────────────────────────────────
+      logW('sys', '[iOS Guard] Tab hidden — pausing all RAF loops to prevent OOM Kill');
+
+      // 1. Stop overlay calibration tick
+      if (overlay && overlay.calRunning) {
+        wasCalRunning = true;
+        overlay.calRunning = false;           // tick() will exit on next frame
+        if (overlay.rafId) {
+          cancelAnimationFrame(overlay.rafId);
+          overlay.rafId = null;
+        }
+      } else {
+        wasCalRunning = false;
+      }
+
+      // 2. Stop Game-level RAF tracker (spawnFlyingResource etc.)
+      if (window.Game && window.Game.activeRAFs && window.Game.activeRAFs.length > 0) {
+        logW('sys', `[iOS Guard] Cancelling ${window.Game.activeRAFs.length} Game RAFs`);
+        window.Game.activeRAFs.forEach(id => cancelAnimationFrame(id));
+        window.Game.activeRAFs = [];
+      }
+
+      // 3. Stop TextRenderer replay RAF if running
+      const tr = window.Game?.typewriter?.renderer;
+      if (tr && typeof tr.cancelAllAnimations === 'function') {
+        tr.cancelAllAnimations();
+      }
+
+      // 4. Stop AliceBattle RAF if running
+      if (window.AliceBattleRef && typeof window.AliceBattleRef.destroy === 'function') {
+        window.AliceBattleRef.destroy();
+      }
+
+      // 5. Track game tracking state
+      wasTracking = window.Game?.state?.isTracking || false;
+
+    } else {
+      // ── TAB VISIBLE AGAIN ───────────────────────────────────────────────
+      logW('sys', '[iOS Guard] Tab visible — resuming');
+
+      // Resume overlay tick only if calibration was actually running
+      if (wasCalRunning && overlay && window.startCalibrationRoutine) {
+        logW('sys', '[iOS Guard] Resuming calibration overlay tick');
+        overlay.calRunning = true;
+        const tick = () => {
+          if (!overlay.calRunning) { overlay.rafId = null; return; }
+          renderOverlay();
+          overlay.rafId = requestAnimationFrame(tick);
+        };
+        tick();
+      }
+      wasCalRunning = false;
+    }
+  });
+})();
+
 // ---------- DOM ----------
 const els = {
   hud: document.getElementById("hud"),
