@@ -139,6 +139,11 @@ const Game = {
     // --- Browser Detection Moved to IntroManager ---
 
     switchScreen(screenId) {
+        // [DEBUG] Log Screen Transition
+        const prevScreen = document.querySelector('.screen.active')?.id || "unknown";
+        console.log(`[Scene] Switch: ${prevScreen} -> ${screenId}`);
+        // Optional: If we had a global 'currentScene' object, we'd log its cleanup here.
+
         // [FIX] Ensure clean state transition
         document.querySelectorAll('.screen').forEach(el => {
             el.classList.remove('active');

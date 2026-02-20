@@ -99,6 +99,11 @@ export class GazeDataManager {
             // CRITICAL: Always push raw data
             this.data.push(entry);
 
+            // [DEBUG] Gaze Data Pressure Monitor
+            if (this.data.length % 1000 === 0) {
+                console.log(`[Mem] GazeData size: ${this.data.length} (Warning!)`);
+            }
+
             // [NEW] Capture Start of Content (First valid Line Index)
             if (this.firstContentTime === null && typeof entry.lineIndex === 'number' && entry.lineIndex >= 0) {
                 this.firstContentTime = entry.t;

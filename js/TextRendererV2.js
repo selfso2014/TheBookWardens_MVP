@@ -44,9 +44,11 @@ export class TextRenderer {
     // [New] Safety Method: Kill all pending text reveals
     cancelAllAnimations() {
         if (this.activeAnimations.length > 0) {
-            console.log(`[TextRenderer] Cancelling ${this.activeAnimations.length} pending animations.`);
+            console.log(`[Life] TextRenderer: Cancelling ${this.activeAnimations.length} pending animations.`);
             this.activeAnimations.forEach(id => clearTimeout(id));
             this.activeAnimations = [];
+        } else {
+            console.log(`[Life] TextRenderer: No pending animations to cancel.`);
         }
     }
 
