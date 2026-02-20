@@ -879,10 +879,10 @@ async function preloadSDK() {
       attachSeesoCallbacks();
 
       // Initialize Engine
-      // [OPTIMIZATION] Disable optional features to reduce initialization load and prevent iOS crashes.
+      // [REVERT] Use full features as requested (Stable)
       const userStatusOption = SDK?.UserStatusOption
-        ? new SDK.UserStatusOption(false, false, false)
-        : { useAttention: false, useBlink: false, useDrowsiness: false };
+        ? new SDK.UserStatusOption(true, true, true)
+        : { useAttention: true, useBlink: true, useDrowsiness: true };
 
       logI("sdk", "initializing engine...");
       const errCode = await seeso.initialize(LICENSE_KEY, userStatusOption);
@@ -906,7 +906,8 @@ async function preloadSDK() {
 }
 
 // Auto-start preload after short delay
-setTimeout(preloadSDK, 500);
+// [CHANGE] Manual Trigger Only: Do not auto-preload on load.
+// setTimeout(preloadSDK, 500);
 
 // Modified initSeeso (now just waits for preload)
 async function initSeeso() {
