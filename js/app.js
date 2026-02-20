@@ -232,6 +232,8 @@ function ensureLogPanel() {
   toolbar.appendChild(createBtn("🗑️ Clear", () => {
     LOG_BUFFER.length = 0;
     panel.textContent = "";
+    // [NEW] Clear LocalStorage too
+    try { localStorage.removeItem("debug_log_backup"); } catch (e) { }
   }, "#ff8a80"));
 
   // Upload (DB)
@@ -261,22 +263,36 @@ function ensureLogPanel() {
 
       const db = firebase.database();
       const sessionId = "session_" + Date.now();
-      // Test Auth first (optional, logging only)
-      if (firebase.auth && !firebase.auth().currentUser) {
-        console.warn("[Upload] Not logged in (Anonymous Auth might be required)");
-      }
 
-      await db.ref("logs/" + sessionId).set({
+      // [NEW] Retrieve Crashed Logs from LocalStorage
+      let crashLogs = [];
+      try {
+        const stored = localStorage.getItem("debug_log_backup");
+        if (stored) crashLogs = JSON.parse(stored);
+      } catch (e) { console.warn("No crash logs found"); }
+
+      // Merge: Crash Logs (Old) + Current Logs (New)
+      // If crash logs exist, they are likely from the session that just died.
+      const uploadData = {
         ua: navigator.userAgent,
         timestamp: new Date().toISOString(),
-        logs: LOG_BUFFER
-      });
+        logs: LOG_BUFFER, // Current Session (Post-Crash)
+        crashLogs: crashLogs.length > 0 ? crashLogs : null // Previous Session (Pre-Crash)
+      };
 
-      alert(`✅ Upload Success!\nSession ID: ${sessionId}`);
-      panel.textContent += `\n[System] Uploaded to: logs/${sessionId}`; // Appended confirmation
+      await db.ref("logs/" + sessionId).set(uploadData);
+
+      let msg = `✅ Upload Success!\nSession ID: ${sessionId}`;
+      if (crashLogs.length > 0) msg += `\n(Recovered ${crashLogs.length} lines from crash)`;
+      alert(msg);
+
+      panel.textContent += `\n[System] Uploaded to: logs/${sessionId}`;
+      // Clear backup after successful upload to avoid duplicate uploads
+      localStorage.removeItem("debug_log_backup");
+
     } catch (e) {
       console.error(e);
-      alert("❌ Upload Failed: " + e.message + "\n\n[Check Firebase Console -> Start Collection if first time, or Rules]");
+      alert("❌ Upload Failed: " + e.message);
     } finally {
       resetBtn();
     }
@@ -660,9 +676,9 @@ async function ensureCamera() {
     mediaStream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "user",
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 30, max: 60 },
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        frameRate: { ideal: 30, max: 30 },
       },
       audio: false,
     });
@@ -955,26 +971,22 @@ function startActualCalibration() {
     overlay.calPointCount = 0;
 
     if (ok) {
+      // [FIX] Prevent duplicate loops
+      if (overlay.rafId) {
+        cancelAnimationFrame(overlay.rafId);
+        overlay.rafId = null;
+      }
+
       // Start single animation loop for calibration
       const tick = () => {
-        if (!overlay.calRunning) return;
+        if (!overlay.calRunning) {
+          overlay.rafId = null;
+          return;
+        }
         renderOverlay();
-        requestAnimationFrame(tick);
+        overlay.rafId = requestAnimationFrame(tick);
       };
       tick();
-
-      // [EMERGENCY SKIP REMOVED FOR PRODUCTION]
-      /*
-      setTimeout(() => {
-        if (overlay.calRunning) {
-          const skipBtn = document.createElement('button');
-          skipBtn.innerText = "⚠️ Emergency Skip";
-           // ... (removed)
-          document.body.appendChild(skipBtn);
-          setTimeout(() => skipBtn.remove(), 10000);
-        }
-      }, 3000);
-      */
     }
 
     logI("cal", "startActualCalibration returned", { ok, criteria });
