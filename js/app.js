@@ -494,6 +494,17 @@ const calManager = new CalibrationManager({
       window.Game.onCalibrationFinish();
     }
   },
+  // [FIX-iOS] Explicitly stop the calibration RAF tick loop.
+  // calibration.js finishSequence() calls this before triggering game start.
+  // Prevents orphaned RAF loop stacking with game loops on iOS -> Tab Kill.
+  stopCalibrationLoop: () => {
+    overlay.calRunning = false; // tick() exit condition
+    if (overlay.rafId) {
+      cancelAnimationFrame(overlay.rafId); // force-cancel as double safety
+      overlay.rafId = null;
+    }
+    logI("cal", "[FIX] Calibration RAF loop stopped.");
+  },
   onFaceCheckSuccess: () => {
     logI("cal", "Face Check Success -> Triggering Real Calibration");
     startActualCalibration();
@@ -885,7 +896,20 @@ async function preloadSDK() {
         : { useAttention: false, useBlink: false, useDrowsiness: false };
 
       logI("sdk", "initializing engine...");
-      const errCode = await seeso.initialize(LICENSE_KEY, userStatusOption);
+
+      // [FIX-iOS] Wrap initialize() with a 20s timeout.
+      // On iOS, seeso.initialize() can hang indefinitely (WASM memory pressure),
+      // causing the app to silently freeze until iOS kills the WebContent process.
+      const SDK_INIT_TIMEOUT_MS = 20000;
+      const errCode = await Promise.race([
+        seeso.initialize(LICENSE_KEY, userStatusOption),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`SDK initialize timeout after ${SDK_INIT_TIMEOUT_MS / 1000}s`)),
+            SDK_INIT_TIMEOUT_MS
+          )
+        )
+      ]);
 
       if (errCode !== 0) {
         setState("sdk", "init_failed");
@@ -898,6 +922,11 @@ async function preloadSDK() {
     } catch (e) {
       logE("sdk", "Preload Failed", e);
       setState("sdk", "init_exception");
+      // [FIX-iOS] Show retry UI on timeout so user isn't stuck on a blank screen.
+      if (e.message && e.message.includes("timeout")) {
+        setStatus("⚠️ 로딩 실패. 페이지를 새로고침 해주세요.");
+        showRetry(true, "sdk_timeout");
+      }
       throw e;
     }
   })();

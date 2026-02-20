@@ -501,6 +501,13 @@ export class CalibrationManager {
         const calScreen = document.getElementById("screen-calibration");
         if (calScreen) calScreen.style.display = 'none';
 
+        // [FIX-iOS] Stop calibration RAF loop BEFORE triggering game start.
+        // Without this, overlay.calRunning stays true forever, leaking an infinite RAF loop
+        // that stacks on top of game loops and causes iOS to kill the WebContent process.
+        if (typeof this.ctx.stopCalibrationLoop === 'function') {
+            this.ctx.stopCalibrationLoop();
+        }
+
         if (this.ctx.onCalibrationFinish) {
             this.ctx.onCalibrationFinish();
         }

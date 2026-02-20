@@ -18,17 +18,30 @@ const Game = {
 
     // [New] Global Resource Tracker
     activeIntervals: [],
+    // [FIX-iOS] Track RAF handles so clearAllResources() can cancel them all.
+    // Without this, RAF loops accumulate across screen transitions -> iOS kill.
+    activeRAFs: [],
 
     trackInterval(id) {
         if (id) this.activeIntervals.push(id);
         return id;
     },
 
+    trackRAF(id) {
+        if (id) this.activeRAFs.push(id);
+        return id;
+    },
+
     clearAllResources() {
-        if (this.activeIntervals.length > 0) {
-            console.log(`[Game] Clearing Resources: Intervals=${this.activeIntervals.length}`);
+        const intervalCount = this.activeIntervals.length;
+        const rafCount = this.activeRAFs.length;
+        if (intervalCount > 0 || rafCount > 0) {
+            console.log(`[Game] Clearing Resources: Intervals=${intervalCount}, RAFs=${rafCount}`);
             this.activeIntervals.forEach(id => clearInterval(id));
             this.activeIntervals = [];
+            // [FIX-iOS] Cancel all tracked RAF loops on screen transition.
+            this.activeRAFs.forEach(id => cancelAnimationFrame(id));
+            this.activeRAFs = [];
         }
     },
 
@@ -169,12 +182,6 @@ const Game = {
         this.uiManager.showToast(msg, duration);
     },
 
-    onCalibrationFinish() {
-        console.log("Calibration done. Entering Reading Rift...");
-        setTimeout(() => {
-            this.switchScreen("screen-read");
-        }, 1000);
-    },
 
     // --- Browser Detection Moved to IntroManager ---
 
@@ -182,10 +189,14 @@ const Game = {
         // [DEBUG] Log Screen Transition
         const prevScreen = document.querySelector('.screen.active')?.id || "unknown";
         console.log(`[Scene] Switch: ${prevScreen} -> ${screenId}`);
-        // Optional: If we had a global 'currentScene' object, we'd log its cleanup here.
 
         // [New] Unconditional Resource Cleanup
         this.clearAllResources();
+
+        // [FIX-iOS] Stop AliceBattle animateLoop if leaving that screen.
+        if (prevScreen === 'screen-alice-battle' && window.AliceBattleRef?.destroy) {
+            window.AliceBattleRef.destroy();
+        }
 
         // [FIX] Ensure clean state transition
         document.querySelectorAll('.screen').forEach(el => {
@@ -307,14 +318,15 @@ const Game = {
                 p.style.top = curY + 'px';
                 p.style.opacity = 1 - Math.pow(ease, 4);
 
-                window.requestAnimationFrame(animate);
+                // [FIX-iOS] Track RAF so clearAllResources() can cancel it if screen changes
+                Game.trackRAF(window.requestAnimationFrame(animate));
             } else {
                 if (p.parentNode) p.remove();
                 if (type === 'gem') Game.addGems(amount);
                 if (type === 'ink') Game.addInk(amount);
             }
         };
-        window.requestAnimationFrame(animate);
+        Game.trackRAF(window.requestAnimationFrame(animate));
     },
 
     // --- 1.2 WPM Selection (Delegated) ---

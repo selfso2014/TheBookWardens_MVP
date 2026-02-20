@@ -1053,6 +1053,19 @@
 
                 }, idx * 30);
             });
+        },
+
+        // [FIX-iOS] Stop animateLoop RAF and remove resize listener when leaving this screen.
+        // Called by game.js switchScreen() to prevent RAF accumulation -> iOS kill.
+        destroy: function () {
+            if (animFrameId) {
+                cancelAnimationFrame(animFrameId);
+                animFrameId = null;
+                console.log('[AliceBattle] destroy: animFrameId cancelled.');
+            }
+            // Remove resize listener to prevent LSN (listener count) leak
+            window.removeEventListener('resize', resize);
+            gameState = 'paused'; // Prevent villain AI from firing
         }
     };
 
