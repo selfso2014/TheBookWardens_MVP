@@ -16,6 +16,46 @@ const Game = {
     scoreManager: null,
     sceneManager: null,
 
+    // [New] Global Resource Tracker
+    activeIntervals: [],
+
+    trackInterval(id) {
+        if (id) this.activeIntervals.push(id);
+        return id;
+    },
+
+    clearAllResources() {
+        if (this.activeIntervals.length > 0) {
+            console.log(`[Game] Clearing Resources: Intervals=${this.activeIntervals.length}`);
+            this.activeIntervals.forEach(id => clearInterval(id));
+            this.activeIntervals = [];
+        }
+    },
+
+    // [Restored] Floating Text Effect (Required for Boss Battle)
+    spawnFloatingText(targetEl, text, type = "normal") {
+        if (!targetEl) return;
+        const rect = targetEl.getBoundingClientRect();
+
+        const floatEl = document.createElement("div");
+        floatEl.innerText = text;
+        floatEl.className = `floating-text ${type}`;
+        floatEl.style.left = (rect.left + rect.width / 2) + "px";
+        floatEl.style.top = (rect.top) + "px";
+
+        document.body.appendChild(floatEl);
+
+        // Animate
+        requestAnimationFrame(() => {
+            floatEl.style.transform = "translate(-50%, -50px)";
+            floatEl.style.opacity = "0";
+        });
+
+        setTimeout(() => {
+            floatEl.remove();
+        }, 1000);
+    },
+
     state: {
         // Renamed/Removed: gem/ink/rune to ScoreManager
         currentWordIndex: 0,
