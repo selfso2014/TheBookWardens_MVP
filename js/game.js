@@ -81,6 +81,9 @@ const Game = {
         // 4. Start Features
         this.introManager.init(); // Now safe to call
 
+        // [FIX] Bind global events (Splash click, debug keys)
+        this.bindEvents();
+
         // 4. Session ID for Firebase
         this.sessionId = Math.random().toString(36).substring(2, 6).toUpperCase();
         console.log("Session ID:", this.sessionId);

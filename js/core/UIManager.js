@@ -23,10 +23,7 @@ export class UIManager {
             // Fallback
             document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
             const target = document.getElementById(screenId);
-            if (target) {
-                target.classList.add("active");
-                target.style.display = ""; // Clear inline display:none
-            }
+            if (target) target.classList.add("active");
         }
 
         // [FIX] Ensure the new screen is clickable

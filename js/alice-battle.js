@@ -378,6 +378,3 @@ export const AliceBattle = {
         if (ui.finalScreen) ui.finalScreen.classList.remove('active');
     }
 };
-
-// [FIX] Expose to Global Scope for GameLogic access
-window.AliceBattleRef = AliceBattle;

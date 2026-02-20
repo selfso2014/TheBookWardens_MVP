@@ -874,12 +874,6 @@ export class TextRenderer {
                         w.element.style.transition = "none";
                         w.element.style.opacity = "1";
                         w.element.style.visibility = "visible";
-
-                        // [CRITICAL FIX] Ensure position is reset to "revealed" state (0px)
-                        // Otherwise it defaults to .tr-word (10px down), causing mismatch.
-                        w.element.style.transform = "translateY(0)";
-                        w.element.classList.add("revealed");
-
                         w.element.classList.remove("faded-out");
                         w.element.classList.remove("chunk-fade-out"); // Specific class used by fadeOutChunk
                         w.element.classList.remove("hidden");
@@ -899,21 +893,21 @@ export class TextRenderer {
         setTimeout(() => {
             clearInterval(safetyInterval);
 
-            // [NEW] CRITICAL FIX: Do NOT Re-Lock Layout.
-            // We use the ORIGINAL coordinates from the reading session.
-            // Re-locking causes micro-shifts if the browser layout engine decided to reflow.
-            // if (this.words.length > 0) {
-            //    console.log("[TextRenderer] Zero-Error Mapping: Re-calculating layout...");
-            //    this.lockLayout();
-            // }
+            // [NEW] CRITICAL FIX: Re-Lock Layout to get EXACT current coordinates
+            // This handles any shifts, reflows, or scroll changes that happened since reading.
+            // We measure the text AS IT IS NOW, ensuring 0px error.
+            if (this.words.length > 0) {
+                console.log("[TextRenderer] Zero-Error Mapping: Re-calculating layout...");
+                this.lockLayout();
+            }
 
-            // Use the freshly calculated lines (or existing ones)
+            // Use the freshly calculated lines
             const visualLines = this.lines || [];
 
             if (visualLines.length === 0) {
-                console.warn("[TextRenderer] No visual lines available for mapping. Forcing one-time lock.");
-                // Emergency Fallback only
-                this.lockLayout();
+                console.warn("[TextRenderer] No visual lines available for mapping.");
+                if (onComplete) onComplete();
+                return;
             }
 
             console.log(`[TextRenderer] Starting Pang-Log Driven Replay...`);

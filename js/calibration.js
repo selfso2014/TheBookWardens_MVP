@@ -14,9 +14,7 @@ export class CalibrationManager {
             pointCount: 0,
             isFinishing: false,
             watchdogTimer: null,
-            inFailPopup: false, // [NEW] Flag to stop rendering when popup is open
         };
-        this.seeso = null; // [NEW] Store SDK reference
     }
 
     reset() {
@@ -25,28 +23,38 @@ export class CalibrationManager {
         this.state.progress = 0;
         this.state.isFinishing = false;
         this.state.running = false;
-        this.state.inFailPopup = false;
         if (this.state.watchdogTimer) clearTimeout(this.state.watchdogTimer);
         if (this.state.safetyTimer) clearTimeout(this.state.safetyTimer);
         if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
-        if (this.state.progressWatchdog) clearInterval(this.state.progressWatchdog);
     }
 
-    // ... (startFaceCheck, handleFaceCheckGaze, updateFaceCheckUI, startCollection kept as is) ...
+    /**
+     * Called when the user clicks "Start Point" button.
+     * We start a strict timer here. If calibration doesn't finish in 8-10s, we force finish.
+     */
+    startCollection() {
+        this.ctx.logI("cal", "startCollection: Starting strict watchdog (10s)");
+
+        // Clear old
+        if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
+
+        // 10 seconds max wait for 1 point
+        this.state.maxWaitTimer = setTimeout(() => {
+            if (this.state.running) {
+                this.ctx.logW("cal", "Calibration timed out (10s limit). Showing fail popup.");
+                this.showFailPopup();
+            }
+        }, 10000);
+    }
 
     showFailPopup() {
-        // Stop rendering the dot/orb so it doesn't overlap text
-        this.state.inFailPopup = true;
-
+        // Stop visual updates but keep session alive?
+        // Ideally we want to let user choose.
         const popup = document.getElementById("cal-fail-popup");
         if (popup) {
             popup.style.display = "flex";
 
-            // Hide the status text behind popup
-            const statusEl = document.getElementById("calibration-status");
-            if (statusEl) statusEl.style.display = 'none';
-
-            // Re-bind buttons dynamically to ensure they work even after DOM updates
+            // Bind buttons if not already (simple way: onclick property)
             const btnRetry = document.getElementById("btn-cal-retry");
             const btnSkip = document.getElementById("btn-cal-skip");
 
@@ -59,277 +67,30 @@ export class CalibrationManager {
             if (btnSkip) {
                 btnSkip.onclick = () => {
                     popup.style.display = "none";
-                    this.ctx.logW("cal", "User skipped calibration via popup.");
-                    this.finishSequence(); // Proceed to game
+                    this.finishSequence();
                 };
             }
-        } else {
-            this.ctx.logE("cal", "Fail popup not found in DOM!");
-            // Fallback: Just finish if UI is broken
-            this.finishSequence();
         }
     }
 
     retryPoint() {
         this.ctx.logI("cal", "Retrying calibration point...");
-
-        // Reset state
-        this.state.running = true;
+        // Reset local state for this point
+        this.state.running = true; // Keep running or wait for button?
         this.state.progress = 0;
         this.state.displayProgress = 0;
-        this.state.inFailPopup = false; // Resume rendering
 
-        // Restore UI
-        const statusEl = document.getElementById("calibration-status");
-        if (statusEl) {
-            statusEl.style.display = 'block';
-            statusEl.textContent = "Look at the Magic Orb!";
-        }
-
-        // [FIX] Explicitly call SDK startCollectSamples
-        if (this.seeso && typeof this.seeso.startCollectSamples === 'function') {
-            this.seeso.startCollectSamples();
-        } else {
-            this.ctx.logW("cal", "seeso.startCollectSamples not available during retry");
-        }
-
-        // Restart watchdog
-        this.startCollection();
-
-        // Let's reset the UI button to "Retry" so user can physically click it again if needed
+        // Strategy: Show the "Start Point" button again so user can position themselves and click.
         const btn = document.getElementById("btn-calibration-start");
         if (btn) {
-            // Actually, if we auto-started collection above, we might not want to show the button?
-            // But if startCollectSamples failed/needs trigger, let's show button just in case.
-            // Wait, usually retry means "Try this point again". 
-            // If we called startCollectSamples automatically, we should HIDE the button.
-            // But if user needs to be ready, maybe showing button is better?
-            // User complained "behavior is weird".
-            // Let's AUTO-START (Hide button). Because having to click "Retry" on popup AND "Start Point" button is double work.
-
-            btn.style.display = "none"; // Hide start button, we auto-started via SDK
-        }
-    }
-
-    /**
-     * Binds to the SeeSo instance.
-     */
-    bindTo(seeso) {
-        if (!seeso) return;
-        this.seeso = seeso; // [NEW] Store reference
-
-        const { logI, logW, logE, setStatus, setState, requestRender, onCalibrationFinish } = this.ctx;
-        // ... (rest of bindTo) ...
-    }
-
-    // ... (rest of methods)
-
-    render(ctx, width, height, toCanvasLocalPoint) {
-        if (this.state.inFailPopup) return; // [NEW] Don't render if popup is open
-        if (!this.state.point) return;
-        // ... (rest of render)
-    }
-
-    /**
-     * Called when the user clicks "Start Point" button.
-     * We start a strict timer here. If calibration doesn't finish in 8-10s, we force finish.
-     */
-    // --- FACE CHECK LOGIC ---
-    startFaceCheck() {
-        this.ctx.logI("cal", "Starting Face Check Mode");
-
-        const faceScreen = document.getElementById("screen-face-check");
-        const calScreen = document.getElementById("screen-calibration");
-
-        if (faceScreen) {
-            faceScreen.classList.add("active");
-            faceScreen.style.display = "flex"; // Ensure flex display
-        }
-        if (calScreen) {
-            calScreen.classList.remove("active");
-            calScreen.style.display = "none";
+            btn.style.display = "inline-block";
+            btn.textContent = "Retry Point";
+            btn.style.pointerEvents = "auto";
         }
 
-        // Reset UI
-        this.updateFaceCheckUI(false);
-
-        // Bind Next Button
-        const btnNext = document.getElementById("btn-face-next");
-        if (btnNext) {
-            btnNext.onclick = () => {
-                this.ctx.logI("cal", "Face Check Passed. Proceeding to Calibration.");
-                // Hide Face Check
-                if (faceScreen) {
-                    faceScreen.classList.remove("active");
-                    faceScreen.style.display = "none";
-                }
-                // Show Calibration Screen
-                if (calScreen) {
-                    calScreen.classList.add("active");
-                    calScreen.style.display = "block";
-                }
-
-                // Start Actual Calibration
-                // This will trigger 'startCalibration' in app.js if wired correctly,
-                // But here we might need to callback to app.js or call seeso directly.
-                // Better pattern: The 'Start Game' button in app.js should call this manager,
-                // and this manager calculates when to call app.startCalibration().
-                if (this.ctx.onFaceCheckSuccess) {
-                    this.ctx.onFaceCheckSuccess();
-                }
-            };
-        }
-    }
-
-    handleFaceCheckGaze(trackingState) {
-        // trackingState: 0 (TRACKING), 1 (FILTER), 2 (FACE_MISSING) usually.
-        // We consider 0 as success.
-        const isTracking = (trackingState === 0);
-        this.updateFaceCheckUI(isTracking);
-    }
-
-    updateFaceCheckUI(isTracking) {
-        const icon = document.getElementById("face-guide-icon");
-        const status = document.getElementById("face-check-status");
-        const btn = document.getElementById("btn-face-next");
-        const frame = document.querySelector(".face-frame");
-
-        if (isTracking) {
-            // Success
-            if (icon) icon.style.opacity = "1";
-            if (status) {
-                status.textContent = "Perfect! Hold this position.";
-                status.style.color = "#00ff00";
-            }
-            if (btn) {
-                btn.disabled = false;
-                btn.style.opacity = "1";
-                btn.style.cursor = "pointer";
-                btn.style.boxShadow = "none";
-            }
-            if (frame) frame.style.borderColor = "#00ff00";
-        } else {
-            // Fail
-            if (icon) icon.style.opacity = "0";
-            if (status) {
-                status.textContent = "Face not detected...";
-                status.style.color = "#aaa";
-            }
-            if (btn) {
-                btn.disabled = true;
-                btn.style.opacity = "0.5";
-                btn.style.cursor = "not-allowed";
-                btn.style.boxShadow = "none";
-            }
-            if (frame) frame.style.borderColor = "rgba(255, 255, 255, 0.3)";
-        }
-    }
-
-    /**
-     * Called when calibration starts (after Face Check).
-     */
-    startCollection() {
-        this.ctx.logI("cal", "startCollection: Starting strict watchdog (10s) & Progress Monitor");
-
-        // Clear old
-        if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
-        if (this.state.progressWatchdog) clearInterval(this.state.progressWatchdog);
-
-        this.state.lastProgressUpdate = performance.now(); // Init timestamp
-
-        // 1. Overall Max Wait (8s) [ADJUSTED]
-        this.state.maxWaitTimer = setTimeout(() => {
-            if (this.state.running) {
-                this.ctx.logW("cal", "Calibration timed out (8s limit). Showing fail popup.");
-                this.showFailPopup();
-            }
-        }, 8000);
-
-        // 2. Progress Stuck Monitor (Check every 1s)
-        this.state.progressWatchdog = setInterval(() => {
-            if (!this.state.running) return;
-
-            const now = performance.now();
-            if (now - this.state.lastProgressUpdate > 5000) {
-                // No progress update for 5 seconds
-                this.ctx.logW("cal", "Calibration progress STUCK for 5s. Showing fail popup.");
-                clearInterval(this.state.progressWatchdog);
-                this.state.progressWatchdog = null;
-                this.showFailPopup();
-            }
-        }, 1000);
-    }
-
-    showFailPopup() {
-        this.ctx.logW("cal", "showFailPopup called. Stopping watchdog.");
-        this.state.running = false; // [FIX] Stop the loop
-
-        // Stop rendering the dot/orb so it doesn't overlap text
-        this.state.inFailPopup = true;
-
-        const popup = document.getElementById("cal-fail-popup");
-        if (popup) {
-            popup.style.display = "flex";
-
-            // Re-bind buttons dynamically to ensure they work even after DOM updates
-            const btnRetry = document.getElementById("btn-cal-retry");
-            const btnSkip = document.getElementById("btn-cal-skip");
-
-            // Remove old listeners (cloning is a quick hack, or just reassign onclick)
-            // Assigning onclick overrides previous handlers, which is safer here.
-
-            if (btnRetry) {
-                btnRetry.onclick = () => {
-                    popup.style.display = "none";
-                    this.retryPoint();
-                };
-            }
-            if (btnSkip) {
-                // [CHANGED] Hide Skip button per user request (Force Calibration)
-                btnSkip.style.display = "none";
-                btnSkip.onclick = null;
-            }
-        } else {
-            this.ctx.logE("cal", "Fail popup not found in DOM!");
-            // Fallback: Just finish if UI is broken
-            this.finishSequence();
-        }
-    }
-
-    retryPoint() {
-        this.ctx.logI("cal", "Retrying calibration point (Async)...");
-
-        // Use setTimeout to unblock UI thread and break potential loops
-        setTimeout(() => {
-            // Reset state
-            this.state.running = true;
-            this.state.progress = 0;
-            this.state.displayProgress = 0;
-            this.state.inFailPopup = false;
-
-            // Restore UI Status Text
-            const statusEl = document.getElementById("calibration-status");
-            if (statusEl) {
-                statusEl.style.display = 'block';
-                statusEl.textContent = "Look at the Magic Orb!";
-            }
-
-            // Hide Start Button (Auto-start)
-            const btn = document.getElementById("btn-calibration-start");
-            if (btn) btn.style.display = "none";
-
-            // [FIX] Restart ENTIRE calibration sequence to prevent premature "Finish"
-            if (this.ctx.onRestart) {
-                this.ctx.onRestart();
-            } else {
-                this.ctx.logE("cal", "onRestart callback missing! Cannot retry properly.");
-                // Fallback: try startCollection but might fail
-                this.startCollection();
-                if (this.seeso && typeof this.seeso.startCollectSamples === 'function') {
-                    this.seeso.startCollectSamples();
-                }
-            }
-        }, 100);
+        // We technically interrupt the current "collection" (visual only). 
+        // SDK might still be thinking it's collecting. 
+        // When user clicks "Start", we call `seeso.startCollectSamples()` again. This usually resets collection for the point.
     }
 
     /**
@@ -338,36 +99,6 @@ export class CalibrationManager {
     bindTo(seeso) {
         if (!seeso) return;
         const { logI, logW, logE, setStatus, setState, requestRender, onCalibrationFinish } = this.ctx;
-
-        // [FIX] Bind Start Button Click to Seeso SDK
-        const btnStart = document.getElementById("btn-calibration-start");
-        if (btnStart) {
-            btnStart.onclick = () => {
-                logI("cal", "User clicked Start Point -> Starting Watchdog & SDK");
-
-                // Hide button immediately
-                btnStart.style.display = "none";
-
-                // [NEW] Hide status text too (Focus on point)
-                const statusEl = document.getElementById("calibration-status");
-                if (statusEl) statusEl.style.display = 'none';
-
-                // 1. Start Watchdog FIRST
-                this.state.running = true; // [FIX] Ensure running=true so watchdog works
-                this.startCollection();
-
-                // 2. Trigger SDK Collection
-                try {
-                    if (typeof seeso.startCollectSamples === "function") {
-                        seeso.startCollectSamples();
-                    } else {
-                        logE("cal", "seeso.startCollectSamples is not a function!");
-                    }
-                } catch (e) {
-                    logE("cal", "SDK startCollectSamples threw error", e);
-                }
-            };
-        }
 
         // 1. Next Point
         if (typeof seeso.addCalibrationNextPointCallback === "function") {
@@ -375,15 +106,16 @@ export class CalibrationManager {
                 this.state.isFinishing = false;
                 this.state.pointCount = (this.state.pointCount || 0) + 1;
 
-                // Clear previous watchdogs
-                if (this.state.maxWaitTimer) { clearTimeout(this.state.maxWaitTimer); this.state.maxWaitTimer = null; }
-                if (this.state.progressWatchdog) { clearInterval(this.state.progressWatchdog); this.state.progressWatchdog = null; }
-                if (this.state.watchdogTimer) { clearTimeout(this.state.watchdogTimer); this.state.watchdogTimer = null; } // Legacy cleanup
-
-                // Clear wait timer (will re-start in startCollection if manual, or here?)
-                // Actually startCollection is called manually by button click usually.
-                // But for Point 2+, it's automatic?
-                // For 1-point, this is called once.
+                // Clear previous watchdog
+                if (this.state.watchdogTimer) {
+                    clearTimeout(this.state.watchdogTimer);
+                    this.state.watchdogTimer = null;
+                }
+                // Clear safety timer
+                if (this.state.safetyTimer) {
+                    clearTimeout(this.state.safetyTimer);
+                    this.state.safetyTimer = null;
+                }
 
                 this.state.point = { x, y };
                 this.state.running = true;
@@ -392,41 +124,19 @@ export class CalibrationManager {
 
                 logI("cal", `onCalibrationNextPoint (#${this.state.pointCount}) x=${x} y=${y}`);
 
-                // Update UI: Text ABOVE Button
+                // Update UI
                 const statusEl = document.getElementById("calibration-status");
                 if (statusEl) {
-                    statusEl.textContent = "Look at the Magic Orb!";
-                    statusEl.style.color = "#00ff00";
-                    statusEl.style.textShadow = "0 0 10px #00ff00";
-
-                    // Force Absolute Position
-                    statusEl.style.position = 'absolute';
-                    statusEl.style.left = '50%';
-                    statusEl.style.transform = 'translateX(-50%)';
-                    statusEl.style.top = (y + 150) + 'px'; // 150px below dot
-                    statusEl.style.width = "auto";
-                    statusEl.style.whiteSpace = "nowrap";
-                    statusEl.style.textAlign = "center";
-                    statusEl.style.pointerEvents = "none";
-
-                    statusEl.style.display = 'block'; // [MOVED]
+                    statusEl.textContent = `Look at the Magic Orb! (${this.state.pointCount}/1)`;
+                    statusEl.style.color = "#0f0";
+                    statusEl.style.textShadow = "0 0 10px #0f0";
                 }
 
                 const btn = document.getElementById("btn-calibration-start");
                 if (btn) {
-                    // Update Button Text & Position
-                    btn.textContent = "OK";
-
-                    // Style: Center horizontally, placed below text
-                    btn.style.position = 'absolute';
-                    btn.style.left = '50%';
-                    btn.style.transform = 'translateX(-50%)';
-
-                    // Place it below the text
-                    btn.style.top = (y + 220) + 'px';
+                    btn.style.display = "inline-block";
+                    btn.textContent = `Start Point ${this.state.pointCount}`;
                     btn.style.pointerEvents = "auto";
-
-                    btn.style.display = "inline-block"; // [MOVED]
                 }
             });
             logI("sdk", "addCalibrationNextPointCallback bound (CalibrationManager)");
@@ -437,18 +147,39 @@ export class CalibrationManager {
             seeso.addCalibrationProgressCallback((progress) => {
                 if (this.state.isFinishing) return;
 
-                // Update Progress Timestamp for Watchdog
-                this.state.lastProgressUpdate = performance.now();
-
                 this.state.progress = progress;
                 const pct = Math.round(progress * 100);
-                setStatus(`Calibrating... ${pct}%`);
+                setStatus(`Calibrating... ${pct}% (Point ${this.state.pointCount}/1)`);
                 setState("cal", `running (${pct}%)`);
 
+                // (Old safety timer logic removed - we now strictly use startCollection timer)
+
                 if (progress >= 1.0) {
-                    // Clear watchdog on success
-                    if (this.state.progressWatchdog) clearInterval(this.state.progressWatchdog);
+                    // If progress reaches 1.0, clear the maxWaitTimer as we're proceeding to finish
                     if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
+                    if (this.state.watchdogTimer) clearTimeout(this.state.watchdogTimer);
+                    if (this.state.softFinishTimer) clearTimeout(this.state.softFinishTimer);
+
+                    this.state.watchdogTimer = setTimeout(() => {
+                        this.state.watchdogTimer = null;
+                        if (this.state.running && this.state.pointCount >= 1) {
+                            this.ctx.logW("cal", "Force finishing calibration (watchdog 100%)");
+                            this.finishSequence();
+                        }
+                    }, 700);
+                } else {
+                    if (this.state.watchdogTimer) {
+                        clearTimeout(this.state.watchdogTimer);
+                        this.state.watchdogTimer = null;
+                    }
+
+                    // Soft Finish Guard: If we are > 85% done, don't let it hang forever.
+                    if (progress > 0.85 && !this.state.softFinishTimer) {
+                        this.state.softFinishTimer = setTimeout(() => {
+                            this.ctx.logW("cal", "Soft finish triggered (>85% stuck)");
+                            this.finishSequence();
+                        }, 2500);
+                    }
                 }
 
                 // Trigger render update
@@ -462,12 +193,8 @@ export class CalibrationManager {
         if (typeof seeso.addCalibrationFinishCallback === "function") {
             seeso.addCalibrationFinishCallback((calibrationData) => {
                 logI("cal", "onCalibrationFinished - Success");
-
-                // Clear timeouts
-                if (this.state.maxWaitTimer) clearTimeout(this.state.maxWaitTimer);
-                if (this.state.progressWatchdog) clearInterval(this.state.progressWatchdog);
-
                 this.state.isFinishing = true;
+                // Force visual 100%
                 this.state.progress = 1.0;
                 this.state.displayProgress = 1.0;
                 requestRender();
@@ -475,10 +202,10 @@ export class CalibrationManager {
                 setStatus("Calibration Complete!");
                 setState("cal", "finished");
 
-                // Wait 1.5s then finish
+                // Wait 2s then finish
                 setTimeout(() => {
                     this.finishSequence();
-                }, 1500);
+                }, 2000);
             });
             logI("sdk", "addCalibrationFinishCallback bound (CalibrationManager)");
         }
@@ -498,9 +225,6 @@ export class CalibrationManager {
         const stage = document.getElementById("stage");
         if (stage) stage.classList.remove("visible");
 
-        const calScreen = document.getElementById("screen-calibration");
-        if (calScreen) calScreen.style.display = 'none';
-
         if (this.ctx.onCalibrationFinish) {
             this.ctx.onCalibrationFinish();
         }
@@ -508,7 +232,6 @@ export class CalibrationManager {
 
     // Draw Logic
     render(ctx, width, height, toCanvasLocalPoint) {
-        // ... (Keep existing renderer)
         if (!this.state.running || !this.state.point) return;
 
         const pt = toCanvasLocalPoint(this.state.point.x, this.state.point.y) || this.state.point;
@@ -566,5 +289,14 @@ export class CalibrationManager {
         ctx.arc(cx, cy, 3, 0, Math.PI * 2); // 2 * 1.5 = 3
         ctx.fillStyle = "white";
         ctx.shadowBlur = 0; // Reset shadow for crisp dot
+        ctx.fill();
+
+        // Text (Optional - kept commented out as per original)
+        /*
+        ctx.fillStyle = "white";
+        ctx.font = "bold 12px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(`${Math.round(p * 100)}%`, cx, cy - 20);
+        */
     }
 }

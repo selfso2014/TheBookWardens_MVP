@@ -22,7 +22,6 @@ export class IntroManager {
                 startBtn.classList.add("loading");
                 startBtn.innerText = "Initializing...";
                 startBtn.disabled = true;
-
                 try {
                     // 2. Check Browser (Sync)
                     if (this.isInAppBrowser()) {
@@ -35,7 +34,6 @@ export class IntroManager {
                     if (typeof window.startEyeTracking !== 'function') {
                         throw new Error("System Error: SDK Module Missing. Reload needed.");
                     }
-
                     console.log("[IntroManager] Requesting Eye Tracking Boot...");
                     const success = await window.startEyeTracking();
 
@@ -129,13 +127,6 @@ export class IntroManager {
         container.appendChild(debugBtn);
     }
 
-    resetStartBtn(btn) {
-        if (!btn) return;
-        btn.disabled = false;
-        btn.innerText = "Start Game";
-        btn.classList.remove("loading");
-    }
-
     checkAutoStart() {
         const params = new URLSearchParams(window.location.search);
         // Check for 'skip_intro=1' or legacy 'skip=1'
@@ -154,31 +145,6 @@ export class IntroManager {
     }
 
     // --- Rift Intro Sequence (Cinematic 20s) ---
-    // --- Rift Intro Sequence (Cinematic 20s) ---
-    // Alias for Game Proxy call
-    dismissSplash() {
-        // 1. Check In-App Browser (Critical for Eye Tracking)
-        if (this.isInAppBrowser()) {
-            this.openSystemBrowser();
-            return;
-        }
-
-        // 2. Go to Home Screen (Lobby)
-        console.log("[IntroManager] Dismissing Splash -> Home Screen");
-        this.game.switchScreen("screen-home");
-
-        // Safety: ensure button appears via CSS fallback (removed JS intervention)
-        /*
-        setTimeout(() => {
-            const btn = document.getElementById('btn-start-game');
-            if(btn) {
-                // btn.style.opacity = "1"; // CSS Animation handles this
-                // btn.style.pointerEvents = "auto";
-            }
-        }, 1500);
-        */
-    }
-
     async startRiftIntro() {
         console.log("[IntroManager] Starting Rift Intro Sequence...");
 
