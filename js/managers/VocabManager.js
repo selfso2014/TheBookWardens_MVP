@@ -214,6 +214,10 @@ export class VocabManager {
             const anim = p.animate(keyframes, { duration: duration, easing: "linear", fill: "forwards" });
 
             anim.onfinish = () => {
+                // [FIX] Cancel the animation before removing the element.
+                // fill:'forwards' locks computed styles on the node, preventing GC.
+                // anim.cancel() reverts to the element's base style, releasing the hold.
+                anim.cancel();
                 p.remove();
                 if (i === 0) {
                     // Reward

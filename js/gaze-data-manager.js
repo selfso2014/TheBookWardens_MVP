@@ -308,7 +308,22 @@ export class GazeDataManager {
         this.lastTriggerTime = 0;
         this.lastPosPeakTime = 0;
         this.firstContentTime = null;
-        this.lastUploadedIndex = 0; // Reset upload cursor
+        this.lastUploadedIndex = 0;   // Reset upload cursor
+        // [FIX] Previously missing — caused unbounded growth across sessions
+        this.wpmData = [];            // Per-line WPM log
+        this.pangLog = [];            // Pang event log
+        this.wpm = 0;                 // Real-time WPM
+        this.validWordSum = 0;        // Cumulative word count
+        this.validTimeSum = 0;        // Cumulative time (ms)
+        this.lastRSTime = 0;
+        this.lastRSLine = -1;
+        this.lastPreprocessIndex = 0; // Reset preprocessing cursor
+        this.searchStartIndex = 0;    // Reset WPM search boundary
+        this.maxLineIndexReached = -1;
+        this.pangCountInPara = 0;
+        this.currentLineMinX = 99999;
+        this.isCollectingLineStart = false;
+        this.pendingReturnSweep = null;
     }
 
     // NEW: Reset only trigger logic (for new paragraph/level) without clearing data

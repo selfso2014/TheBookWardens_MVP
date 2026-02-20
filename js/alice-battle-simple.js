@@ -1065,6 +1065,12 @@
             }
             // Remove resize listener to prevent LSN (listener count) leak
             window.removeEventListener('resize', resize);
+            // [FIX] Stop the AUTO-LINKER interval
+            if (this._linkInterval) {
+                clearInterval(this._linkInterval);
+                this._linkInterval = null;
+                console.log('[AliceBattle] destroy: linkInterval cleared.');
+            }
             gameState = 'paused'; // Prevent villain AI from firing
         }
     };
@@ -1072,7 +1078,7 @@
     // Alias
     window.AliceBattle = window.AliceBattleRef;
 
-    // AUTO-LINKER
+    // AUTO-LINKER — register interval on ref so destroy() can clear it
     const linkInterval = setInterval(() => {
         if (window.Game && window.AliceBattleRef) {
             if (window.Game.AliceBattle !== window.AliceBattleRef) {
@@ -1084,5 +1090,7 @@
             debugBtn.onclick = function () { window.AliceBattleRef.init(); };
         }
     }, 1000);
+    // [FIX] Store reference on the object so destroy() can clear it
+    if (window.AliceBattleRef) window.AliceBattleRef._linkInterval = linkInterval;
 
 })();

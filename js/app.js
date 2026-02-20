@@ -1238,5 +1238,54 @@ async function boot() {
 // Expose boot control to Game
 window.startEyeTracking = boot;
 
-// (Auto-check removed to allow UI access)
+// ---------- Shutdown: Camera + SDK Cleanup ----------
+/**
+ * [FIX] Release all SeeSo and camera resources.
+ * Previously, seeso.startTracking() was never paired with stopTracking(),
+ * causing the camera to stay active (LED on) for the entire browser session.
+ * This function should be called:
+ *   - On page unload (beforeunload)
+ *   - When the user reaches the final score/share screen (optional: camera no longer needed)
+ */
+function shutdownEyeTracking() {
+  try {
+    if (seeso && typeof seeso.stopTracking === 'function') {
+      seeso.stopTracking();
+      logI('sys', '[Shutdown] seeso.stopTracking() called.');
+    }
+  } catch (e) {
+    logW('sys', '[Shutdown] seeso.stopTracking() threw:', e);
+  }
+
+  // Stop all camera tracks (turns off camera LED)
+  try {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => {
+        track.stop();
+        logI('sys', `[Shutdown] Camera track stopped: ${track.kind} (${track.label})`);
+      });
+      mediaStream = null;
+    }
+  } catch (e) {
+    logW('sys', '[Shutdown] mediaStream.getTracks() threw:', e);
+  }
+
+  // Stop video element feed
+  try {
+    if (els && els.video) {
+      els.video.pause();
+      els.video.srcObject = null;
+    }
+  } catch (e) { /* silent */ }
+
+  logI('sys', '[Shutdown] Eye tracking resources released.');
+}
+
+// [FIX] Auto-shutdown on page unload (covers: tab close, refresh, navigation)
+window.addEventListener('beforeunload', () => {
+  shutdownEyeTracking();
+});
+
+// Expose so Game can call manually on final screen
+window.shutdownEyeTracking = shutdownEyeTracking;
 

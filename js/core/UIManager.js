@@ -2,6 +2,7 @@ export class UIManager {
     constructor(game) {
         this.game = game;
         this.toastTimer = null;
+        this._animRafs = []; // [FIX] Track animateValue RAFs for cancellation
     }
 
     // --- Screen Management ---
@@ -93,12 +94,19 @@ export class UIManager {
         }
     }
 
+    // [FIX] Cancel all in-flight animateValue loops (call before screen transition)
+    cancelAnims() {
+        this._animRafs.forEach(id => cancelAnimationFrame(id));
+        this._animRafs = [];
+    }
+
     // --- Utilities ---
     animateValue(id, start, end, duration, prefix = "", suffix = "", startDelay = 0) {
         setTimeout(() => {
             const obj = document.getElementById(id);
             if (!obj) return;
             let startTimestamp = null;
+            let rafId;
             const step = (timestamp) => {
                 if (!startTimestamp) startTimestamp = timestamp;
                 const progress = Math.min((timestamp - startTimestamp) / duration, 1);
@@ -107,10 +115,17 @@ export class UIManager {
                 const current = Math.floor(ease * (end - start) + start);
                 obj.innerText = prefix + current.toLocaleString() + suffix;
                 if (progress < 1) {
-                    window.requestAnimationFrame(step);
+                    rafId = window.requestAnimationFrame(step);
+                    // Keep the latest id in the list (replace old)
+                    const idx = this._animRafs.indexOf(rafId);
+                    if (idx === -1) this._animRafs.push(rafId);
+                } else {
+                    // Animation complete — remove from tracking list
+                    this._animRafs = this._animRafs.filter(r => r !== rafId);
                 }
             };
-            window.requestAnimationFrame(step);
+            rafId = window.requestAnimationFrame(step);
+            this._animRafs.push(rafId);
         }, startDelay);
     }
 }

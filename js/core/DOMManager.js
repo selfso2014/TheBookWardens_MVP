@@ -115,6 +115,20 @@ export class DOMManager {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener(event, handler);
+            // [FIX] Store reference so unbindAll() can remove it later
+            if (!this._listeners) this._listeners = [];
+            this._listeners.push({ el, event, handler });
         }
+    }
+
+    // [FIX] Remove all listeners registered via bind()
+    // Call this if DOMManager needs to be torn down (e.g. after game-over and page reload)
+    unbindAll() {
+        if (!this._listeners) return;
+        this._listeners.forEach(({ el, event, handler }) => {
+            el.removeEventListener(event, handler);
+        });
+        this._listeners = [];
+        console.log('[DOMManager] All event listeners unbound.');
     }
 }

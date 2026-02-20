@@ -43,6 +43,10 @@ const Game = {
             this.activeRAFs.forEach(id => cancelAnimationFrame(id));
             this.activeRAFs = [];
         }
+        // [FIX] Also cancel UIManager's in-flight score-counter RAF loops
+        if (this.uiManager && typeof this.uiManager.cancelAnims === 'function') {
+            this.uiManager.cancelAnims();
+        }
     },
 
     // [Restored] Floating Text Effect (Required for Boss Battle)
@@ -185,20 +189,97 @@ const Game = {
 
     // --- Browser Detection Moved to IntroManager ---
 
-    switchScreen(screenId) {
-        // [DEBUG] Log Screen Transition
-        const prevScreen = document.querySelector('.screen.active')?.id || "unknown";
-        console.log(`[Scene] Switch: ${prevScreen} -> ${screenId}`);
+    // ─────────────────────────────────────────────────────────────────────
+    // SCREEN LIFECYCLE CONTRACT
+    // Each screen declares exactly what it owns and how to unmount.
+    // switchScreen() enforces this: UNMOUNT previous → transition → MOUNT next.
+    //
+    // Rule: if a screen allocates a resource, it MUST declare it here.
+    // No heuristics, no timeouts, no error thresholds — just deterministic cleanup.
+    // ─────────────────────────────────────────────────────────────────────
+    SCREEN_CLEANUP: {
 
-        // [New] Unconditional Resource Cleanup
-        this.clearAllResources();
+        // ── Reading Screen ───────────────────────────────────────────────
+        'screen-read': () => {
+            // 1. Stop all TextRenderer animations (timeouts + RAFs)
+            const renderer = window.Game?.typewriter?.renderer;
+            if (renderer && typeof renderer.cancelAllAnimations === 'function') {
+                renderer.cancelAllAnimations();
+                console.log('[Lifecycle] screen-read: TextRenderer cleared');
+            }
+            // 2. Remove all transient DOM overlays created during reading
+            //    (Pang markers, mini scores, flying ink, impact flashes)
+            const OVERLAYS = [
+                '#pang-marker-layer',
+                '#replay-canvas',
+            ];
+            OVERLAYS.forEach(sel => {
+                document.querySelectorAll(sel).forEach(el => el.remove());
+            });
+            document.querySelectorAll('.replay-mini-score, .flying-ink').forEach(el => el.remove());
+            console.log('[Lifecycle] screen-read: DOM overlays cleared');
+        },
 
-        // [FIX-iOS] Stop AliceBattle animateLoop if leaving that screen.
-        if (prevScreen === 'screen-alice-battle' && window.AliceBattleRef?.destroy) {
-            window.AliceBattleRef.destroy();
+        // ── Calibration Screen ───────────────────────────────────────────
+        'screen-calibration': () => {
+            // Cal RAF loop is managed by app.js overlay.calRunning / stopCalibrationLoop.
+            // This is already called by CalibrationManager.finishSequence().
+            // Nothing extra needed here — cal cleanup is handled at the app.js level.
+            console.log('[Lifecycle] screen-calibration: (managed by app.js)');
+        },
+
+        // ── Alice Battle Screen ──────────────────────────────────────────
+        'screen-alice-battle': () => {
+            if (window.AliceBattleRef && typeof window.AliceBattleRef.destroy === 'function') {
+                window.AliceBattleRef.destroy();
+                console.log('[Lifecycle] screen-alice-battle: AliceBattleRef destroyed');
+            }
+        },
+
+        // ── Mid-Boss / Quiz Screens ──────────────────────────────────────
+        'screen-battle': () => {
+            // Remove any battle-specific animated elements
+            document.querySelectorAll('.battle-fx, .battle-lightning').forEach(el => el.remove());
+        },
+
+        // ── Rift / Intro Screens ─────────────────────────────────────────
+        'screen-rift-intro': () => {
+            // The SceneManager.resetRiftIntro() handles DOM, nothing extra.
+        },
+
+        // ── Score / Share Screens ─────────────────────────────────────────
+        'screen-new-score': () => {
+            // Cancel any in-flight score-counter animations when leaving this screen
+            if (window.Game?.uiManager?.cancelAnims) {
+                window.Game.uiManager.cancelAnims();
+            }
+        },
+
+        // ── Default: no specific cleanup needed ──────────────────────────
+        _default: () => { },
+    },
+
+    // Central cleanup dispatcher — call before mounting new screen
+    _unmountScreen(screenId) {
+        const cleanup = this.SCREEN_CLEANUP[screenId] || this.SCREEN_CLEANUP._default;
+        try {
+            cleanup();
+        } catch (e) {
+            console.error(`[Lifecycle] unmount error for ${screenId}:`, e);
         }
+    },
 
-        // [FIX] Ensure clean state transition
+    switchScreen(screenId) {
+        const prevScreen = document.querySelector('.screen.active')?.id || 'unknown';
+        console.log(`[Scene] ${prevScreen} → ${screenId}`);
+
+        // ── STEP 1: UNMOUNT previous screen (deterministic resource cleanup) ──
+        // Always runs: Game-global resources (RAFs, Intervals)
+        this.clearAllResources();
+        // Screen-specific owned resources
+        this._unmountScreen(prevScreen);
+
+        // ── STEP 2: DOM Transition ────────────────────────────────────────
         document.querySelectorAll('.screen').forEach(el => {
             el.classList.remove('active');
             el.style.display = 'none';
@@ -206,26 +287,30 @@ const Game = {
 
         const target = document.getElementById(screenId);
         if (target) {
-            target.style.display = 'flex'; // Force flex
-            // Use timeout to allow display change to register before adding class (for transitions)
-            requestAnimationFrame(() => {
-                target.classList.add('active');
-            });
+            target.style.display = 'flex';
+            requestAnimationFrame(() => target.classList.add('active'));
         }
 
-        // [FIX] HUD Visibility Control
-        const topHud = document.querySelector(".hud-container");
+        // ── STEP 3: HUD Visibility ────────────────────────────────────────
+        const topHud = document.querySelector('.hud-container');
         if (topHud) {
-            // Hide HUD on Score and Share screens
-            if (screenId === "screen-new-score" || screenId === "screen-home" || screenId === "screen-new-share") {
-                topHud.style.opacity = "0";
-                topHud.style.pointerEvents = "none";
-            } else {
-                topHud.style.opacity = "1";
-                topHud.style.pointerEvents = "auto";
+            const hideHud = ['screen-new-score', 'screen-home', 'screen-new-share'].includes(screenId);
+            topHud.style.opacity = hideHud ? '0' : '1';
+            topHud.style.pointerEvents = hideHud ? 'none' : 'auto';
+        }
+
+        // ── STEP 4: Release camera + SDK on terminal screens ──────────────
+        // Game is over — shut down eye tracking immediately,
+        // rather than waiting for beforeunload.
+        const TERMINAL_SCREENS = ['screen-new-score', 'screen-new-share', 'screen-new-signup'];
+        if (TERMINAL_SCREENS.includes(screenId)) {
+            if (typeof window.shutdownEyeTracking === 'function') {
+                window.shutdownEyeTracking();
+                console.log('[Lifecycle] Eye tracking shut down on terminal screen:', screenId);
             }
         }
     },
+
 
     updateUI() {
         if (this.scoreManager) {

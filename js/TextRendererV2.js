@@ -64,6 +64,20 @@ export class TextRenderer {
             cancelAnimationFrame(this._replayRAFId);
             this._replayRAFId = null;
         }
+        // [FIX] Remove persistent DOM nodes injected into document.body.
+        // These were previously left in the DOM across screen transitions, causing accumulation.
+        if (this.cursor && this.cursor.parentNode) {
+            this.cursor.remove();
+            this.cursor = null;
+            console.log('[Life] TextRenderer: cursor removed from DOM.');
+        }
+        if (this.impactElement && this.impactElement.parentNode) {
+            this.impactElement.remove();
+            this.impactElement = null;
+            console.log('[Life] TextRenderer: impactElement removed from DOM.');
+        }
+        // [FIX] Remove any lingering pang marker layer
+        document.querySelectorAll('#pang-marker-layer').forEach(el => el.remove());
     }
 
     // [FIX-iOS] Track a RAF id so cancelAllAnimations() can clean it up
