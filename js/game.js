@@ -16,6 +16,22 @@ const Game = {
     scoreManager: null,
     sceneManager: null,
 
+    // [New] Global Resource Tracker (Missing Fix)
+    activeIntervals: [],
+
+    trackInterval(id) {
+        if (id) this.activeIntervals.push(id);
+        return id;
+    },
+
+    clearAllResources() {
+        if (this.activeIntervals.length > 0) {
+            console.log(`[Game] Clearing Resources: Intervals=${this.activeIntervals.length}`);
+            this.activeIntervals.forEach(id => clearInterval(id));
+            this.activeIntervals = [];
+        }
+    },
+
     state: {
         // Renamed/Removed: gem/ink/rune to ScoreManager
         currentWordIndex: 0,
