@@ -854,8 +854,9 @@ Game.typewriter = {
     },
 
     playNextParagraph() {
-        // [iOS OOM Fix] Resume SeeSo tracking — needed for gaze detection during reading.
-        // Was OFF during replay / mid-boss battle to free ~100~190MB of camera+ML memory.
+        // [iOS Gate] Open gaze processing gate — start accepting gaze data for this paragraph.
+        // NOTE: SeeSo SDK itself stays running continuously (iOS cannot restart mid-session).
+        // This simply sets window._gazeActive = true so the gaze callback resumes processing.
         if (typeof window.setSeesoTracking === 'function') {
             window.setSeesoTracking(true, `reading para ${this.currentParaIndex}`);
         }
@@ -1107,10 +1108,10 @@ Game.typewriter = {
         return new Promise((resolve) => {
             console.log("[triggerGazeReplay] Preparing Gaze Replay...");
 
-            // [iOS OOM Fix] Stop SeeSo tracking immediately — gaze not needed during replay.
-            // SeeSo (camera + ML model) holds ~100~190MB on iOS. Releasing it here
-            // is the single most impactful action to prevent OOM Kill during the
-            // replay → mid-boss → next paragraph transition window.
+            // [iOS Gate] Close gaze processing gate — stop processing gaze data during replay.
+            // NOTE: SeeSo SDK itself stays running (iOS cannot restart after stopTracking).
+            // This simply sets window._gazeActive = false so onGaze/processGaze are skipped.
+            // Gaze callbacks still fire from SDK but are ignored until next paragraph.
             if (typeof window.setSeesoTracking === 'function') {
                 window.setSeesoTracking(false, 'gaze replay start');
             }

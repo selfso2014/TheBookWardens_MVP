@@ -913,7 +913,8 @@ function attachSeesoCallbacks() {
       const xRaw = gazeInfo?.x;
       const yRaw = gazeInfo?.y;
 
-      // [NEW] Face Check Logic
+      // [iOS Fix] Face check & calibration always run regardless of gate.
+      // These phases need gaze even during "inactive" states.
       if (calManager && calManager.handleFaceCheckGaze) {
         calManager.handleFaceCheckGaze(gazeInfo?.trackingState);
       }
@@ -932,6 +933,14 @@ function attachSeesoCallbacks() {
         trackingState: gazeInfo?.trackingState,
         confidence: gazeInfo?.confidence,
       };
+
+      // [iOS Fix] JS-level gate: SeeSo SDK runs continuously (stop/start cycle
+      // breaks gaze on iOS). During replay / battles, we skip game processing
+      // but keep the SDK alive so it can restart cleanly for the next paragraph.
+      if (!window._gazeActive) {
+        renderOverlay(); // Keep overlay dot moving for visual feedback
+        return;          // Skip game logic and data recording
+      }
 
       // --- GAME INTEGRATION (First Update Context/Game State) ---
       if (typeof window.Game !== "undefined" && overlay.gaze.x !== null) {
@@ -1289,60 +1298,29 @@ window.startEyeTracking = boot;
  * Call setSeesoTracking(false) to release camera + ML memory during replay / battles.
  * Call setSeesoTracking(true)  to resume before the next reading passage starts.
  */
-(function () {
-  let _tracking = true; // Assume tracking is ON after boot()
+// [iOS Fix] Gaze Processing Gate
+// SeeSo SDK cannot be stopped and restarted mid-session on iOS:
+// stopTracking() works, but startTracking() does NOT resume gaze callbacks.
+// Solution: Keep SDK running 100% of the time. Use _gazeActive flag to
+// enable/disable GAME LOGIC processing only (not the SDK itself).
+// This keeps tracking stable while allowing replay/battle phases to skip
+// unnecessary processing.
+window._gazeActive = true; // true = game processes gaze; false = SDK runs but game ignores it
 
-  // Helper: read JS heap in MB (Chrome/Android only; null on Safari/iOS)
-  function _heapMB() {
-    return performance.memory
-      ? Math.round(performance.memory.usedJSHeapSize / 1048576)
-      : null;
+window.setSeesoTracking = function (on, reason) {
+  if (window._gazeActive === on) {
+    logI('seeso', `[Gate] already ${on ? 'OPEN' : 'CLOSED'}, skipping (${reason})`);
+    return;
   }
-
-  window.setSeesoTracking = function (on, reason) {
-    if (_tracking === on) {
-      logI('seeso', `[Track] already ${on ? 'ON' : 'OFF'}, skipping (${reason})`);
-      return;
-    }
-    _tracking = on;
-    try {
-      if (on) {
-        if (!seeso || !mediaStream) {
-          logW('seeso', '[Track] Cannot start — seeso or mediaStream not ready');
-          return;
-        }
-        const heapBefore = _heapMB();
-        seeso.startTracking(mediaStream);
-        // Log heap 800ms after restart (GC may have settled)
-        setTimeout(() => {
-          const heapAfter = _heapMB();
-          if (heapBefore !== null && heapAfter !== null) {
-            const delta = heapAfter - heapBefore;
-            logI('seeso', `[Track] ON  ← ${reason} | JS heap: ${heapBefore}MB → ${heapAfter}MB (${delta >= 0 ? '+' : ''}${delta}MB)`);
-          } else {
-            logI('seeso', `[Track] ON  ← ${reason} | JS heap: N/A (iOS/Safari)`);
-          }
-        }, 800);
-      } else {
-        if (!seeso || typeof seeso.stopTracking !== 'function') return;
-        const heapBefore = _heapMB();
-        seeso.stopTracking();
-        // Measure 800ms later — give GC time to reclaim JS-side SDK buffers
-        setTimeout(() => {
-          const heapAfter = _heapMB();
-          if (heapBefore !== null && heapAfter !== null) {
-            const delta = heapBefore - heapAfter; // positive = freed
-            logI('seeso', `[Track] OFF ← ${reason} | JS heap: ${heapBefore}MB → ${heapAfter}MB (${delta >= 0 ? '-' : '+'}${Math.abs(delta)}MB freed)`);
-          } else {
-            logI('seeso', `[Track] OFF ← ${reason} | JS heap: N/A (iOS/Safari — native ~150MB freed)`);
-          }
-        }, 800);
-      }
-    } catch (e) {
-      logW('seeso', `[Track] ${on ? 'startTracking' : 'stopTracking'} threw:`, e);
-    }
-  };
-})();
+  window._gazeActive = on;
+  const heapMB = performance.memory
+    ? Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB'
+    : 'N/A';
+  logI('seeso', `[Gate] ${on ? 'OPEN  ← reading' : 'CLOSED← replay/battle'} | reason: ${reason} | JS heap: ${heapMB}`);
+  // NOTE: seeso.stopTracking() / startTracking() are intentionally NOT called here.
+  // On iOS, startTracking() after stopTracking() does not restore gaze callbacks.
+  // The SDK stays running. Only JS processing is gated.
+};
 
 // ---------- Shutdown: Camera + SDK Cleanup ----------
 /**
