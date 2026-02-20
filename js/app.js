@@ -153,107 +153,147 @@ function ensureLogPanel() {
   container = document.createElement("div");
   container.id = "debugContainer";
   container.style.position = "fixed";
-  container.style.right = "10px";
-  container.style.bottom = "10px";
+  container.style.right = "20px";
+  container.style.bottom = "80px"; // Moved up to avoid bottom nav bars
   container.style.zIndex = "99999";
   container.style.display = "flex";
   container.style.flexDirection = "column";
   container.style.alignItems = "flex-end";
-  container.style.gap = "5px";
+  container.style.gap = "10px"; // Increased gap
 
   // Toggle Button (Mini Mode)
   const btnToggle = document.createElement("button");
   btnToggle.textContent = "🐞";
-  btnToggle.style.fontSize = "24px";
-  btnToggle.style.width = "40px";
-  btnToggle.style.height = "40px";
+  btnToggle.style.fontSize = "32px"; // Bigger icon
+  btnToggle.style.width = "56px"; // Bigger touch target
+  btnToggle.style.height = "56px";
   btnToggle.style.borderRadius = "50%";
-  btnToggle.style.border = "2px solid rgba(255,255,255,0.3)";
-  btnToggle.style.background = "rgba(0,0,0,0.6)";
+  btnToggle.style.border = "2px solid rgba(255,255,255,0.4)";
+  btnToggle.style.background = "rgba(0,0,0,0.7)";
+  btnToggle.style.color = "#fff";
   btnToggle.style.cursor = "pointer";
-  btnToggle.style.boxShadow = "0 0 10px rgba(0,0,0,0.5)";
+  btnToggle.style.boxShadow = "0 4px 12px rgba(0,0,0,0.6)";
+  btnToggle.style.transition = "transform 0.2s";
 
   // Panel (Hidden by default)
   const panel = document.createElement("pre");
   panel.id = "debugLogPanel";
-  panel.style.display = "none"; // Start hidden
-  panel.style.width = "300px"; // Mobile friendly width
-  panel.style.height = "200px";
+  panel.style.display = "none";
+  panel.style.width = "340px"; // Slightly wider
+  panel.style.height = "250px"; // Slightly taller
   panel.style.overflow = "auto";
-  panel.style.padding = "10px";
-  panel.style.borderRadius = "10px";
-  panel.style.background = "rgba(0,0,0,0.85)";
+  panel.style.padding = "12px";
+  panel.style.borderRadius = "12px";
+  panel.style.background = "rgba(0,0,0,0.9)";
   panel.style.color = "#0f0";
   panel.style.fontFamily = "monospace";
-  panel.style.fontSize = "10px";
+  panel.style.fontSize = "11px";
   panel.style.whiteSpace = "pre-wrap";
   panel.style.wordBreak = "break-word";
-  panel.style.border = "1px solid #333";
+  panel.style.border = "1px solid #444";
   panel.style.marginBottom = "5px";
 
   // Toolbar
   const toolbar = document.createElement("div");
-  toolbar.style.display = "none"; // Start hidden with panel
-  toolbar.style.gap = "5px";
+  toolbar.style.display = "none";
+  toolbar.style.gap = "8px"; // Increased gap
+  toolbar.style.flexWrap = "wrap"; // Allow wrapping
+  toolbar.style.justifyContent = "flex-end";
 
-  const createBtn = (text, onClick, color = "#fff") => {
+  let isExpanded = false;
+
+  const createBtn = (text, onClick, color = "#fff", bg = "#333") => {
     const b = document.createElement("button");
     b.textContent = text;
-    b.style.padding = "4px 8px";
-    b.style.fontSize = "10px";
-    b.style.borderRadius = "4px";
-    b.style.border = "1px solid #555";
-    b.style.background = "#333";
+    b.style.padding = "8px 14px"; // Larger touch area
+    b.style.fontSize = "13px";
+    b.style.fontWeight = "bold";
+    b.style.borderRadius = "6px";
+    b.style.border = "1px solid #666";
+    b.style.background = bg;
     b.style.color = color;
+    b.style.cursor = "pointer";
     b.onclick = onClick;
     return b;
   };
 
   // Copy
-  toolbar.appendChild(createBtn("Copy", async () => {
+  toolbar.appendChild(createBtn("📋 Copy", async () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(LOG_BUFFER, null, 2));
-      alert("Logs Copied!");
+      const originalText = panel.textContent;
+      panel.textContent += "\n[System] Copied to Clipboard!";
+      panel.scrollTop = panel.scrollHeight;
+      setTimeout(() => alert("Logs Copied!"), 100);
     } catch (e) { alert("Copy Failed"); }
   }));
 
   // Clear
-  toolbar.appendChild(createBtn("Clear", () => {
+  toolbar.appendChild(createBtn("🗑️ Clear", () => {
     LOG_BUFFER.length = 0;
     panel.textContent = "";
-  }));
+  }, "#ff8a80"));
 
   // Upload (DB)
-  toolbar.appendChild(createBtn("Upload DB", async () => {
+  const btnUpload = createBtn("☁️ Upload DB", async () => {
+    // UI Feedback: Loading
+    const originalText = btnUpload.textContent;
+    btnUpload.textContent = "⏳ Sending...";
+    btnUpload.disabled = true;
+    btnUpload.style.opacity = "0.7";
+    btnUpload.style.cursor = "wait";
+
     if (!window.firebase) {
-      alert("Firebase SDK missing!");
+      alert("Error: Firebase SDK not loaded.");
+      resetBtn();
       return;
     }
-    const db = firebase.database();
-    const sessionId = "session_" + Date.now();
+
     try {
+      const db = firebase.database();
+      const sessionId = "session_" + Date.now();
+      // Test Auth first (optional, logging only)
+      if (firebase.auth && !firebase.auth().currentUser) {
+        console.warn("[Upload] Not logged in (Anonymous Auth might be required)");
+      }
+
       await db.ref("logs/" + sessionId).set({
         ua: navigator.userAgent,
         timestamp: new Date().toISOString(),
         logs: LOG_BUFFER
       });
-      alert(`Uploaded! Session ID: ${sessionId}`);
+
+      alert(`✅ Upload Success!\nSession ID: ${sessionId}`);
+      panel.textContent += `\n[System] Uploaded to: logs/${sessionId}`;
     } catch (e) {
-      // Guide user to fix permissions
-      alert("Upload Failed: " + e.message + "\n\n[Action Required]\nGo to Firebase Console > Realtime Database > Rules\nSet .read and .write to true.");
+      console.error(e);
+      alert("❌ Upload Failed: " + e.message + "\n\n[Check Firebase Console -> Start Collection if first time, or Rules]");
+    } finally {
+      resetBtn();
     }
-  }, "#4fc3f7"));
+
+    function resetBtn() {
+      btnUpload.textContent = originalText;
+      btnUpload.disabled = false;
+      btnUpload.style.opacity = "1";
+      btnUpload.style.cursor = "pointer";
+    }
+  }, "#40c4ff", "#01579b"); // Blue color
+
+  toolbar.appendChild(btnUpload);
 
   // Toggle Logic
-  let isExpanded = false;
   btnToggle.onclick = () => {
     isExpanded = !isExpanded;
     panel.style.display = isExpanded ? "block" : "none";
     toolbar.style.display = isExpanded ? "flex" : "none";
     btnToggle.textContent = isExpanded ? "❌" : "🐞";
-
-    // Auto-scroll to bottom when opening
-    if (isExpanded) panel.scrollTop = panel.scrollHeight;
+    if (isExpanded) {
+      panel.scrollTop = panel.scrollHeight;
+      btnToggle.style.transform = "scale(0.9)";
+    } else {
+      btnToggle.style.transform = "scale(1)";
+    }
   };
 
   container.appendChild(panel);
