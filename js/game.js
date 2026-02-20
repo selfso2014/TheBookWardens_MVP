@@ -302,8 +302,13 @@ const Game = {
         // ── STEP 4: Release camera + SDK on terminal screens ──────────────
         // Game is over — shut down eye tracking immediately,
         // rather than waiting for beforeunload.
-        const TERMINAL_SCREENS = ['screen-new-score', 'screen-new-share', 'screen-new-signup'];
-        if (TERMINAL_SCREENS.includes(screenId)) {
+        // ── STEP 4: Release camera + SDK on terminal screens ──────────────
+        // Fire shutdownEyeTracking() ONLY after Firebase upload is complete.
+        // screen-new-score: claim button → uploadToCloud() is still running → DO NOT shutdown yet.
+        // screen-new-share / screen-new-signup: upload is done at this point → safe to shutdown.
+        // beforeunload (app.js) also covers tab close / refresh as a safety net.
+        const SHUTDOWN_SCREENS = ['screen-new-share', 'screen-new-signup'];
+        if (SHUTDOWN_SCREENS.includes(screenId)) {
             if (typeof window.shutdownEyeTracking === 'function') {
                 window.shutdownEyeTracking();
                 console.log('[Lifecycle] Eye tracking shut down on terminal screen:', screenId);

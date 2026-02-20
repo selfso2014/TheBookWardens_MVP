@@ -76,8 +76,10 @@ export class TextRenderer {
             this.impactElement = null;
             console.log('[Life] TextRenderer: impactElement removed from DOM.');
         }
-        // [FIX] Remove any lingering pang marker layer
-        document.querySelectorAll('#pang-marker-layer').forEach(el => el.remove());
+        // NOTE: #pang-marker-layer is NOT removed here.
+        // cancelAllAnimations() is called on every showPage() during reading.
+        // Removing pang markers here would destroy them as soon as they appear.
+        // Pang cleanup is handled exclusively in SCREEN_CLEANUP['screen-read'] (game.js).
     }
 
     // [FIX-iOS] Track a RAF id so cancelAllAnimations() can clean it up
