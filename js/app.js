@@ -1275,6 +1275,48 @@ async function boot() {
 // Expose boot control to Game
 window.startEyeTracking = boot;
 
+// ---------- SeeSo Tracking On/Off Control ----------
+/**
+ * [iOS OOM Fix] Selectively pause/resume SeeSo eye tracking.
+ *
+ * SeeSo (camera + ML model) is the single largest memory consumer (~100~190MB on iOS).
+ * It only needs to run during:
+ *   1. Face check / posture correction
+ *   2. Calibration
+ *   3. Rabbit eye animation
+ *   4. Text reading  (NOT during replay)
+ *
+ * Call setSeesoTracking(false) to release camera + ML memory during replay / battles.
+ * Call setSeesoTracking(true)  to resume before the next reading passage starts.
+ */
+(function () {
+  let _tracking = true; // Assume tracking is ON after boot()
+
+  window.setSeesoTracking = function (on, reason) {
+    if (_tracking === on) {
+      logI('seeso', `[Track] already ${on ? 'ON' : 'OFF'}, skipping (${reason})`);
+      return;
+    }
+    _tracking = on;
+    try {
+      if (on) {
+        if (!seeso || !mediaStream) {
+          logW('seeso', '[Track] Cannot start — seeso or mediaStream not ready');
+          return;
+        }
+        seeso.startTracking(mediaStream);
+        logI('seeso', `[Track] ON  ← ${reason}`);
+      } else {
+        if (!seeso || typeof seeso.stopTracking !== 'function') return;
+        seeso.stopTracking();
+        logI('seeso', `[Track] OFF ← ${reason}`);
+      }
+    } catch (e) {
+      logW('seeso', `[Track] ${on ? 'startTracking' : 'stopTracking'} threw:`, e);
+    }
+  };
+})();
+
 // ---------- Shutdown: Camera + SDK Cleanup ----------
 /**
  * [FIX] Release all SeeSo and camera resources.

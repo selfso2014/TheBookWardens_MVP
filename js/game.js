@@ -854,6 +854,12 @@ Game.typewriter = {
     },
 
     playNextParagraph() {
+        // [iOS OOM Fix] Resume SeeSo tracking — needed for gaze detection during reading.
+        // Was OFF during replay / mid-boss battle to free ~100~190MB of camera+ML memory.
+        if (typeof window.setSeesoTracking === 'function') {
+            window.setSeesoTracking(true, `reading para ${this.currentParaIndex}`);
+        }
+
         // [SAFETY FIX] Reset Scroll Position to (0,0) BEFORE rendering new content.
         // This prevents lingering scroll from previous paragraphs from affecting lockLayout coordinates.
         window.scrollTo(0, 0);
@@ -1100,6 +1106,14 @@ Game.typewriter = {
     triggerGazeReplay() {
         return new Promise((resolve) => {
             console.log("[triggerGazeReplay] Preparing Gaze Replay...");
+
+            // [iOS OOM Fix] Stop SeeSo tracking immediately — gaze not needed during replay.
+            // SeeSo (camera + ML model) holds ~100~190MB on iOS. Releasing it here
+            // is the single most impactful action to prevent OOM Kill during the
+            // replay → mid-boss → next paragraph transition window.
+            if (typeof window.setSeesoTracking === 'function') {
+                window.setSeesoTracking(false, 'gaze replay start');
+            }
 
             // [CHANGED] Upload Data to Firebase NOW (Background Sync)
             // We do this here because Replay start signifies "Paragraph Done".
