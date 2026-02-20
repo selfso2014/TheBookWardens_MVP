@@ -466,14 +466,12 @@ const Game = {
 
         // Typewriter Gaze Feedback
         if (this.typewriter) {
-            // New Ink Logic
+            // Gaze Stats (Hit Test + Line Progress)
             if (typeof this.typewriter.updateGazeStats === "function") {
                 this.typewriter.updateGazeStats(x, y);
             }
-            // Legacy Logic (if exists)
-            if (typeof this.typewriter.checkGazeDistance === "function") {
-                this.typewriter.checkGazeDistance(x, y);
-            }
+            // [FIX-iOS] Removed checkGazeDistance() — it just called updateGazeStats() again,
+            // causing hitTest to run TWICE per gaze frame (2x DOM rect access).
 
             // [RGT] Check Responsive Words
             if (this.typewriter.renderer && typeof this.typewriter.renderer.checkRuneTriggers === 'function') {
@@ -897,6 +895,7 @@ Game.typewriter = {
         this.renderer.prepareDynamic({ paragraphs: [paraData] }, currentWPM);
 
         this.chunkIndex = 0;
+        this._lineStartSet = null; // [FIX] Reset cached Set for new paragraph layout
         this.lineStats.clear(); // Reset reading stats for new page
 
         // [FIX] Register Cursor with SceneManager (Cursor is recreated directly in prepare())
@@ -1014,10 +1013,15 @@ Game.typewriter = {
                 if (this.renderer && this.renderer.chunks && this.renderer.lines) {
                     const currentChunkIndices = this.renderer.chunks[this.chunkIndex];
                     if (currentChunkIndices) {
-                        // Check if any word in this chunk is a start of a line (excluding the very first word of text)
-                        hadLineBreak = currentChunkIndices.some(wordIdx => {
-                            return wordIdx > 0 && this.renderer.lines.some(line => line.startIndex === wordIdx);
-                        });
+                        // [FIX-iOS] Use Set for O(1) lookup instead of O(N×M) nested some().
+                        // Old code: chunks.some(w => lines.some(l => l.startIndex === w))
+                        // = chunkSize × lineCount comparisons per tick.
+                        if (!this._lineStartSet) {
+                            this._lineStartSet = new Set(this.renderer.lines.map(l => l.startIndex));
+                        }
+                        hadLineBreak = currentChunkIndices.some(wordIdx =>
+                            wordIdx > 0 && this._lineStartSet.has(wordIdx)
+                        );
                     }
                 }
 

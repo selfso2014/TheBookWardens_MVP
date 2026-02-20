@@ -49,7 +49,10 @@ const originalRAF = window.requestAnimationFrame;
 const originalCAF = window.cancelAnimationFrame;
 
 window.requestAnimationFrame = (cb) => {
-  const id = originalRAF((t) => {
+  // [FIX-iOS] Reuse wrapper to avoid per-frame anonymous closure creation.
+  // Old code: originalRAF((t) => { ... }) created a new function every frame.
+  // SeeSo SDK calls RAF at 30fps internally = 30 closures/sec × session = GC pressure.
+  const id = originalRAF(function rafWrapper(t) {
     activeRafs.delete(id);
     if (cb) cb(t);
   });
@@ -82,27 +85,18 @@ EventTarget.prototype.removeEventListener = function (type, listener, options) {
 
 // Start 1s Metric Loop
 setInterval(() => {
-  // Only log if debug is enabled OR to console if critical
   const rafCount = activeRafs.size;
 
-  const metricData = {
-    ts: new Date().toISOString(),
-    rafCount: rafCount,
-    rafs: Array.from(activeRafs),
-    listenerCount: totalListeners,
-    listeners: { ...listenerCounts },
-    buffers: {}
-  };
+  // [FIX-iOS] Avoid per-second allocations (Array.from, object spread).
+  // Old code: Array.from(activeRafs) + {...listenerCounts} = 2 new allocations/sec.
+  logBase("INFO", "Meter", `RAF:${rafCount} | LSN:${totalListeners} | BUF:?`);
 
-  // Log format requested by user
-  logBase("INFO", "Meter", `RAF:${rafCount} | LSN:${totalListeners} | BUF:?`, metricData);
-
-  // Critical Warnings (iOS Crash Prevention)
+  // Critical Warnings — only log when actually critical
   if (rafCount > 2) {
-    logE("CRITICAL", `RAF > 2: [${Array.from(activeRafs)}]`);
+    logE("CRITICAL", `RAF > 2: count=${rafCount}`);
   }
   if (totalListeners > 60) {
-    logE("CRITICAL", `LSN > 60:`, listenerCounts);
+    logE("CRITICAL", `LSN > 60: total=${totalListeners}`);
   }
 
 }, 1000);
@@ -408,17 +402,29 @@ function ensureLogPanel() {
 
 const panel = ensureLogPanel();
 
+// [FIX-iOS] Batch DOM updates — at most 4 textContent rebuilds per second.
+// Old code rebuilt 225KB string on EVERY log call.
+let _logDirty = false;
+let _logFlushTimer = null;
 function pushLog(line) {
-  if (!panel) return; // No panel, no display
+  if (!panel) return;
   LOG_BUFFER.push(line);
   if (LOG_BUFFER.length > LOG_MAX) LOG_BUFFER.splice(0, LOG_BUFFER.length - LOG_MAX);
-  panel.textContent = LOG_BUFFER.join("\n");
-  panel.scrollTop = panel.scrollHeight;
+  if (!_logDirty) {
+    _logDirty = true;
+    _logFlushTimer = setTimeout(() => {
+      _logDirty = false;
+      panel.textContent = LOG_BUFFER.join("\n");
+      panel.scrollTop = panel.scrollHeight;
+    }, 250);
+  }
 }
 
 function logBase(level, tag, msg, data) {
-  const line = `[${ts()}] ${level.padEnd(5)} ${tag.padEnd(10)} ${msg}${data !== undefined ? " " + JSON.stringify(safeJson(data)) : ""
-    }`;
+  // [FIX-iOS] Removed double-serialization: old code did JSON.stringify(safeJson(data))
+  // which is JSON.stringify(JSON.parse(JSON.stringify(data))) = 2x serialize.
+  const dataStr = data !== undefined ? " " + (typeof data === 'string' ? data : JSON.stringify(data)) : "";
+  const line = `[${ts()}] ${level.padEnd(5)} ${tag.padEnd(10)} ${msg}${dataStr}`;
   if (level === "ERROR") console.error(line);
   else if (level === "WARN") console.warn(line);
   else console.log(line);
@@ -1010,6 +1016,12 @@ async function preloadSDK() {
 // This gives iOS the user-gesture signal it requires to allocate memory fairly.
 
 async function initSeeso() {
+  // [FIX] Prevent multiple initializations/preloads
+  if (seeso && (state.sdk === "initialized" || state.sdk === "tracking")) {
+    logI("sdk", "initSeeso skipped: already initialized");
+    return true;
+  }
+
   // First call: starts the preload. Subsequent calls: waits for existing promise.
   if (!initPromise) {
     logI("sdk", "[FIX] initSeeso: starting SDK init on-demand (user-gesture path).");

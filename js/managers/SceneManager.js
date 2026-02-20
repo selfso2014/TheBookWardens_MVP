@@ -13,6 +13,11 @@ export class SceneManager {
     }
 
     show(screenId) {
+        // [FIX-iOS] Auto-clean resources on screen change
+        if (window.Game && typeof window.Game.clearAllResources === 'function') {
+            window.Game.clearAllResources();
+        }
+
         // 1. Hide all screens
         document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
 
