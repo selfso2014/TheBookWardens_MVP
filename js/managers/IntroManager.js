@@ -222,9 +222,9 @@ export class IntroManager {
         if (villainContainer) villainContainer.style.opacity = 1;
 
         // Start light meteors
-        const lightMeteorLoop = setInterval(() => {
+        const lightMeteorLoop = this.game.trackInterval(setInterval(() => {
             if (Math.random() > 0.7) this.spawnMeteor(meteorLayer);
-        }, 300);
+        }, 300));
 
         await wait(1500);
         clearInterval(lightMeteorLoop);
@@ -238,10 +238,10 @@ export class IntroManager {
         if (this.game.sceneManager) this.game.sceneManager.showStoryText("The words are fading...<br>WARDEN, RESTORE THE STORY!");
         if (textContainer) textContainer.classList.add("rift-damaged");
 
-        const heavyMeteorLoop = setInterval(() => {
+        const heavyMeteorLoop = this.game.trackInterval(setInterval(() => {
             this.spawnMeteor(meteorLayer);
             this.spawnMeteor(meteorLayer);
-        }, 100);
+        }, 100));
 
         await wait(3000);
         await wait(800);

@@ -144,6 +144,9 @@ const Game = {
         console.log(`[Scene] Switch: ${prevScreen} -> ${screenId}`);
         // Optional: If we had a global 'currentScene' object, we'd log its cleanup here.
 
+        // [New] Unconditional Resource Cleanup
+        this.clearAllResources();
+
         // [FIX] Ensure clean state transition
         document.querySelectorAll('.screen').forEach(el => {
             el.classList.remove('active');
