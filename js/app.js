@@ -848,16 +848,13 @@ async function ensureCamera() {
 
   setState("perm", "requesting");
   try {
-    // 1st Attempt: Ideal constraints
+    // EasySeeSo 공식 패턴과 동일: facingMode만 지정, SDK가 내부적으로 카메라 포맷 처리
+    // width/height/frameRate 강제 지정 시 portrait(480x640) 프레임이 와서 SDK face detection 실패 가능
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "user",
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        frameRate: { ideal: 30, max: 30 },
-      },
+      video: { facingMode: "user" },
       audio: false,
     });
+
   } catch (e1) {
     console.warn("[Camera] 1st attempt failed (constraints). Retrying with basic constraints...");
     try {
