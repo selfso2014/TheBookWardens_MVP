@@ -1040,11 +1040,12 @@ async function preloadSDK() {
   initPromise = (async () => {
     try {
       setState("sdk", "loading");
-      // [SDK-SWAP v3] New seeso.js (SDK 0.2.3 dev build) via loadWebpackModule.
-      // seeso.js replaced 2026-02-21 with new 0.2.3 build (458KB).
-      SDK = await loadWebpackModule("./seeso/dist/seeso.js");
+      // [SDK-SWAP v4] seeso.min.js (SDK 0.2.3 production webpack bundle) via loadWebpackModule.
+      // seeso.min.js = 442KB new SDK (updated 2026-02-21). No eval, plain webpack bundle.
+      SDK = await loadWebpackModule("./seeso/dist/seeso.min.js");
       const SeesoClass = SDK?.default || SDK;
-      if (!SeesoClass) throw new Error("Seeso export not found from ./seeso/dist/seeso.js");
+      if (!SeesoClass) throw new Error("Seeso export not found from ./seeso/dist/seeso.min.js");
+
 
 
       seeso = new SeesoClass();
