@@ -1053,6 +1053,11 @@ async function preloadSDK() {
       // NOTE: Camera (getUserMedia) is also done AFTER init (see boot()),
       //       matching EasySeeSo.startTracking() internal flow.
 
+      // [CRITICAL DIAG] SharedArrayBuffer required for SDK 0.2.3 WASM threading.
+      // GitHub Pages does NOT send COOP/COEP headers → crossOriginIsolated = false → SDK fails silently.
+      logI("sdk", "[DIAG] crossOriginIsolated: " + window.crossOriginIsolated);
+      logI("sdk", "[DIAG] SharedArrayBuffer available: " + (typeof SharedArrayBuffer !== "undefined"));
+
       // Initialize WITHOUT userStatusOption (pass undefined like EasySeeSo default).
       // Old SDK needed new UserStatusOption(f,f,f), new SDK 0.2.3 may use different constructor.
       logI("sdk", "initializing engine (no userStatusOption - EasySeeSo default)...");
