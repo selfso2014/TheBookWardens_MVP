@@ -1011,10 +1011,7 @@ async function preloadSDK() {
 
       setState("sdk", "constructed");
 
-      // Bind callbacks early
-      attachSeesoCallbacks();
-
-      // Initialize Engine
+      // Initialize Engine FIRST (new SDK 0.2.3 requires callbacks after initialize)
       // [OPTIMIZATION] Disable optional features to reduce initialization load and prevent iOS crashes.
       const userStatusOption = SDK?.UserStatusOption
         ? new SDK.UserStatusOption(false, false, false)
@@ -1040,6 +1037,11 @@ async function preloadSDK() {
         setState("sdk", "init_failed");
         throw new Error("Initialize returned: " + errCode);
       }
+
+      // [SDK-SWAP FIX] Bind callbacks AFTER initialize() (new SDK 0.2.3 requirement).
+      // Old seeso.js (2.5.x) accepted callbacks before initialize, new SDK does not.
+      // Matches easy-seeso.js official pattern: init → addGazeCallback.
+      attachSeesoCallbacks();
 
       setState("sdk", "initialized");
       console.log("[Seeso] Preload Complete! Ready for Tracking.");
