@@ -1105,14 +1105,23 @@ function startTracking() {
 }
 
 /**
- * Entry Point for Game: Enters Face Check Mode.
+ * Entry Point for Game: Enters Calibration.
+ * [DIAG] Face check bypassed for SDK 0.2.3 testing.
+ * New SDK may only fire gaze callbacks after seeso.startCalibration() is called.
+ * → If gaze appears during calibration, we confirm face check bypass is correct for 0.2.3.
  */
 function startCalibration() {
   if (!seeso) return false;
 
-  // Start tracking first if not already
   logI("cal", "Entering Face Check Mode...");
+  // [TEMP DIAG] Skip face check, go directly to calibration.
+  // SDK 0.2.3 does not fire gaze callbacks before startCalibration().
   calManager.startFaceCheck();
+  // Auto-pass face check after 500ms to trigger startActualCalibration
+  setTimeout(() => {
+    logI("cal", "[DIAG] Auto-passing face check (SDK 0.2.3 bypass)");
+    startActualCalibration();
+  }, 500);
   return true;
 }
 
