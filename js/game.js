@@ -1490,69 +1490,27 @@ Game.typewriter = {
 
     // Extracted Helper: Trigger Final Boss
     triggerFinalBossBattleSequence() {
-        // 1. FORCE HIDE MID BOSS SCREEN
-        const vs = document.getElementById("screen-boss");
-        if (vs) {
-            vs.style.display = "none";
-            vs.classList.remove("active");
-            vs.style.pointerEvents = "auto";
-        }
+        console.log("[FinalBoss] triggerFinalBossBattleSequence() called - using switchScreen");
 
-        // 2. Log
-        console.log("Direct Trigger Final Boss (v14.1.32)! Skip GameLogic.");
+        // Use the standard switchScreen flow (handles display, active class, clearAllResources)
+        Game.switchScreen("screen-alice-battle");
 
-        // 3. FORCE SWITCH SCREEN (Manual)
-        const aliceScreen = document.getElementById("screen-alice-battle");
-        console.log("[FinalBoss] screen-alice-battle element:", aliceScreen ? "FOUND" : "NOT FOUND");
-        if (aliceScreen) {
-            // Hide all screens
-            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-            // Show Alice Screen
-            aliceScreen.classList.add('active');
-            aliceScreen.style.display = "flex";
-            console.log("[FinalBoss] screen switched to alice-battle, display=flex");
-        } else {
-            console.error("ERROR: screen-alice-battle element missing!");
-            return;
-        }
-
-        // 4. INIT ALICE BATTLE (WITH DATA)
-        console.log("[FinalBoss] AliceBattleRef:", window.AliceBattleRef ? "FOUND" : "NOT FOUND");
+        // Init AliceBattle after screen transition settles
         setTimeout(() => {
-            // Re-check AliceBattleRef in case it was set after page load
             const ref = window.AliceBattleRef;
+            console.log("[FinalBoss] AliceBattleRef:", ref ? "FOUND" : "NOT FOUND");
             if (ref && typeof ref.init === 'function') {
                 const currentStats = {
                     ink: Game.state.ink,
                     rune: Game.state.rune,
                     gem: Game.state.gems
                 };
-                console.log("[FinalBoss] Calling AliceBattleRef.init() with stats:", currentStats);
-                try {
-                    ref.init(currentStats);
-                    console.log("[FinalBoss] AliceBattleRef.init() called successfully");
-                } catch (e) {
-                    console.error("[FinalBoss] AliceBattleRef.init() THREW:", e);
-                    // Show error on screen so it's not just black
-                    if (aliceScreen) {
-                        aliceScreen.innerHTML = `<div style="color:white;font-size:1.2rem;padding:40px;text-align:center;">
-                            <p>⚠️ Alice Battle Error</p>
-                            <p style="font-size:0.9rem;color:#aaa;margin-top:10px;">${e.message}</p>
-                            <button onclick="Game.goToNewScore()" style="margin-top:30px;padding:12px 24px;background:#5c35d5;color:white;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">결과 보기 →</button>
-                        </div>`;
-                    }
-                }
+                console.log("[FinalBoss] Calling AliceBattleRef.init():", currentStats);
+                ref.init(currentStats);
             } else {
-                console.error("[FinalBoss] FATAL: AliceBattleRef NOT FOUND or missing init(). window.AliceBattleRef =", window.AliceBattleRef);
-                // Fallback: go to score screen directly
-                if (aliceScreen) {
-                    aliceScreen.innerHTML = `<div style="color:white;font-size:1.2rem;padding:40px;text-align:center;">
-                        <p>🎉 모든 지문을 완주했습니다!</p>
-                        <button onclick="Game.goToNewScore()" style="margin-top:30px;padding:12px 24px;background:#5c35d5;color:white;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">결과 보기 →</button>
-                    </div>`;
-                }
+                console.error("[FinalBoss] AliceBattleRef NOT FOUND");
             }
-        }, 100);
+        }, 200);
     },
 
     // [State] Simple Battle System (Delegated to GameLogic)
