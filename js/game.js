@@ -1500,10 +1500,11 @@ Game.typewriter = {
             const ref = window.AliceBattleRef;
             console.log("[FinalBoss] AliceBattleRef:", ref ? "FOUND" : "NOT FOUND");
             if (ref && typeof ref.init === 'function') {
+                const sm = Game.scoreManager || {};
                 const currentStats = {
-                    ink: Game.state.ink,
-                    rune: Game.state.rune,
-                    gem: Game.state.gems
+                    ink: sm.ink || 0,
+                    rune: sm.runes || 0,
+                    gem: sm.gems || 0
                 };
                 console.log("[FinalBoss] Calling AliceBattleRef.init():", currentStats);
                 ref.init(currentStats);
