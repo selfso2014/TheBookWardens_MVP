@@ -1389,13 +1389,22 @@ window.setSeesoTracking = function (on, reason) {
       logW('seeso', '[Gate] stopTracking() threw:', e);
     }
   } else {
-    // ── SDK ON: 기존 mediaStream으로 재시작 ──
+    // ── SDK ON: stopTracking()이 카메라 트랙을 ended로 만들기 때문에
+    //           existingStream 없이 호출 → SDK 내부에서 getUserMedia() fresh 스트림 획득
     try {
       if (seeso && _onGazeCb && _onDebugCb) {
-        seeso.startTracking(_onGazeCb, _onDebugCb, mediaStream || undefined)
+        seeso.startTracking(_onGazeCb, _onDebugCb)  // NO existingStream → fresh camera
           .then((ok) => {
             logI('seeso', `[Gate] OPEN  ← SDK startTracking() ok=${ok} | reason: ${reason} | heap: ${heapMB}`);
-            if (!ok) logW('seeso', '[Gate] startTracking() returned false');
+            if (ok) {
+              // 새 스트림으로 mediaStream 참조 업데이트
+              mediaStream = seeso.stream || mediaStream;
+              if (els && els.video && mediaStream) {
+                els.video.srcObject = mediaStream;
+              }
+            } else {
+              logW('seeso', '[Gate] startTracking() returned false');
+            }
           })
           .catch((e) => logW('seeso', '[Gate] startTracking() threw:', e));
       } else {
