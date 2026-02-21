@@ -2,6 +2,7 @@
 import { loadWebpackModule } from "./webpack-loader.js";
 import { CalibrationManager } from "./calibration.js";
 import { GazeDataManager } from "./gaze-data-manager.js"; // Import
+import EasySeeSo from "../seeso/easy-seeso.js";
 
 // [DIAG] Intercept console.error/warn to surface SDK internal errors in our debug panel.
 // SDK errors (WASM load failure, license error, etc.) never appear in logI/logW/logE.
@@ -927,123 +928,18 @@ function enumName(enumObj, value) {
 function attachSeesoCallbacks() {
   if (!seeso) return;
 
-  // ---- Gaze callback (log + HUD) ----
-  const logGazeXY = throttle((g) => {
-    const xRaw = g?.x ?? g?.gazeInfo?.x ?? g?.data?.x ?? g?.screenX ?? g?.gazeX ?? g?.rawX;
-    const yRaw = g?.y ?? g?.gazeInfo?.y ?? g?.data?.y ?? g?.screenY ?? g?.gazeY ?? g?.rawY;
-    const stVal = g?.trackingState;
-    const conf = g?.confidence;
-
-    const stName = SDK?.TrackingState ? enumName(SDK.TrackingState, stVal) : String(stVal);
-
-    // IMPORTANT: string message so NaN/undefined remains visible
-    // [MOD] Removed per user request (too noisy)
-    // logI("gaze", `xy x=${fmt(xRaw)} y=${fmt(yRaw)} state=${stName}(${fmt(stVal)}) conf=${fmt(conf)}`);
-
-    // [MOD] Removed per user request (too noisy)
-    // setGazeInfo(`gaze: x=${fmt(xRaw)}  y=${fmt(yRaw)}  state=${stName}(${fmt(stVal)})  conf=${fmt(conf)}`);
-
-    if ((typeof xRaw !== "number" || typeof yRaw !== "number") && DEBUG_LEVEL >= 2) {
-      logD("gaze", "schema", { keys: g ? Object.keys(g) : null });
-    }
-  }, 150);
-
-  // For debug=2, keep a lightweight sample object (throttled)
-  const logGazeSample = throttle(() => {
-    if (DEBUG_LEVEL >= 2 && overlay.gazeRaw) {
-      logD("gaze", "sample", {
-        x: overlay.gazeRaw.x,
-        y: overlay.gazeRaw.y,
-        trackingState: overlay.gazeRaw.trackingState,
-      });
-    }
-  }, 60);
-
-  if (typeof seeso.addGazeCallback === "function") {
-    seeso.addGazeCallback((gazeInfo) => {
-      lastGazeAt = performance.now();
-
-      // Raw values (for HUD/log)
-      const xRaw = gazeInfo?.x;
-      const yRaw = gazeInfo?.y;
-
-      // [iOS Fix] Face check & calibration always run regardless of gate.
-      // These phases need gaze even during "inactive" states.
-      if (calManager && calManager.handleFaceCheckGaze) {
-        calManager.handleFaceCheckGaze(gazeInfo?.trackingState);
-      }
-
-      overlay.gazeRaw = {
-        x: xRaw,
-        y: yRaw,
-        trackingState: gazeInfo?.trackingState,
-        confidence: gazeInfo?.confidence,
-      };
-
-      // Use finite numbers only for drawing
-      overlay.gaze = {
-        x: typeof xRaw === "number" && Number.isFinite(xRaw) ? xRaw : null,
-        y: typeof yRaw === "number" && Number.isFinite(yRaw) ? yRaw : null,
-        trackingState: gazeInfo?.trackingState,
-        confidence: gazeInfo?.confidence,
-      };
-
-      // [iOS Fix] JS-level gate: SeeSo SDK runs continuously (stop/start cycle
-      // breaks gaze on iOS). During replay / battles, we skip game processing
-      // but keep the SDK alive so it can restart cleanly for the next paragraph.
-      if (!window._gazeActive) {
-        renderOverlay(); // Keep overlay dot moving for visual feedback
-        return;          // Skip game logic and data recording
-      }
-
-      // --- GAME INTEGRATION (First Update Context/Game State) ---
-      if (typeof window.Game !== "undefined" && overlay.gaze.x !== null) {
-        window.Game.onGaze(overlay.gaze.x, overlay.gaze.y);
-      }
-
-      // --- DATA LOGGING (Then Save Data with Updated Context) ---
-      if (window.gazeDataManager) {
-        window.gazeDataManager.processGaze(gazeInfo);
-      }
-      // ------------------------
-
-      // Log + HUD
-      logGazeXY(gazeInfo);
-      logGazeSample();
-
-      renderOverlay();
-    });
-
-    logI("sdk", "addGazeCallback bound (xy HUD/log enabled)");
-  } else {
-    logW("sdk", "addGazeCallback not found on seeso instance");
-  }
-
-  // ---- Debug callback (FORCED to INFO for new SDK diagnosis) ----
-  if (typeof seeso.addDebugCallback === "function") {
-    seeso.addDebugCallback((info) => {
-      // [DIAG] Force INFO level so SDK debug events are visible in panel
-      logI("sdkdbg", JSON.stringify(info).substring(0, 200));
-    });
-    logI("sdk", "addDebugCallback bound");
-  }
-
-  // ---- Face callback (new SDK 0.2.3 may use this for face detection) ----
-  if (typeof seeso.addFaceCallback === "function") {
-    let _faceFirst = false;
-    seeso.addFaceCallback((faceInfo) => {
-      if (!_faceFirst) {
-        _faceFirst = true;
-        logI("sdk", "[DIAG] First faceCallback fired!", { faceInfo: JSON.stringify(faceInfo).substring(0, 150) });
-      }
-    });
-    logI("sdk", "addFaceCallback bound (new SDK face detection)");
-  } else {
-    logW("sdk", "addFaceCallback not available on this Seeso instance");
-  }
+  // NOTE: EasySeeSo 패턴에서 gaze/debug 콜백은 startTracking(onGaze, onDebug)으로 전달.
+  // 여기서는 calibration 콜백만 바인딩.
 
   // ---- Calibration callbacks (Delegated to CalibrationManager) ----
-  calManager.bindTo(seeso);
+  // EasySeeSo는 내부적으로 seeso.seeso (raw Seeso 인스턴스)를 갖고 있음
+  // calManager.bindTo는 raw Seeso 인스턴스가 필요할 수 있음
+  if (seeso.seeso) {
+    calManager.bindTo(seeso.seeso);
+  } else {
+    calManager.bindTo(seeso);
+  }
+  logI("sdk", "attachSeesoCallbacks: calibration callbacks bound");
 }
 
 // --- Preload Logic ---
@@ -1056,30 +952,24 @@ async function preloadSDK() {
   initPromise = (async () => {
     try {
       setState("sdk", "loading");
-      // seeso.min.js is an ESM bundle → use dynamic import(), not loadWebpackModule.
-      // loadWebpackModule is for the old webpack/UMD seeso.js format only.
-      SDK = await import("../seeso/dist/seeso.min.js");
-      const SeesoClass = SDK?.default;
-      if (!SeesoClass) throw new Error("Seeso export not found from seeso.min.js");
 
-
-
-      seeso = new SeesoClass();
-      window.__seeso = { SDK, seeso };
+      // README 공식 패턴: EasySeeSo 사용
+      // EasySeeSo.init() 내부에서 initialize + addGazeCallback 처리
+      seeso = new EasySeeSo();
+      window.__seeso = seeso;
       setState("sdk", "constructed");
 
-      // [EasySeeSo pattern] addGazeCallback AFTER initialize.
-      // Register gaze + calibration callbacks after SDK is ready.
-      // NOTE: Camera (getUserMedia) is also done AFTER init (see boot()),
-      //       matching EasySeeSo.startTracking() internal flow.
-
-      // Initialize WITHOUT userStatusOption (pass undefined like EasySeeSo default).
-      // Old SDK needed new UserStatusOption(f,f,f), new SDK 0.2.3 may use different constructor.
-      logI("sdk", "initializing engine (no userStatusOption - EasySeeSo default)...");
+      logI("sdk", "initializing engine via EasySeeSo.init()...");
 
       const SDK_INIT_TIMEOUT_MS = 20000;
-      const errCode = await Promise.race([
-        seeso.initialize(LICENSE_KEY),
+      await Promise.race([
+        new Promise((resolve, reject) => {
+          seeso.init(
+            LICENSE_KEY,
+            () => resolve(),          // afterInitialized
+            () => reject(new Error("EasySeeSo init failed (afterFailed)"))
+          );
+        }),
         new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error(`SDK initialize timeout after ${SDK_INIT_TIMEOUT_MS / 1000}s`)),
@@ -1088,12 +978,8 @@ async function preloadSDK() {
         )
       ]);
 
-      if (errCode !== 0) {
-        setState("sdk", "init_failed");
-        throw new Error("Initialize returned: " + errCode);
-      }
-
-      // Bind callbacks AFTER initialize (EasySeeSo pattern)
+      // EasySeeSo.init() 성공 후 gaze 콜백은 startTracking() 실행 시 등록됨
+      // 여기서는 calibration 콜백만 별도 등록
       attachSeesoCallbacks();
       setState("sdk", "initialized");
       console.log("[Seeso] Preload Complete! Ready for Tracking.");
@@ -1101,7 +987,6 @@ async function preloadSDK() {
     } catch (e) {
       logE("sdk", "Preload Failed", e);
       setState("sdk", "init_exception");
-      // [FIX-iOS] Show retry UI on timeout so user isn't stuck on a blank screen.
       if (e.message && e.message.includes("timeout")) {
         setStatus("⚠️ 로딩 실패. 페이지를 새로고침 해주세요.");
         showRetry(true, "sdk_timeout");
@@ -1112,6 +997,7 @@ async function preloadSDK() {
 
   return initPromise;
 }
+
 
 // [FIX-iOS Cases 3&4] REMOVED auto-start preload.
 // Previously: setTimeout(preloadSDK, 500) ran WASM init 500ms after page load.
@@ -1142,51 +1028,76 @@ async function initSeeso() {
 }
 
 function startTracking() {
-  if (!seeso || !mediaStream) return false;
+  if (!seeso) return false;
 
-  try {
-    // [FIX] SDK에게 clone된 별도 스트림 전달.
-    // 같은 MediaStream을 video element(preview, face-check)와 SDK ImageCapture가 동시에
-    // 소비하면 일부 Android 기기에서 ImageCapture.grabFrame()이 빈 프레임을 반환해
-    // gaze/face 콜백이 발화하지 않는 문제가 있음.
-    const seesoStream = mediaStream.clone();
-    const ok = seeso.startTracking(seesoStream);
-    logI("track", "startTracking returned", { ok });
+  // README 공식 패턴: EasySeeSo.startTracking(onGaze, onDebug)
+  // 내부에서 getUserMedia를 직접 호출 → 별도 스트림 → SDK 전용
+  // 외부 mediaStream을 전달하지 않음!
 
-    setState("track", ok ? "running" : "failed");
+  // 우선 preview video용 stream이 있으면 camera 탭 피드백 유지
+  if (mediaStream) {
+    const vid = els.video;
+    if (vid && !vid.srcObject) {
+      vid.srcObject = mediaStream;
+      vid.playsInline = true;
+      vid.muted = true;
+      vid.play().catch(() => { });
+    }
+  }
 
-    // [DIAG] Patch seeso.processFrame_ to surface internal errors
-    // SDK's startCameraThread_ swallows all errors with catch(e){console.log(e)}
-    // Error objects JSON.stringify to {} so they were invisible. Now we log properly.
-    if (ok && seeso && typeof seeso.processFrame_ === "function") {
-      const _origPF = seeso.processFrame_.bind(seeso);
-      let _pfCallCount = 0;
-      let _pfLastLogAt = 0;
-      seeso.processFrame_ = async function patchedProcessFrame(imageCapture) {
-        _pfCallCount++;
-        const _t = performance.now();
-        if (_t - _pfLastLogAt > 3000) {
-          _pfLastLogAt = _t;
-          logI("diag", `[PF] processFrame_ call #${_pfCallCount}`);
-        }
-        try {
-          return await _origPF(imageCapture);
-        } catch (e) {
-          // Properly surface the real error (Error.message, not JSON.stringify)
-          logE("diag", `[PF] processFrame_ THREW: ${e?.message || String(e)}`);
-          throw e;
-        }
-      };
-      logI("diag", "[PF] processFrame_ patched for diagnostics");
+  const onGaze = (gazeInfo) => {
+    lastGazeAt = performance.now();
+    const xRaw = gazeInfo?.x;
+    const yRaw = gazeInfo?.y;
+
+    // [DIAG] 첫 발화 로그
+    if (!startTracking._gazeFirstFired) {
+      startTracking._gazeFirstFired = true;
+      logI("gaze", "[DIAG] FIRST gazeCallback fired via EasySeeSo!", {
+        x: xRaw, y: yRaw,
+        trackingState: gazeInfo?.trackingState,
+        keys: gazeInfo ? Object.keys(gazeInfo) : null
+      });
     }
 
-    return !!ok;
+    if (calManager && calManager.handleFaceCheckGaze) {
+      calManager.handleFaceCheckGaze(gazeInfo?.trackingState);
+    }
 
-  } catch (e) {
+    overlay.gazeRaw = { x: xRaw, y: yRaw, trackingState: gazeInfo?.trackingState, confidence: gazeInfo?.confidence };
+    overlay.gaze = {
+      x: typeof xRaw === "number" && Number.isFinite(xRaw) ? xRaw : null,
+      y: typeof yRaw === "number" && Number.isFinite(yRaw) ? yRaw : null,
+      trackingState: gazeInfo?.trackingState,
+      confidence: gazeInfo?.confidence,
+    };
+
+    if (!window._gazeActive) { renderOverlay(); return; }
+    if (typeof window.Game !== "undefined" && overlay.gaze.x !== null) {
+      window.Game.onGaze(overlay.gaze.x, overlay.gaze.y);
+    }
+    if (window.gazeDataManager) {
+      window.gazeDataManager.processGaze(gazeInfo);
+    }
+    renderOverlay();
+  };
+
+  const onDebug = (fps, latMin, latMax, latAvg) => {
+    logI("sdkdbg", `FPS=${fps} lat(min=${latMin} max=${latMax} avg=${latAvg?.toFixed ? latAvg.toFixed(1) : latAvg}ms)`);
+  };
+
+  // EasySeeSo.startTracking은 async — 내부에서 getUserMedia + SDK startTracking 처리
+  seeso.startTracking(onGaze, onDebug).then((ok) => {
+    logI("track", "EasySeeSo.startTracking returned", { ok });
+    setState("track", ok ? "running" : "failed");
+  }).catch((e) => {
     setState("track", "failed");
-    logE("track", "startTracking threw", e);
-    return false;
-  }
+    logE("track", "EasySeeSo.startTracking threw", e?.message || String(e));
+  });
+
+  // startTracking은 async이므로 즉시 true 반환 (상태는 위 then/catch에서 처리)
+  setState("track", "starting");
+  return true;
 }
 
 
