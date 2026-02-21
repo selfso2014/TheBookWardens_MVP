@@ -254,7 +254,7 @@ setInterval(() => {
 // ---------- DOM ----------
 const els = {
   hud: document.getElementById("hud"),
-  video: document.getElementById("preview"),
+  video: document.getElementById("camera-preview"),
   canvas: document.getElementById("output"),
   status: document.getElementById("status"),
   pillCoi: document.getElementById("pillCoi"),
