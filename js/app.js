@@ -906,8 +906,20 @@ function attachSeesoCallbacks() {
   }, 60);
 
   if (typeof seeso.addGazeCallback === "function") {
+    let _firstGazeFired = false; // [TEMP DIAG] one-time log
     seeso.addGazeCallback((gazeInfo) => {
       lastGazeAt = performance.now();
+
+      // [TEMP DIAG] Log the very first gaze callback to confirm SDK is delivering data.
+      if (!_firstGazeFired) {
+        _firstGazeFired = true;
+        logI("sdk", "[DIAG] First gaze callback fired", {
+          trackingState: gazeInfo?.trackingState,
+          x: gazeInfo?.x,
+          y: gazeInfo?.y,
+          keys: gazeInfo ? Object.keys(gazeInfo) : null
+        });
+      }
 
       // Raw values (for HUD/log)
       const xRaw = gazeInfo?.x;
