@@ -906,20 +906,8 @@ function attachSeesoCallbacks() {
   }, 60);
 
   if (typeof seeso.addGazeCallback === "function") {
-    let _firstGazeFired = false; // [TEMP DIAG] one-time log
     seeso.addGazeCallback((gazeInfo) => {
       lastGazeAt = performance.now();
-
-      // [TEMP DIAG] Log the very first gaze callback to confirm SDK is delivering data.
-      if (!_firstGazeFired) {
-        _firstGazeFired = true;
-        logI("sdk", "[DIAG] First gaze callback fired", {
-          trackingState: gazeInfo?.trackingState,
-          x: gazeInfo?.x,
-          y: gazeInfo?.y,
-          keys: gazeInfo ? Object.keys(gazeInfo) : null
-        });
-      }
 
       // Raw values (for HUD/log)
       const xRaw = gazeInfo?.x;
@@ -997,13 +985,10 @@ async function preloadSDK() {
   initPromise = (async () => {
     try {
       setState("sdk", "loading");
-      // [SDK-SWAP] seeso.min.js is a standard ESM bundle — use dynamic import() directly.
-      // Old seeso.js was a webpack-shim format loaded via loadWebpackModule().
-      // New seeso.min.js uses 'export { ... as default }' → import() handles it natively.
-      // NOTE: import() resolves relative to THIS FILE (js/app.js), not document root.
-      //       So "../seeso/dist/" is correct (not "./seeso/dist/").
-      SDK = await import("../seeso/dist/seeso.min.js?v=NEW_SDK_v1");
-      const SeesoClass = SDK?.default;
+      // [ROLLBACK] seeso.min.js (v0.2.3) failed - WASM not loading, no callbacks.
+      // Reverted to seeso.js (v2.5.x) via loadWebpackModule (webpack-shim format).
+      SDK = await loadWebpackModule("./seeso/dist/seeso.js?v=ROLLBACK_v1");
+      const SeesoClass = SDK?.default || SDK?.Seeso || SDK;
       if (!SeesoClass) throw new Error("Seeso export not found");
 
       seeso = new SeesoClass();
@@ -1011,7 +996,10 @@ async function preloadSDK() {
 
       setState("sdk", "constructed");
 
-      // Initialize Engine FIRST (new SDK 0.2.3 requires callbacks after initialize)
+      // Bind callbacks BEFORE initialize (seeso.js 2.5.x works this way)
+      attachSeesoCallbacks();
+
+      // Initialize Engine
       // [OPTIMIZATION] Disable optional features to reduce initialization load and prevent iOS crashes.
       const userStatusOption = SDK?.UserStatusOption
         ? new SDK.UserStatusOption(false, false, false)
@@ -1037,11 +1025,6 @@ async function preloadSDK() {
         setState("sdk", "init_failed");
         throw new Error("Initialize returned: " + errCode);
       }
-
-      // [SDK-SWAP FIX] Bind callbacks AFTER initialize() (new SDK 0.2.3 requirement).
-      // Old seeso.js (2.5.x) accepted callbacks before initialize, new SDK does not.
-      // Matches easy-seeso.js official pattern: init → addGazeCallback.
-      attachSeesoCallbacks();
 
       setState("sdk", "initialized");
       console.log("[Seeso] Preload Complete! Ready for Tracking.");
@@ -1105,23 +1088,13 @@ function startTracking() {
 }
 
 /**
- * Entry Point for Game: Enters Calibration.
- * [DIAG] Face check bypassed for SDK 0.2.3 testing.
- * New SDK may only fire gaze callbacks after seeso.startCalibration() is called.
- * → If gaze appears during calibration, we confirm face check bypass is correct for 0.2.3.
+ * Entry Point for Game: Enters Face Check Mode.
  */
 function startCalibration() {
   if (!seeso) return false;
 
   logI("cal", "Entering Face Check Mode...");
-  // [TEMP DIAG] Skip face check, go directly to calibration.
-  // SDK 0.2.3 does not fire gaze callbacks before startCalibration().
   calManager.startFaceCheck();
-  // Auto-pass face check after 500ms to trigger startActualCalibration
-  setTimeout(() => {
-    logI("cal", "[DIAG] Auto-passing face check (SDK 0.2.3 bypass)");
-    startActualCalibration();
-  }, 500);
   return true;
 }
 

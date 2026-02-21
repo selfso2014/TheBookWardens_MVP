@@ -137,7 +137,6 @@ export class CalibrationManager {
     // --- FACE CHECK LOGIC ---
     startFaceCheck() {
         this.ctx.logI("cal", "Starting Face Check Mode");
-        this._fcLogCount = 0; // Reset diagnostic counter each face check
 
         const faceScreen = document.getElementById("screen-face-check");
         const calScreen = document.getElementById("screen-calibration");
@@ -183,16 +182,9 @@ export class CalibrationManager {
     }
 
     handleFaceCheckGaze(trackingState) {
-        // trackingState: 0 (SUCCESS), 1 (LOW_CONFIDENCE in new SDK / FACE_MISSING in old SDK).
+        // trackingState: 0 (SUCCESS), 1 (LOW_CONFIDENCE).
         const isTracking = (trackingState === 0);
         this.updateFaceCheckUI(isTracking);
-
-        // [TEMP DIAG] Log first 5 calls to confirm gaze callback fires + show actual trackingState value.
-        if (!this._fcLogCount) this._fcLogCount = 0;
-        if (this._fcLogCount < 5) {
-            this._fcLogCount++;
-            this.ctx.logI('facecheck', `gaze received [${this._fcLogCount}/5]`, { trackingState, isTracking });
-        }
     }
 
     updateFaceCheckUI(isTracking) {
