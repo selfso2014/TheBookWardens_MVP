@@ -153,6 +153,18 @@ export class CalibrationManager {
         // Reset UI
         this.updateFaceCheckUI(false);
 
+        // 카메라 미리보기를 face-check-video에 연결
+        const faceVideo = document.getElementById('face-check-video');
+        if (faceVideo) {
+            // window.mediaStream은 app.js에서 getUserMedia 후 할당됨
+            const stream = window._mediaStream || (window.__seeso && null);
+            // app.js의 mediaStream을 직접 참조할 수 없으므로 preview video의 srcObject를 재사용
+            const previewVideo = document.getElementById('preview');
+            if (previewVideo && previewVideo.srcObject) {
+                faceVideo.srcObject = previewVideo.srcObject;
+            }
+        }
+
         // Bind Next Button
         const btnNext = document.getElementById("btn-face-next");
         if (btnNext) {
@@ -209,7 +221,7 @@ export class CalibrationManager {
             if (frame) frame.style.borderColor = "#00ff00";
         } else {
             // Fail
-            if (icon) icon.style.opacity = "0";
+            if (icon) icon.style.opacity = "0.25"; // 항상 가이드 아이콘은 보이게 (dim)
             if (status) {
                 status.textContent = "Face not detected...";
                 status.style.color = "#aaa";

@@ -493,11 +493,15 @@
 
         <!-- Face Frame Container -->
         <div class="face-frame"
-          style="width: 200px; height: 200px; border: 3px dashed rgba(255, 255, 255, 0.3); border-radius: 20px; margin: 0 auto 30px auto; position: relative; display: flex; align-items: center; justify-content: center; transition: border-color 0.3s;">
+          style="width: 200px; height: 260px; border: 3px dashed rgba(255, 255, 255, 0.3); border-radius: 20px; margin: 0 auto 30px auto; position: relative; display: flex; align-items: center; justify-content: center; transition: border-color 0.3s; overflow: hidden; background: rgba(0,0,0,0.5);">
 
-          <!-- Guide Icon (Initially Hidden) -->
+          <!-- 카메라 셀피 미리보기 (사용자가 얼굴 위치 확인용) -->
+          <video id="face-check-video" autoplay muted playsinline
+            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); border-radius: 17px; opacity: 0.85;"></video>
+
+          <!-- Guide Icon Overlay (감지 성공 시 표시) -->
           <img id="face-guide-icon" src="./detection_guide_face.png" alt="Face Guide"
-            style="width: 60%; opacity: 0; transition: opacity 0.3s ease; filter: drop-shadow(0 0 10px #00ff00);">
+            style="position: relative; z-index: 2; width: 60%; opacity: 0.25; transition: opacity 0.3s ease; filter: drop-shadow(0 0 10px #00ff00);">
 
         </div>
 
