@@ -977,7 +977,12 @@ export class TextRenderer {
             // [FIX-iOS] O(N+M) sorted-pointer approach instead of O(N×M) filter-per-pang.
             // Old code: 8 pangs × gazeData.filter(9000) = 72,000 comparisons.
             // New code: single pass through sorted gazeData with advancing pointer.
-            const sortedGaze = gazeData.slice().sort((a, b) => a.t - b.t);
+            //
+            // [FIX-iOS] gazeData is already time-sorted: processGaze() timestamps with Date.now()
+            // and pushes sequentially, so t values are monotonically increasing.
+            // slice().sort() on a 9000-entry array creates a full copy + O(N log N) sort
+            // for no reordering benefit — eliminated to prevent JS heap spike at replay start.
+            const sortedGaze = gazeData; // Already sorted by t (Date.now() monotonic)
             let gazePointer = 0;
             let lastLogEndTime = 0;
 
