@@ -1503,18 +1503,21 @@ Game.typewriter = {
 
         // 3. FORCE SWITCH SCREEN (Manual)
         const aliceScreen = document.getElementById("screen-alice-battle");
+        console.log("[FinalBoss] screen-alice-battle element:", aliceScreen ? "FOUND" : "NOT FOUND");
         if (aliceScreen) {
             // Hide all screens
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
             // Show Alice Screen
             aliceScreen.classList.add('active');
             aliceScreen.style.display = "flex";
+            console.log("[FinalBoss] screen switched to alice-battle, display=flex");
         } else {
             console.error("ERROR: screen-alice-battle element missing!");
             return;
         }
 
         // 4. INIT ALICE BATTLE (WITH DATA)
+        console.log("[FinalBoss] AliceBattleRef:", window.AliceBattleRef ? "FOUND" : "NOT FOUND");
         setTimeout(() => {
             if (window.AliceBattleRef) {
                 const currentStats = {
@@ -1522,7 +1525,9 @@ Game.typewriter = {
                     rune: Game.state.rune,
                     gem: Game.state.gems
                 };
+                console.log("[FinalBoss] Calling AliceBattleRef.init() with stats:", currentStats);
                 window.AliceBattleRef.init(currentStats);
+                console.log("[FinalBoss] AliceBattleRef.init() called successfully");
             } else {
                 console.error("FATAL: AliceBattleRef NOT FOUND!");
             }
