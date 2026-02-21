@@ -985,34 +985,28 @@ async function preloadSDK() {
   initPromise = (async () => {
     try {
       setState("sdk", "loading");
-      // [ROLLBACK] seeso.min.js (v0.2.3) failed - WASM not loading, no callbacks.
-      // Reverted to seeso.js (v2.5.x) via loadWebpackModule (webpack-shim format).
-      SDK = await loadWebpackModule("./seeso/dist/seeso.js?v=ROLLBACK_v1");
-      const SeesoClass = SDK?.default || SDK?.Seeso || SDK;
+      // [SDK-SWAP v2] Load new seeso.min.js (ESM) via dynamic import.
+      // NOTE: import() path is relative to THIS FILE (js/app.js).
+      SDK = await import("../seeso/dist/seeso.min.js?v=NEW_SDK_v2");
+      const SeesoClass = SDK?.default;
       if (!SeesoClass) throw new Error("Seeso export not found");
 
       seeso = new SeesoClass();
       window.__seeso = { SDK, seeso };
-
       setState("sdk", "constructed");
 
-      // Bind callbacks BEFORE initialize (seeso.js 2.5.x works this way)
-      attachSeesoCallbacks();
+      // [EasySeeSo pattern] addGazeCallback AFTER initialize.
+      // Register gaze + calibration callbacks after SDK is ready.
+      // NOTE: Camera (getUserMedia) is also done AFTER init (see boot()),
+      //       matching EasySeeSo.startTracking() internal flow.
 
-      // Initialize Engine
-      // [OPTIMIZATION] Disable optional features to reduce initialization load and prevent iOS crashes.
-      const userStatusOption = SDK?.UserStatusOption
-        ? new SDK.UserStatusOption(false, false, false)
-        : { useAttention: false, useBlink: false, useDrowsiness: false };
+      // Initialize WITHOUT userStatusOption (pass undefined like EasySeeSo default).
+      // Old SDK needed new UserStatusOption(f,f,f), new SDK 0.2.3 may use different constructor.
+      logI("sdk", "initializing engine (no userStatusOption - EasySeeSo default)...");
 
-      logI("sdk", "initializing engine...");
-
-      // [FIX-iOS] Wrap initialize() with a 20s timeout.
-      // On iOS, seeso.initialize() can hang indefinitely (WASM memory pressure),
-      // causing the app to silently freeze until iOS kills the WebContent process.
       const SDK_INIT_TIMEOUT_MS = 20000;
       const errCode = await Promise.race([
-        seeso.initialize(LICENSE_KEY, userStatusOption),
+        seeso.initialize(LICENSE_KEY),
         new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error(`SDK initialize timeout after ${SDK_INIT_TIMEOUT_MS / 1000}s`)),
@@ -1026,6 +1020,8 @@ async function preloadSDK() {
         throw new Error("Initialize returned: " + errCode);
       }
 
+      // Bind callbacks AFTER initialize (EasySeeSo pattern)
+      attachSeesoCallbacks();
       setState("sdk", "initialized");
       console.log("[Seeso] Preload Complete! Ready for Tracking.");
       return true;
@@ -1252,8 +1248,6 @@ async function boot() {
   resizeCanvas();
   renderOverlay();
 
-  // (In-app browser check moved to immediate execution)
-
   setStatus("Initializing...");
   setGazeInfo("gaze: -");
   showRetry(false);
@@ -1264,11 +1258,14 @@ async function boot() {
     return;
   }
 
-  const camOk = await ensureCamera();
-  if (!camOk) return false; // Return false on failure
-
+  // [EasySeeSo pattern] SDK init FIRST, then camera.
+  // EasySeeSo.init() → EasySeeSo.startTracking() (getUserMedia inside).
   const sdkOk = await initSeeso();
   if (!sdkOk) return false;
+
+  // Camera AFTER init (matches EasySeeSo flow)
+  const camOk = await ensureCamera();
+  if (!camOk) return false;
 
   const trackOk = startTracking();
   if (!trackOk) {
