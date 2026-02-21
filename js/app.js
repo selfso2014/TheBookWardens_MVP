@@ -3,32 +3,41 @@ import { loadWebpackModule } from "./webpack-loader.js";
 import { CalibrationManager } from "./calibration.js";
 import { GazeDataManager } from "./gaze-data-manager.js"; // Import
 
-// [DIAG] Intercept console.error/warn/log to surface SDK internal errors in our debug panel.
-// SDK errors (grabFrame fail, WASM error, track.readyState, etc.) use console.log not .error!
+// [DIAG] Intercept console.error/warn to surface SDK internal errors in our debug panel.
+// SDK errors (WASM load failure, license error, etc.) never appear in logI/logW/logE.
 // Must be set up BEFORE SDK loads.
 const _origConsoleError = console.error.bind(console);
 const _origConsoleWarn = console.warn.bind(console);
-const _origConsoleLog = console.log.bind(console);
-const _fmtArgs = (args) => args.map(a => {
-  try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 150) : String(a); }
-  catch (_) { return String(a); }
-}).join(' ');
 
 console.error = function (...args) {
-  const msg = _fmtArgs(args);
+  const msg = args.map(a => {
+    try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 120) : String(a); }
+    catch (_) { return String(a); }
+  }).join(' ');
+  // Forward to our debug panel (logE defined later - use deferred log if not ready)
   if (typeof logE === 'function') logE('console', msg);
   else setTimeout(() => { if (typeof logE === 'function') logE('console', msg); }, 100);
   _origConsoleError(...args);
 };
 
 console.warn = function (...args) {
-  const msg = _fmtArgs(args);
+  const msg = args.map(a => {
+    try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 120) : String(a); }
+    catch (_) { return String(a); }
+  }).join(' ');
   if (typeof logW === 'function') logW('console', msg);
   else setTimeout(() => { if (typeof logW === 'function') logW('console', msg); }, 100);
   _origConsoleWarn(...args);
 };
 
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = e.reason?.message || e.reason?.toString?.() || String(e.reason);
+  if (typeof logE === 'function') logE('sdk', 'Unhandled rejection: ' + msg);
+});
 
+window.addEventListener('error', (e) => {
+  if (typeof logE === 'function') logE('sdk', 'Uncaught error: ' + e.message + ' (' + e.filename + ':' + e.lineno + ')');
+});
 
 // Initialize Manager
 const gazeDataManager = new GazeDataManager();
@@ -114,7 +123,7 @@ EventTarget.prototype.removeEventListener = function (type, listener, options) {
 setInterval(() => {
   const rafCount = activeRafs.size;
 
-  // [NEW] HEAP monitoring ??Chrome/Android only (Safari blocks performance.memory for privacy).
+  // [NEW] HEAP monitoring — Chrome/Android only (Safari blocks performance.memory for privacy).
   // Reads 3 numbers from an existing browser object: negligible overhead (<0.01ms/call).
   let heapStr = 'N/A'; // Default for Safari / unsupported browsers
   let heapPct = -1;
@@ -127,10 +136,10 @@ setInterval(() => {
 
   logBase("INFO", "Meter", `RAF:${rafCount} | LSN:${totalListeners} | HEAP:${heapStr}`);
 
-  // RAF Warnings ??tiered thresholds
+  // RAF Warnings — tiered thresholds
   // Normal gameplay peak: RAF:7 (gaze + revealChunk + flying ink particles)
-  // > 5  : WARN  ??slightly above normal, worth watching
-  // > 10 : CRITICAL ??likely a runaway loop (OOM risk)
+  // > 5  : WARN  — slightly above normal, worth watching
+  // > 10 : CRITICAL — likely a runaway loop (OOM risk)
   if (rafCount > 10) {
     logE("CRITICAL", `RAF > 10: count=${rafCount}`);
   } else if (rafCount > 5) {
@@ -140,12 +149,12 @@ setInterval(() => {
     logE("CRITICAL", `LSN > 60: total=${totalListeners}`);
   }
 
-  // HEAP Warnings (Chrome/Android only ??heapPct === -1 means unsupported, skip)
-  // > 70% : WARN     ??memory climbing, watch trend
-  // > 85% : CRITICAL ??high pressure, iOS OOM risk zone
+  // HEAP Warnings (Chrome/Android only — heapPct === -1 means unsupported, skip)
+  // > 70% : WARN     — memory climbing, watch trend
+  // > 85% : CRITICAL — high pressure, iOS OOM risk zone
   if (heapPct >= 0) {
     if (heapPct > 85) {
-      logE("CRITICAL", `HEAP > 85%: ${heapStr} ??OOM risk`);
+      logE("CRITICAL", `HEAP > 85%: ${heapStr} — OOM risk`);
     } else if (heapPct > 70) {
       logBase("WARN", "Meter", `HEAP > 70%: ${heapStr}`);
     }
@@ -155,7 +164,7 @@ setInterval(() => {
 
 // ---------- iOS Visibility Guard ----------
 // [FIX-iOS] When user backgrounds the tab (notification, home button, social app switch),
-// iOS does NOT suspend JS immediately ??RAF loops keep running, burning CPU & memory.
+// iOS does NOT suspend JS immediately — RAF loops keep running, burning CPU & memory.
 // iOS may then kill the WebContent process after a short period of high memory pressure.
 // This handler pauses all known RAF loops on hide and resumes on return.
 // This covers ALL 4 crash cases: whether the crash happened before or after calibration.
@@ -165,8 +174,8 @@ setInterval(() => {
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      // ?�?� TAB HIDDEN ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-      logW('sys', '[iOS Guard] Tab hidden ??pausing all RAF loops to prevent OOM Kill');
+      // ── TAB HIDDEN ──────────────────────────────────────────────────────
+      logW('sys', '[iOS Guard] Tab hidden — pausing all RAF loops to prevent OOM Kill');
 
       // 1. Stop overlay calibration tick
       if (overlay && overlay.calRunning) {
@@ -202,8 +211,8 @@ setInterval(() => {
       wasTracking = window.Game?.state?.isTracking || false;
 
     } else {
-      // ?�?� TAB VISIBLE AGAIN ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-      logW('sys', '[iOS Guard] Tab visible ??resuming');
+      // ── TAB VISIBLE AGAIN ───────────────────────────────────────────────
+      logW('sys', '[iOS Guard] Tab visible — resuming');
 
       // Resume overlay tick only if calibration was actually running
       if (wasCalRunning && overlay && window.startCalibrationRoutine) {
@@ -277,7 +286,7 @@ function ensureLogPanel() {
 
   // Toggle Button (Mini Mode)
   const btnToggle = document.createElement("button");
-  btnToggle.textContent = "?��";
+  btnToggle.textContent = "🐞";
   btnToggle.style.fontSize = "32px"; // Bigger icon
   btnToggle.style.width = "56px"; // Bigger touch target
   btnToggle.style.height = "56px";
@@ -332,7 +341,7 @@ function ensureLogPanel() {
   };
 
   // Copy
-  toolbar.appendChild(createBtn("?�� Copy", async () => {
+  toolbar.appendChild(createBtn("📋 Copy", async () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(LOG_BUFFER, null, 2));
       const originalText = panel.textContent;
@@ -343,7 +352,7 @@ function ensureLogPanel() {
   }));
 
   // Clear
-  toolbar.appendChild(createBtn("?���?Clear", () => {
+  toolbar.appendChild(createBtn("🗑️ Clear", () => {
     LOG_BUFFER.length = 0;
     panel.textContent = "";
     // [NEW] Clear LocalStorage too
@@ -351,10 +360,10 @@ function ensureLogPanel() {
   }, "#ff8a80"));
 
   // Upload (DB)
-  const btnUpload = createBtn("?�️ Upload DB", async () => {
+  const btnUpload = createBtn("☁️ Upload DB", async () => {
     // UI Feedback: Loading
     const originalText = btnUpload.textContent;
-    btnUpload.textContent = "??Sending...";
+    btnUpload.textContent = "⏳ Sending...";
     btnUpload.disabled = true;
     btnUpload.style.opacity = "0.7";
     btnUpload.style.cursor = "wait";
@@ -405,7 +414,7 @@ function ensureLogPanel() {
         timeout
       ]);
 
-      let msg = `??Upload Success!\nSession ID: ${sessionId}`;
+      let msg = `✅ Upload Success!\nSession ID: ${sessionId}`;
       if (crashLogs.length > 0) msg += `\n(Recovered ${crashLogs.length} lines from crash)`;
       alert(msg);
 
@@ -415,7 +424,7 @@ function ensureLogPanel() {
 
     } catch (e) {
       console.error(e);
-      alert("??Upload Failed: " + e.message);
+      alert("❌ Upload Failed: " + e.message);
     } finally {
       resetBtn();
     }
@@ -435,7 +444,7 @@ function ensureLogPanel() {
     isExpanded = !isExpanded;
     panel.style.display = isExpanded ? "block" : "none";
     toolbar.style.display = isExpanded ? "flex" : "none";
-    btnToggle.textContent = isExpanded ? "?? : "?��";
+    btnToggle.textContent = isExpanded ? "❌" : "🐞";
     if (isExpanded) {
       panel.scrollTop = panel.scrollHeight;
       btnToggle.style.transform = "scale(0.9)";
@@ -454,7 +463,7 @@ function ensureLogPanel() {
 
 const panel = ensureLogPanel();
 
-// [FIX-iOS] Batch DOM updates ??at most 4 textContent rebuilds per second.
+// [FIX-iOS] Batch DOM updates — at most 4 textContent rebuilds per second.
 // Old code rebuilt 225KB string on EVERY log call.
 let _logDirty = false;
 let _logFlushTimer = null;
@@ -477,9 +486,9 @@ function logBase(level, tag, msg, data) {
   // which is JSON.stringify(JSON.parse(JSON.stringify(data))) = 2x serialize.
   const dataStr = data !== undefined ? " " + (typeof data === 'string' ? data : JSON.stringify(data)) : "";
   const line = `[${ts()}] ${level.padEnd(5)} ${tag.padEnd(10)} ${msg}${dataStr}`;
-  if (level === "ERROR") _origConsoleError(line);
-  else if (level === "WARN") _origConsoleWarn(line);
-  else _origConsoleLog(line);
+  if (level === "ERROR") console.error(line);
+  else if (level === "WARN") console.warn(line);
+  else console.log(line);
   pushLog(line);
 }
 
@@ -1029,11 +1038,11 @@ async function preloadSDK() {
   initPromise = (async () => {
     try {
       setState("sdk", "loading");
-      // [SDK-SWAP v3] Load new seeso.js (0.2.3 dev webpack build) via loadWebpackModule.
-      // seeso.js replaced with SDK 0.2.3 build on 2026-02-21.
-      SDK = await loadWebpackModule("./seeso/dist/seeso.js");
-      const SeesoClass = SDK?.default || SDK;
-      if (!SeesoClass) throw new Error("Seeso export not found from ./seeso/dist/seeso.js");
+      // [SDK-SWAP v2] Load new seeso.min.js (ESM) via dynamic import.
+      // NOTE: import() path is relative to THIS FILE (js/app.js).
+      SDK = await import("../seeso/dist/seeso.min.js?v=NEW_SDK_v2");
+      const SeesoClass = SDK?.default;
+      if (!SeesoClass) throw new Error("Seeso export not found");
 
       seeso = new SeesoClass();
       window.__seeso = { SDK, seeso };
@@ -1043,11 +1052,6 @@ async function preloadSDK() {
       // Register gaze + calibration callbacks after SDK is ready.
       // NOTE: Camera (getUserMedia) is also done AFTER init (see boot()),
       //       matching EasySeeSo.startTracking() internal flow.
-
-      // [CRITICAL DIAG] SharedArrayBuffer required for SDK 0.2.3 WASM threading.
-      // GitHub Pages does NOT send COOP/COEP headers ??crossOriginIsolated = false ??SDK fails silently.
-      logI("sdk", "[DIAG] crossOriginIsolated: " + window.crossOriginIsolated);
-      logI("sdk", "[DIAG] SharedArrayBuffer available: " + (typeof SharedArrayBuffer !== "undefined"));
 
       // Initialize WITHOUT userStatusOption (pass undefined like EasySeeSo default).
       // Old SDK needed new UserStatusOption(f,f,f), new SDK 0.2.3 may use different constructor.
@@ -1079,7 +1083,7 @@ async function preloadSDK() {
       setState("sdk", "init_exception");
       // [FIX-iOS] Show retry UI on timeout so user isn't stuck on a blank screen.
       if (e.message && e.message.includes("timeout")) {
-        setStatus("?�️ 로딩 ?�패. ?�이지�??�로고침 ?�주?�요.");
+        setStatus("⚠️ 로딩 실패. 페이지를 새로고침 해주세요.");
         showRetry(true, "sdk_timeout");
       }
       throw e;
@@ -1308,7 +1312,7 @@ async function boot() {
   }
 
   // [EasySeeSo pattern] SDK init FIRST, then camera.
-  // EasySeeSo.init() ??EasySeeSo.startTracking() (getUserMedia inside).
+  // EasySeeSo.init() → EasySeeSo.startTracking() (getUserMedia inside).
   const sdkOk = await initSeeso();
   if (!sdkOk) return false;
 
@@ -1346,15 +1350,15 @@ window.startEyeTracking = boot;
  * Call setSeesoTracking(true)  to resume before the next reading passage starts.
  */
 // Gaze Processing Gate (JS-level only)
-// ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-// SeeSo WASM uses SharedArrayBuffer (SAB) ??~150MB, NOT garbage-collected.
+// ─────────────────────────────────────
+// SeeSo WASM uses SharedArrayBuffer (SAB) — ~150MB, NOT garbage-collected.
 // SAB is freed ONLY when the Worker terminates (stopTracking()).
 //
 // [TESTED & CONFIRMED] stopTracking() + startTracking() mid-session does NOT work:
 //   - startTracking() returns ok:true but gaze callbacks never fire again.
 //   - attachSeesoCallbacks() called on restart causes LSN explosion (+4-6/s)
 //     because SeeSo SDK accumulates callbacks (addGazeCallback ADDS, not replaces).
-//   - Root cause: stopTracking() severs the camera?�WASM feed; re-establishing
+//   - Root cause: stopTracking() severs the camera→WASM feed; re-establishing
 //     it requires full SDK reinit (seeso.initialize()) which needs user gesture.
 //
 // Decision: SDK runs continuously for the full session. _gazeActive gates
@@ -1371,9 +1375,9 @@ window.setSeesoTracking = function (on, reason) {
   const heapMB = performance.memory
     ? Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB'
     : 'N/A';
-  logI('seeso', `[Gate] ${on ? 'OPEN  ??reading' : 'CLOSED??replay/battle'} | reason: ${reason} | JS heap: ${heapMB}`);
+  logI('seeso', `[Gate] ${on ? 'OPEN  ← reading' : 'CLOSED← replay/battle'} | reason: ${reason} | JS heap: ${heapMB}`);
   // SDK stays running. Only JS processing is gated.
-  // stopTracking() is NOT called here ??mid-session stop permanently breaks gaze on iOS/iPadOS.
+  // stopTracking() is NOT called here — mid-session stop permanently breaks gaze on iOS/iPadOS.
 };
 
 
