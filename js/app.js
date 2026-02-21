@@ -720,6 +720,8 @@ function setPill(el, text) {
 function setStatus(text) {
   if (els.status) els.status.textContent = text;
 }
+// [FIX #7] Expose globally so IntroManager / other modules can show non-blocking status messages
+window.setStatus = setStatus;
 
 function showRetry(show, reason) {
   if (!els.btnRetry) return;

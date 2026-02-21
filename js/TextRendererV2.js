@@ -36,6 +36,8 @@ export class TextRenderer {
         // [FIX-iOS] Track RAF IDs to cancel them all on cleanup (prevents orphaned loops)
         this.activeRAFs = [];
         this._replayRAFId = null; // dedicated slot for the replay animate loop
+        // [FIX #9] Track flying-ink particle elements so cancelAllAnimations() can remove orphan DOM nodes
+        this._activeFlyingInkNodes = new Set();
 
         // Visual Elements
         this.cursor = null;
@@ -63,6 +65,16 @@ export class TextRenderer {
         if (this._replayRAFId) {
             cancelAnimationFrame(this._replayRAFId);
             this._replayRAFId = null;
+        }
+        // [FIX #9] Remove orphaned flying-ink particle nodes from body.
+        // When RAF is force-cancelled, p.remove() inside animate() never fires.
+        // _activeFlyingInkNodes tracks every live particle so we can clean them up here.
+        if (this._activeFlyingInkNodes && this._activeFlyingInkNodes.size > 0) {
+            console.log(`[Life] TextRenderer: Removing ${this._activeFlyingInkNodes.size} orphaned flying-ink nodes.`);
+            this._activeFlyingInkNodes.forEach(node => {
+                try { if (node.parentNode) node.remove(); } catch (e) { /* silent */ }
+            });
+            this._activeFlyingInkNodes.clear();
         }
         // IMPORTANT: Do NOT touch this.cursor or this.impactElement here.
         // cancelAllAnimations() is called on every showPage() / prepareDynamic() / prepare() during reading.
@@ -1308,6 +1320,8 @@ export class TextRenderer {
         p.style.transition = 'transform 0.1s';
 
         document.body.appendChild(p);
+        // [FIX #9] Register this node so cancelAllAnimations() can remove it if RAF is force-cancelled
+        if (this._activeFlyingInkNodes) this._activeFlyingInkNodes.add(p);
 
         // [120Hz FIX] Timestamp-gate to 60fps max.
         const TARGET_FRAME_MS = 1000 / 60;
@@ -1328,6 +1342,8 @@ export class TextRenderer {
 
             if (progress >= 1) {
                 if (p.parentNode) p.remove();
+                // [FIX #9] Deregister from tracking set on natural completion
+                if (this._activeFlyingInkNodes) this._activeFlyingInkNodes.delete(p);
                 // Remove our slot from tracking
                 if (currentRAFId) {
                     const idx = this.activeRAFs.indexOf(currentRAFId);

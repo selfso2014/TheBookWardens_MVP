@@ -45,19 +45,28 @@ export class IntroManager {
                         const success = await window.startEyeTracking();
                         if (!success) {
                             console.error("[IntroManager] Eye Tracking Init Failed!");
-                            alert("Eye tracking failed to initialize. Please check camera permissions.");
+                            // [FIX #7] alert() → 논블로킹 메시지: iOS alert()는 async 흐름 블로킹
+                            if (typeof window.setStatus === 'function') {
+                                window.setStatus("⚠️ 카메라 초기화 실패. 카메라 권한을 확인해주세요.");
+                            }
                             this.resetStartBtn(startBtn);
                             return; // Stop here
                         }
                     } else {
                         console.error("[IntroManager] startEyeTracking function not found!");
-                        alert("System Error: Tracking module missing.");
+                        // [FIX #7] alert() → 논블로킹 메시지
+                        if (typeof window.setStatus === 'function') {
+                            window.setStatus("⚠️ 시스템 오류: 추적 모듈을 찾을 수 없습니다.");
+                        }
                         this.resetStartBtn(startBtn);
                         return;
                     }
                 } catch (e) {
                     console.error("[IntroManager] SDK Boot Error:", e);
-                    alert("Error starting eye tracking: " + e.message);
+                    // [FIX #7] alert() → 논블로킹 메시지
+                    if (typeof window.setStatus === 'function') {
+                        window.setStatus("⚠️ 시선 추적 초기화 오류: " + (e.message || e));
+                    }
                     this.resetStartBtn(startBtn);
                     return;
                 }

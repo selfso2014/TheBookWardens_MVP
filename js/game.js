@@ -47,6 +47,18 @@ const Game = {
         if (this.uiManager && typeof this.uiManager.cancelAnims === 'function') {
             this.uiManager.cancelAnims();
         }
+        // [FIX #9] Remove transient body-level DOM nodes that may be orphaned
+        // when RAF/timeout is cancelled mid-flight during screen transitions.
+        // These classes are appended to document.body by:
+        //   - spawnFloatingText() → .floating-text
+        //   - _animateScoreToHud() → .flying-ink (also handled by TextRenderer._activeFlyingInkNodes)
+        //   - battle animations → .replay-mini-score
+        const TRANSIENT_SELECTORS = ['.floating-text', '.flying-ink', '.replay-mini-score'];
+        TRANSIENT_SELECTORS.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+                try { el.remove(); } catch (e) { /* silent */ }
+            });
+        });
     },
 
     // [Restored] Floating Text Effect (Required for Boss Battle)
