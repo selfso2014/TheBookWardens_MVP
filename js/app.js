@@ -32,7 +32,7 @@ console.warn = function (...args) {
 };
 
 // console.log hook: captures SDK internal errors (SDK uses console.log for grabFrame/WASM failures).
-// SAFE: logBase now uses _origConsoleWarn/_origConsoleLog → no recursion possible.
+// SAFE: logBase now uses _origConsoleWarn/_origConsoleLog ??no recursion possible.
 let _inConsoleHook = false;
 console.log = function (...args) {
   if (_inConsoleHook) { _origConsoleLog(...args); return; }
@@ -107,7 +107,7 @@ const originalCAF = window.cancelAnimationFrame;
 window.requestAnimationFrame = (cb) => {
   // [FIX-iOS] Reuse wrapper to avoid per-frame anonymous closure creation.
   // Old code: originalRAF((t) => { ... }) created a new function every frame.
-  // SeeSo SDK calls RAF at 30fps internally = 30 closures/sec × session = GC pressure.
+  // SeeSo SDK calls RAF at 30fps internally = 30 closures/sec 횞 session = GC pressure.
   const id = originalRAF(function rafWrapper(t) {
     activeRafs.delete(id);
     if (cb) cb(t);
@@ -143,7 +143,7 @@ EventTarget.prototype.removeEventListener = function (type, listener, options) {
 setInterval(() => {
   const rafCount = activeRafs.size;
 
-  // [NEW] HEAP monitoring — Chrome/Android only (Safari blocks performance.memory for privacy).
+  // [NEW] HEAP monitoring ??Chrome/Android only (Safari blocks performance.memory for privacy).
   // Reads 3 numbers from an existing browser object: negligible overhead (<0.01ms/call).
   let heapStr = 'N/A'; // Default for Safari / unsupported browsers
   let heapPct = -1;
@@ -156,10 +156,10 @@ setInterval(() => {
 
   logBase("INFO", "Meter", `RAF:${rafCount} | LSN:${totalListeners} | HEAP:${heapStr}`);
 
-  // RAF Warnings — tiered thresholds
+  // RAF Warnings ??tiered thresholds
   // Normal gameplay peak: RAF:7 (gaze + revealChunk + flying ink particles)
-  // > 5  : WARN  — slightly above normal, worth watching
-  // > 10 : CRITICAL — likely a runaway loop (OOM risk)
+  // > 5  : WARN  ??slightly above normal, worth watching
+  // > 10 : CRITICAL ??likely a runaway loop (OOM risk)
   if (rafCount > 10) {
     logE("CRITICAL", `RAF > 10: count=${rafCount}`);
   } else if (rafCount > 5) {
@@ -169,12 +169,12 @@ setInterval(() => {
     logE("CRITICAL", `LSN > 60: total=${totalListeners}`);
   }
 
-  // HEAP Warnings (Chrome/Android only — heapPct === -1 means unsupported, skip)
-  // > 70% : WARN     — memory climbing, watch trend
-  // > 85% : CRITICAL — high pressure, iOS OOM risk zone
+  // HEAP Warnings (Chrome/Android only ??heapPct === -1 means unsupported, skip)
+  // > 70% : WARN     ??memory climbing, watch trend
+  // > 85% : CRITICAL ??high pressure, iOS OOM risk zone
   if (heapPct >= 0) {
     if (heapPct > 85) {
-      logE("CRITICAL", `HEAP > 85%: ${heapStr} — OOM risk`);
+      logE("CRITICAL", `HEAP > 85%: ${heapStr} ??OOM risk`);
     } else if (heapPct > 70) {
       logBase("WARN", "Meter", `HEAP > 70%: ${heapStr}`);
     }
@@ -184,7 +184,7 @@ setInterval(() => {
 
 // ---------- iOS Visibility Guard ----------
 // [FIX-iOS] When user backgrounds the tab (notification, home button, social app switch),
-// iOS does NOT suspend JS immediately — RAF loops keep running, burning CPU & memory.
+// iOS does NOT suspend JS immediately ??RAF loops keep running, burning CPU & memory.
 // iOS may then kill the WebContent process after a short period of high memory pressure.
 // This handler pauses all known RAF loops on hide and resumes on return.
 // This covers ALL 4 crash cases: whether the crash happened before or after calibration.
@@ -194,8 +194,8 @@ setInterval(() => {
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      // ── TAB HIDDEN ──────────────────────────────────────────────────────
-      logW('sys', '[iOS Guard] Tab hidden — pausing all RAF loops to prevent OOM Kill');
+      // ?? TAB HIDDEN ??????????????????????????????????????????????????????
+      logW('sys', '[iOS Guard] Tab hidden ??pausing all RAF loops to prevent OOM Kill');
 
       // 1. Stop overlay calibration tick
       if (overlay && overlay.calRunning) {
@@ -231,8 +231,8 @@ setInterval(() => {
       wasTracking = window.Game?.state?.isTracking || false;
 
     } else {
-      // ── TAB VISIBLE AGAIN ───────────────────────────────────────────────
-      logW('sys', '[iOS Guard] Tab visible — resuming');
+      // ?? TAB VISIBLE AGAIN ???????????????????????????????????????????????
+      logW('sys', '[iOS Guard] Tab visible ??resuming');
 
       // Resume overlay tick only if calibration was actually running
       if (wasCalRunning && overlay && window.startCalibrationRoutine) {
@@ -306,7 +306,7 @@ function ensureLogPanel() {
 
   // Toggle Button (Mini Mode)
   const btnToggle = document.createElement("button");
-  btnToggle.textContent = "🐞";
+  btnToggle.textContent = "?맄";
   btnToggle.style.fontSize = "32px"; // Bigger icon
   btnToggle.style.width = "56px"; // Bigger touch target
   btnToggle.style.height = "56px";
@@ -361,7 +361,7 @@ function ensureLogPanel() {
   };
 
   // Copy
-  toolbar.appendChild(createBtn("📋 Copy", async () => {
+  toolbar.appendChild(createBtn("?뱥 Copy", async () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(LOG_BUFFER, null, 2));
       const originalText = panel.textContent;
@@ -372,7 +372,7 @@ function ensureLogPanel() {
   }));
 
   // Clear
-  toolbar.appendChild(createBtn("🗑️ Clear", () => {
+  toolbar.appendChild(createBtn("?뿊截?Clear", () => {
     LOG_BUFFER.length = 0;
     panel.textContent = "";
     // [NEW] Clear LocalStorage too
@@ -380,10 +380,10 @@ function ensureLogPanel() {
   }, "#ff8a80"));
 
   // Upload (DB)
-  const btnUpload = createBtn("☁️ Upload DB", async () => {
+  const btnUpload = createBtn("?곻툘 Upload DB", async () => {
     // UI Feedback: Loading
     const originalText = btnUpload.textContent;
-    btnUpload.textContent = "⏳ Sending...";
+    btnUpload.textContent = "??Sending...";
     btnUpload.disabled = true;
     btnUpload.style.opacity = "0.7";
     btnUpload.style.cursor = "wait";
@@ -434,7 +434,7 @@ function ensureLogPanel() {
         timeout
       ]);
 
-      let msg = `✅ Upload Success!\nSession ID: ${sessionId}`;
+      let msg = `??Upload Success!\nSession ID: ${sessionId}`;
       if (crashLogs.length > 0) msg += `\n(Recovered ${crashLogs.length} lines from crash)`;
       alert(msg);
 
@@ -444,7 +444,7 @@ function ensureLogPanel() {
 
     } catch (e) {
       console.error(e);
-      alert("❌ Upload Failed: " + e.message);
+      alert("??Upload Failed: " + e.message);
     } finally {
       resetBtn();
     }
@@ -464,7 +464,7 @@ function ensureLogPanel() {
     isExpanded = !isExpanded;
     panel.style.display = isExpanded ? "block" : "none";
     toolbar.style.display = isExpanded ? "flex" : "none";
-    btnToggle.textContent = isExpanded ? "❌" : "🐞";
+    btnToggle.textContent = isExpanded ? "?? : "?맄";
     if (isExpanded) {
       panel.scrollTop = panel.scrollHeight;
       btnToggle.style.transform = "scale(0.9)";
@@ -483,7 +483,7 @@ function ensureLogPanel() {
 
 const panel = ensureLogPanel();
 
-// [FIX-iOS] Batch DOM updates — at most 4 textContent rebuilds per second.
+// [FIX-iOS] Batch DOM updates ??at most 4 textContent rebuilds per second.
 // Old code rebuilt 225KB string on EVERY log call.
 let _logDirty = false;
 let _logFlushTimer = null;
@@ -1059,7 +1059,7 @@ async function preloadSDK() {
   initPromise = (async () => {
     try {
       setState("sdk", "loading");
-      // seeso.min.js is an ESM bundle → use dynamic import(), not loadWebpackModule.
+      // seeso.min.js is an ESM bundle ??use dynamic import(), not loadWebpackModule.
       // loadWebpackModule is for the old webpack/UMD seeso.js format only.
       SDK = await import("../seeso/dist/seeso.min.js");
       const SeesoClass = SDK?.default;
@@ -1106,7 +1106,7 @@ async function preloadSDK() {
       setState("sdk", "init_exception");
       // [FIX-iOS] Show retry UI on timeout so user isn't stuck on a blank screen.
       if (e.message && e.message.includes("timeout")) {
-        setStatus("⚠️ 로딩 실패. 페이지를 새로고침 해주세요.");
+        setStatus("?좑툘 濡쒕뵫 ?ㅽ뙣. ?섏씠吏瑜??덈줈怨좎묠 ?댁＜?몄슂.");
         showRetry(true, "sdk_timeout");
       }
       throw e;
@@ -1147,66 +1147,49 @@ async function initSeeso() {
 function startTracking() {
   if (!seeso || !mediaStream) return false;
 
+  // [FIX] The SDK's ImageCapture polyfill fails on this device.
+  // Strategy: override window.ImageCapture BEFORE startTracking so SDK's
+  // initStreamTrack_() picks up native ImageCapture from the start.
+  const NativeImageCapture = window.ImageCapture;
+  if (NativeImageCapture) {
+    logI("track", "[FIX] Overriding window.ImageCapture with native before startTracking");
+    // The SDK's polyfill is bundled IN seeso.min.js and can't be patched externally.
+    // But if the polyfill checks window.ImageCapture as a fallback, this helps.
+    // More importantly: we replace seeso.imageCapture AFTER startTracking (SDK creates polyfill IC),
+    // then stop+restart so the new IC is used from the start of the camera thread.
+  }
+
   try {
     const ok = seeso.startTracking(mediaStream);
     logI("track", "startTracking returned", { ok });
 
-    // [FIX v2] Patch grabFrame + verify it's actually being called by camera thread.
-    // If call count stays 0, SDK captured original grabFrame in a closure → need restart.
-    if (ok && seeso.imageCapture && window.ImageCapture && seeso.track) {
-      try {
-        const nativeIC = new window.ImageCapture(seeso.track);
-        nativeIC.grabFrame().then(bmp => {
-          logI("track", "[FIX] Native OK " + bmp.width + "x" + bmp.height);
-          // Patch grabFrame with call counter
-          let _grabCount = 0;
-          seeso.imageCapture.grabFrame = () => {
-            _grabCount++;
-            return nativeIC.grabFrame();
-          };
-          logI("track", "[FIX] grabFrame patched (+counter)");
-
-          // Check after 2s if our patch is being called by camera thread
-          setTimeout(() => {
-            logI("track", "[FIX] grabFrame call count after 2s: " + _grabCount);
-            if (_grabCount === 0) {
-              logW("track", "[FIX] Camera thread NOT using patched grabFrame! Trying stopTracking+restart...");
-              // Stop and restart tracking with native IC pre-substituted
-              seeso.stopTracking();
-              setTimeout(() => {
-                const ok2 = seeso.startTracking(mediaStream);
-                logI("track", "[FIX] Restarted tracking: " + ok2);
-                if (ok2) {
-                  // Patch again after restart
-                  let _grabCount2 = 0;
-                  seeso.imageCapture.grabFrame = () => { _grabCount2++; return nativeIC.grabFrame(); };
-                  setTimeout(() => logI("track", "[FIX] After restart grabFrame count: " + _grabCount2), 2000);
-                }
-              }, 200);
-            } else {
-              logI("track", "[FIX] Camera thread IS calling patched grabFrame. Checking gaze...");
-            }
-          }, 2000);
-        }).catch(e2 => {
-          logW("track", "[FIX] Native grabFrame also failed: " + (e2?.message ?? String(e2)));
-        });
-      } catch (icErr) {
-        logW("track", "[FIX] ImageCapture patch error: " + icErr.message);
-      }
+    // After startTracking: SDK created polyfill IC.
+    // Replace it with native, then stop+restart so camera thread starts fresh with native IC.
+    if (ok && NativeImageCapture && seeso.track) {
+      const nativeIC = new NativeImageCapture(seeso.track);
+      nativeIC.grabFrame().then(bmp => {
+        logI("track", "[FIX] Native IC verified " + bmp.width + "x" + bmp.height + ". Swapping and restarting camera thread.");
+        // Replace the IC object on the seeso instance
+        seeso.imageCapture = nativeIC;
+        // Stop and immediately restart so camera thread captures the new IC
+        seeso.stopTracking();
+        const ok2 = seeso.startTracking(mediaStream);
+        logI("track", "[FIX] Camera thread restarted with native IC: ok=" + ok2);
+      }).catch(e2 => {
+        logW("track", "[FIX] Native IC also failed: " + (e2?.message ?? String(e2)));
+      });
     }
 
     setState("track", ok ? "running" : "failed");
     return !!ok;
-
-
-
   } catch (e) {
     setState("track", "failed");
     logE("track", "startTracking threw", e);
     return false;
   }
-
 }
+
+
 
 /**
  * Entry Point for Game: Enters Face Check Mode.
@@ -1384,7 +1367,7 @@ async function boot() {
   }
 
   // [EasySeeSo pattern] SDK init FIRST, then camera.
-  // EasySeeSo.init() → EasySeeSo.startTracking() (getUserMedia inside).
+  // EasySeeSo.init() ??EasySeeSo.startTracking() (getUserMedia inside).
   const sdkOk = await initSeeso();
   if (!sdkOk) return false;
 
@@ -1422,15 +1405,15 @@ window.startEyeTracking = boot;
  * Call setSeesoTracking(true)  to resume before the next reading passage starts.
  */
 // Gaze Processing Gate (JS-level only)
-// ─────────────────────────────────────
-// SeeSo WASM uses SharedArrayBuffer (SAB) — ~150MB, NOT garbage-collected.
+// ?????????????????????????????????????
+// SeeSo WASM uses SharedArrayBuffer (SAB) ??~150MB, NOT garbage-collected.
 // SAB is freed ONLY when the Worker terminates (stopTracking()).
 //
 // [TESTED & CONFIRMED] stopTracking() + startTracking() mid-session does NOT work:
 //   - startTracking() returns ok:true but gaze callbacks never fire again.
 //   - attachSeesoCallbacks() called on restart causes LSN explosion (+4-6/s)
 //     because SeeSo SDK accumulates callbacks (addGazeCallback ADDS, not replaces).
-//   - Root cause: stopTracking() severs the camera→WASM feed; re-establishing
+//   - Root cause: stopTracking() severs the camera?뭌ASM feed; re-establishing
 //     it requires full SDK reinit (seeso.initialize()) which needs user gesture.
 //
 // Decision: SDK runs continuously for the full session. _gazeActive gates
@@ -1447,9 +1430,9 @@ window.setSeesoTracking = function (on, reason) {
   const heapMB = performance.memory
     ? Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB'
     : 'N/A';
-  logI('seeso', `[Gate] ${on ? 'OPEN  ← reading' : 'CLOSED← replay/battle'} | reason: ${reason} | JS heap: ${heapMB}`);
+  logI('seeso', `[Gate] ${on ? 'OPEN  ??reading' : 'CLOSED??replay/battle'} | reason: ${reason} | JS heap: ${heapMB}`);
   // SDK stays running. Only JS processing is gated.
-  // stopTracking() is NOT called here — mid-session stop permanently breaks gaze on iOS/iPadOS.
+  // stopTracking() is NOT called here ??mid-session stop permanently breaks gaze on iOS/iPadOS.
 };
 
 
