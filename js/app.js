@@ -1092,6 +1092,50 @@ function startTracking() {
   seeso.startTracking(onGaze, onDebug, mediaStream || undefined).then((ok) => {
     logI("track", "EasySeeSo.startTracking returned", { ok });
     setState("track", ok ? "running" : "failed");
+
+    // [DIAG v18] Patch raw Seeso processFrame_ to surface internal errors
+    // seeso = EasySeeSo instance, seeso.seeso = raw Seeso instance
+    const rawSeeso = seeso.seeso;
+    if (ok && rawSeeso && typeof rawSeeso.processFrame_ === "function") {
+      const _origPF = rawSeeso.processFrame_.bind(rawSeeso);
+      let _pfCallCount = 0;
+      let _pfLastLog = 0;
+      rawSeeso.processFrame_ = async function diagProcessFrame(imageCapture) {
+        _pfCallCount++;
+        const now = performance.now();
+        if (now - _pfLastLog > 3000) { // log every 3s
+          _pfLastLog = now;
+          logI("diag", `processFrame_ call #${_pfCallCount} | track.readyState=${rawSeeso.track?.readyState} muted=${rawSeeso.track?.muted} enabled=${rawSeeso.track?.enabled}`);
+        }
+        try {
+          const result = await _origPF(imageCapture);
+          return result;
+        } catch (e) {
+          logE("diag", `processFrame_ THREW: ${e?.message || String(e)}`);
+          throw e;
+        }
+      };
+      logI("diag", "processFrame_ patch applied to rawSeeso (seeso.seeso)");
+
+      // Also patch checkStreamTrack_ to see if it's blocking
+      if (typeof rawSeeso.checkStreamTrack_ === "function") {
+        const _origCST = rawSeeso.checkStreamTrack_.bind(rawSeeso);
+        let _cstFalseCount = 0;
+        rawSeeso.checkStreamTrack_ = function diagCheckStreamTrack(track) {
+          const result = _origCST(track);
+          if (!result) {
+            _cstFalseCount++;
+            if (_cstFalseCount <= 5 || _cstFalseCount % 100 === 0) {
+              logW("diag", `checkStreamTrack_ returned FALSE #${_cstFalseCount} | readyState=${track?.readyState} muted=${track?.muted} enabled=${track?.enabled} null=${track === null}`);
+            }
+          }
+          return result;
+        };
+        logI("diag", "checkStreamTrack_ patch applied");
+      }
+    } else {
+      logW("diag", `processFrame_ patch SKIPPED: ok=${ok} rawSeeso=${!!rawSeeso} hasFn=${typeof rawSeeso?.processFrame_}`);
+    }
   }).catch((e) => {
     setState("track", "failed");
     logE("track", "EasySeeSo.startTracking threw", e?.message || String(e));
