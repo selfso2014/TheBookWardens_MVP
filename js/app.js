@@ -988,7 +988,9 @@ async function preloadSDK() {
       // [SDK-SWAP] seeso.min.js is a standard ESM bundle — use dynamic import() directly.
       // Old seeso.js was a webpack-shim format loaded via loadWebpackModule().
       // New seeso.min.js uses 'export { ... as default }' → import() handles it natively.
-      SDK = await import("./seeso/dist/seeso.min.js?v=NEW_SDK_v1");
+      // NOTE: import() resolves relative to THIS FILE (js/app.js), not document root.
+      //       So "../seeso/dist/" is correct (not "./seeso/dist/").
+      SDK = await import("../seeso/dist/seeso.min.js?v=NEW_SDK_v1");
       const SeesoClass = SDK?.default;
       if (!SeesoClass) throw new Error("Seeso export not found");
 
