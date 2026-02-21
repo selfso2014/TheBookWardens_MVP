@@ -31,6 +31,25 @@ console.warn = function (...args) {
   _origConsoleWarn(...args);
 };
 
+// console.log hook: captures SDK internal errors (SDK uses console.log for grabFrame/WASM failures).
+// SAFE: logBase now uses _origConsoleWarn/_origConsoleLog → no recursion possible.
+let _inConsoleHook = false;
+console.log = function (...args) {
+  if (_inConsoleHook) { _origConsoleLog(...args); return; }
+  const msg = args.map(a => {
+    try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 120) : String(a); }
+    catch (_) { return String(a); }
+  }).join(' ');
+  if (/error|fail|exception|grab|muted|track|wasm|seeso/i.test(msg)) {
+    _inConsoleHook = true;
+    try {
+      if (typeof logW === 'function') logW('sdk-log', msg);
+    } finally { _inConsoleHook = false; }
+  }
+  _origConsoleLog(...args);
+};
+
+
 window.addEventListener('unhandledrejection', (e) => {
   const msg = e.reason?.message || e.reason?.toString?.() || String(e.reason);
   if (typeof logE === 'function') logE('sdk', 'Unhandled rejection: ' + msg);
