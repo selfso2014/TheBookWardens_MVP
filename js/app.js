@@ -1516,6 +1516,11 @@ window.setSeesoTracking = function (on, reason) {
               if (els && els.video && mediaStream) {
                 els.video.srcObject = mediaStream;
               }
+              // [SAFARI FIX] stopTracking() 후 startTracking() 재호출 시
+              // SDK가 새 imageCapture 인스턴스를 생성함 → 이전 패치 소멸
+              // → 매 startTracking() 성공마다 패치를 재적용해야 함
+              const rawSeeso = seeso?.seeso;
+              if (rawSeeso) patchSdkImageCapture(rawSeeso);
             } else {
               logW('seeso', '[Gate] startTracking() returned false');
             }
