@@ -3,6 +3,42 @@ import { loadWebpackModule } from "./webpack-loader.js";
 import { CalibrationManager } from "./calibration.js";
 import { GazeDataManager } from "./gaze-data-manager.js"; // Import
 
+// [DIAG] Intercept console.error/warn to surface SDK internal errors in our debug panel.
+// SDK errors (WASM load failure, license error, etc.) never appear in logI/logW/logE.
+// Must be set up BEFORE SDK loads.
+const _origConsoleError = console.error.bind(console);
+const _origConsoleWarn = console.warn.bind(console);
+
+console.error = function (...args) {
+  const msg = args.map(a => {
+    try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 120) : String(a); }
+    catch (_) { return String(a); }
+  }).join(' ');
+  // Forward to our debug panel (logE defined later - use deferred log if not ready)
+  if (typeof logE === 'function') logE('console', msg);
+  else setTimeout(() => { if (typeof logE === 'function') logE('console', msg); }, 100);
+  _origConsoleError(...args);
+};
+
+console.warn = function (...args) {
+  const msg = args.map(a => {
+    try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 120) : String(a); }
+    catch (_) { return String(a); }
+  }).join(' ');
+  if (typeof logW === 'function') logW('console', msg);
+  else setTimeout(() => { if (typeof logW === 'function') logW('console', msg); }, 100);
+  _origConsoleWarn(...args);
+};
+
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = e.reason?.message || e.reason?.toString?.() || String(e.reason);
+  if (typeof logE === 'function') logE('sdk', 'Unhandled rejection: ' + msg);
+});
+
+window.addEventListener('error', (e) => {
+  if (typeof logE === 'function') logE('sdk', 'Uncaught error: ' + e.message + ' (' + e.filename + ':' + e.lineno + ')');
+});
+
 // Initialize Manager
 const gazeDataManager = new GazeDataManager();
 // Expose to Game if needed, or Game accesses via window
