@@ -29,12 +29,17 @@ console.warn = function (...args) {
   _origConsoleWarn(...args);
 };
 
-// console.log: only capture if contains 'error' keywords (SDK uses .log for errors!)
+// console.log: captures SDK error keywords. Recursion guard prevents infinite loop.
+let _inConsoleHook = false;
 console.log = function (...args) {
+  if (_inConsoleHook) { _origConsoleLog(...args); return; }
   const msg = _fmtArgs(args);
   if (/error|fail|exception|track|ready|muted|grab/i.test(msg)) {
-    if (typeof logW === 'function') logW('console.log', msg);
-    else setTimeout(() => { if (typeof logW === 'function') logW('console.log', msg); }, 100);
+    _inConsoleHook = true;
+    try {
+      if (typeof logW === 'function') logW('console.log', msg);
+      else setTimeout(() => { if (typeof logW === 'function') logW('console.log', msg); }, 100);
+    } finally { _inConsoleHook = false; }
   }
   _origConsoleLog(...args);
 };
@@ -175,7 +180,7 @@ setInterval(() => {
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      // ?€?€ TAB HIDDEN ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+      // ?ï¿½?ï¿½ TAB HIDDEN ?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
       logW('sys', '[iOS Guard] Tab hidden ??pausing all RAF loops to prevent OOM Kill');
 
       // 1. Stop overlay calibration tick
@@ -212,7 +217,7 @@ setInterval(() => {
       wasTracking = window.Game?.state?.isTracking || false;
 
     } else {
-      // ?€?€ TAB VISIBLE AGAIN ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+      // ?ï¿½?ï¿½ TAB VISIBLE AGAIN ?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
       logW('sys', '[iOS Guard] Tab visible ??resuming');
 
       // Resume overlay tick only if calibration was actually running
@@ -287,7 +292,7 @@ function ensureLogPanel() {
 
   // Toggle Button (Mini Mode)
   const btnToggle = document.createElement("button");
-  btnToggle.textContent = "?";
+  btnToggle.textContent = "?ï¿½ï¿½";
   btnToggle.style.fontSize = "32px"; // Bigger icon
   btnToggle.style.width = "56px"; // Bigger touch target
   btnToggle.style.height = "56px";
@@ -342,7 +347,7 @@ function ensureLogPanel() {
   };
 
   // Copy
-  toolbar.appendChild(createBtn("?“‹ Copy", async () => {
+  toolbar.appendChild(createBtn("?ï¿½ï¿½ Copy", async () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(LOG_BUFFER, null, 2));
       const originalText = panel.textContent;
@@ -353,7 +358,7 @@ function ensureLogPanel() {
   }));
 
   // Clear
-  toolbar.appendChild(createBtn("?—‘ï¸?Clear", () => {
+  toolbar.appendChild(createBtn("?ï¿½ï¿½ï¿½?Clear", () => {
     LOG_BUFFER.length = 0;
     panel.textContent = "";
     // [NEW] Clear LocalStorage too
@@ -361,7 +366,7 @@ function ensureLogPanel() {
   }, "#ff8a80"));
 
   // Upload (DB)
-  const btnUpload = createBtn("?ï¸ Upload DB", async () => {
+  const btnUpload = createBtn("?ï¿½ï¸ Upload DB", async () => {
     // UI Feedback: Loading
     const originalText = btnUpload.textContent;
     btnUpload.textContent = "??Sending...";
@@ -445,7 +450,7 @@ function ensureLogPanel() {
     isExpanded = !isExpanded;
     panel.style.display = isExpanded ? "block" : "none";
     toolbar.style.display = isExpanded ? "flex" : "none";
-    btnToggle.textContent = isExpanded ? "?? : "?";
+    btnToggle.textContent = isExpanded ? "?? : "?ï¿½ï¿½";
     if (isExpanded) {
       panel.scrollTop = panel.scrollHeight;
       btnToggle.style.transform = "scale(0.9)";
@@ -1089,7 +1094,7 @@ async function preloadSDK() {
       setState("sdk", "init_exception");
       // [FIX-iOS] Show retry UI on timeout so user isn't stuck on a blank screen.
       if (e.message && e.message.includes("timeout")) {
-        setStatus("? ï¸ ë¡œë”© ?¤íŒ¨. ?˜ì´ì§€ë¥??ˆë¡œê³ ì¹¨ ?´ì£¼?¸ìš”.");
+        setStatus("?ï¿½ï¸ ë¡œë”© ?ï¿½íŒ¨. ?ï¿½ì´ì§€ï¿½??ï¿½ë¡œê³ ì¹¨ ?ï¿½ì£¼?ï¿½ìš”.");
         showRetry(true, "sdk_timeout");
       }
       throw e;
@@ -1356,7 +1361,7 @@ window.startEyeTracking = boot;
  * Call setSeesoTracking(true)  to resume before the next reading passage starts.
  */
 // Gaze Processing Gate (JS-level only)
-// ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+// ?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
 // SeeSo WASM uses SharedArrayBuffer (SAB) ??~150MB, NOT garbage-collected.
 // SAB is freed ONLY when the Worker terminates (stopTracking()).
 //
@@ -1364,7 +1369,7 @@ window.startEyeTracking = boot;
 //   - startTracking() returns ok:true but gaze callbacks never fire again.
 //   - attachSeesoCallbacks() called on restart causes LSN explosion (+4-6/s)
 //     because SeeSo SDK accumulates callbacks (addGazeCallback ADDS, not replaces).
-//   - Root cause: stopTracking() severs the camera?’WASM feed; re-establishing
+//   - Root cause: stopTracking() severs the camera?ï¿½WASM feed; re-establishing
 //     it requires full SDK reinit (seeso.initialize()) which needs user gesture.
 //
 // Decision: SDK runs continuously for the full session. _gazeActive gates
