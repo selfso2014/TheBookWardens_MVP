@@ -43,6 +43,12 @@ export class GazeDataManager {
         // [FIX] Search Boundary for WPM Calculation
         this.searchStartIndex = 0;
 
+        // [FIX-iOS] Rolling window — cap gaze buffer to prevent OOM on long sessions.
+        // At 30fps × ~5min = 9000 frames. Beyond that, iOS kills the WebContent process.
+        // We trim the front of the array and adjust lastUploadedIndex accordingly.
+        this.MAX_BUFFER_SIZE = 9000; // ~5 minutes at 30fps
+        this.lastPreprocessIndex = 0; // Track which entries have been smoothed
+
         // --- RGT (Relative-Gaze Trigger) State ---
         this.currentLineMinX = 99999;     // 'a' (Line Start)
         this.globalMaxX = 0;              // 'b' (Line End / Screen Right)
@@ -82,25 +88,40 @@ export class GazeDataManager {
             if (gazeInfo.eyemovementState === 0) type = 'Fixation';
             else if (gazeInfo.eyemovementState === 2) type = 'Saccade';
 
+            // [FIX-iOS] Data Diet: Keep only essential fields to minimize memory footprint.
+            // Removed: gx, gy (calculated later), vx, vy (calculated later), 
+            // sdkFixationX, sdkFixationY (redundant), rsState, rsTriggerType (only for debug).
             const entry = {
                 t, x, y,
-                gx: null, gy: null,
-                vx: null, vy: null,
-                targetY: null, avgY: null,
-                type,
-                sdkFixationX: gazeInfo.fixationX,
-                sdkFixationY: gazeInfo.fixationY,
-                ...(this.context || {}),
-                // New Debug Fields
-                rsState: null,     // 'Pending', 'Immediate', 'Delayed', 'Missed', 'Timeout'
-                rsTriggerType: null // 'Immediate', 'Delayed'
+                line: this.context.lineIndex,
+                pIdx: this.context.paraIndex,
+                wIdx: this.context.wordIndex,
+                type: (gazeInfo.eyemovementState === 0 ? 0 : (gazeInfo.eyemovementState === 2 ? 2 : 1)) // Use numbers instead of strings
             };
 
             // CRITICAL: Always push raw data
             this.data.push(entry);
 
+            // [FIX-iOS] Rolling buffer: trim oldest entries when over the size limit.
+            // This prevents the data array from growing unboundedly during long sessions.
+            if (this.data.length > this.MAX_BUFFER_SIZE) {
+                const trimCount = Math.floor(this.MAX_BUFFER_SIZE * 0.1); // trim 10% at once
+                this.data.splice(0, trimCount);
+                // Adjust upload cursor so we don't re-upload trimmed entries
+                this.lastUploadedIndex = Math.max(0, this.lastUploadedIndex - trimCount);
+                this.lastPreprocessIndex = Math.max(0, this.lastPreprocessIndex - trimCount);
+                this.searchStartIndex = Math.max(0, (this.searchStartIndex || 0) - trimCount);
+                // Adjust searchStartIndex floor to new data[0]
+                console.warn(`[Mem] GazeData trimmed: ${trimCount} old entries removed. New size: ${this.data.length}`);
+            }
+
+            // [DEBUG] Gaze Data Pressure Monitor
+            if (this.data.length % 1000 === 0) {
+                console.warn(`[Mem] GazeData size: ${this.data.length} / ${this.MAX_BUFFER_SIZE}`);
+            }
+
             // [NEW] Capture Start of Content (First valid Line Index)
-            if (this.firstContentTime === null && typeof entry.lineIndex === 'number' && entry.lineIndex >= 0) {
+            if (this.firstContentTime === null && typeof entry.line === 'number' && entry.line >= 0) {
                 this.firstContentTime = entry.t;
                 // [RGT] Initial Line Start Collection
                 this.isCollectingLineStart = true;
@@ -139,11 +160,10 @@ export class GazeDataManager {
                 // We use this.prevLineIndex which holds the state from the PREVIOUS frame loop.
                 const isContextRestored = (this.prevLineIndex === null || this.prevLineIndex === undefined || this.prevLineIndex === -1);
 
-                if (this.pendingReturnSweep && entry.lineIndex !== undefined && entry.lineIndex !== null && isContextRestored) {
+                if (this.pendingReturnSweep && entry.line !== undefined && entry.line !== null && isContextRestored) {
                     // Check if the pending sweep is still fresh (< 1000ms)
                     if ((t - this.pendingReturnSweep.t) < 1000) {
                         this._fireEffect("Delayed", this.pendingReturnSweep.vx);
-                        if (this.data.length > 0) this.data[this.data.length - 1].rsState = "Delayed_Success";
                         this.pendingReturnSweep = null;
                         // console.log("[RS] ✅ Delayed Trigger Fired (Context Restored)");
                     } else {
@@ -175,13 +195,21 @@ export class GazeDataManager {
     }
 
     /**
-     * Post-processing: Interpolation -> Smoothing -> Velocity
+     * Post-processing: Smoothing & Velocity — INCREMENTAL (only new entries)
+     * [FIX-iOS] Previously ran O(n²) over the ENTIRE data array on every upload.
+     * Now only processes entries from lastPreprocessIndex onward.
      */
     preprocessData() {
         if (this.data.length < 2) return;
 
-        // 1. Interpolation
-        for (let i = 0; i < this.data.length; i++) {
+        // [FIX] Only process NEW data since last call
+        const startIdx = Math.max(0, this.lastPreprocessIndex - 2); // overlap 2 for smooth continuity
+        const endIdx = this.data.length;
+
+        if (startIdx >= endIdx - 1) return; // Nothing new to process
+
+        // 1. Interpolation (only for new slice)
+        for (let i = startIdx; i < endIdx; i++) {
             const curr = this.data[i];
             const isMissing = isNaN(curr.x) || isNaN(curr.y) || (curr.x === 0 && curr.y === 0) || typeof curr.x !== 'number';
 
@@ -210,11 +238,11 @@ export class GazeDataManager {
             }
         }
 
-        // 2. Gaussian Smoothing & Velocity
+        // 2. Gaussian Smoothing & Velocity (only for new slice)
         const kernel = [0.0545, 0.2442, 0.4026, 0.2442, 0.0545]; // Sigma=1.0
         const half = Math.floor(kernel.length / 2);
 
-        for (let i = 0; i < this.data.length; i++) {
+        for (let i = startIdx; i < endIdx; i++) {
             let sumX = 0, sumY = 0, sumK = 0;
             for (let k = -half; k <= half; k++) {
                 const idx = i + k;
@@ -227,7 +255,6 @@ export class GazeDataManager {
             this.data[i].gx = sumX / sumK;
             this.data[i].gy = sumY / sumK;
 
-            // Recalculate Velocity with Smoothed Data
             if (i > 0) {
                 const prev = this.data[i - 1];
                 const dt = this.data[i].t - prev.t;
@@ -240,17 +267,28 @@ export class GazeDataManager {
                 }
             }
         }
+
+        // Update cursor
+        this.lastPreprocessIndex = endIdx;
     }
 
     setContext(ctx) {
-        this.context = { ...this.context, ...ctx };
+        // [FIX-iOS] Mutate in-place instead of spread-creating a new object.
+        // Old code: this.context = {...this.context, ...ctx} = new obj every call.
+        // Called 30x/sec from updateGazeStats → 30 allocs/sec eliminated.
+        if (ctx) {
+            for (const key in ctx) {
+                this.context[key] = ctx[key];
+            }
+        }
     }
 
     setLineMetadata(lineIndex, metadata) {
         if (!this.lineMetadata[lineIndex]) {
             this.lineMetadata[lineIndex] = {};
         }
-        this.lineMetadata[lineIndex] = { ...this.lineMetadata[lineIndex], ...metadata };
+        // [FIX-iOS] Mutate in-place via Object.assign instead of spread.
+        Object.assign(this.lineMetadata[lineIndex], metadata);
     }
 
     setReplayData(data) {
@@ -274,7 +312,22 @@ export class GazeDataManager {
         this.lastTriggerTime = 0;
         this.lastPosPeakTime = 0;
         this.firstContentTime = null;
-        this.lastUploadedIndex = 0; // Reset upload cursor
+        this.lastUploadedIndex = 0;   // Reset upload cursor
+        // [FIX] Previously missing — caused unbounded growth across sessions
+        this.wpmData = [];            // Per-line WPM log
+        this.pangLog = [];            // Pang event log
+        this.wpm = 0;                 // Real-time WPM
+        this.validWordSum = 0;        // Cumulative word count
+        this.validTimeSum = 0;        // Cumulative time (ms)
+        this.lastRSTime = 0;
+        this.lastRSLine = -1;
+        this.lastPreprocessIndex = 0; // Reset preprocessing cursor
+        this.searchStartIndex = 0;    // Reset WPM search boundary
+        this.maxLineIndexReached = -1;
+        this.pangCountInPara = 0;
+        this.currentLineMinX = 99999;
+        this.isCollectingLineStart = false;
+        this.pendingReturnSweep = null;
     }
 
     // NEW: Reset only trigger logic (for new paragraph/level) without clearing data
@@ -285,6 +338,14 @@ export class GazeDataManager {
         this.pendingReturnSweep = null;
         this.maxLineIndexReached = -1; // Reset max reach guard
         this.pangLog = []; // NEW: Reset Pang Logs
+        // [FIX-iOS] Clear wpmData per paragraph (was only cleared in reset(), not resetTriggers()).
+        // Without this, all paragraphs' WPM log entries accumulate across the session.
+        this.wpmData = [];
+
+        // [FIX-iOS] Clear lineMetadata to prevent unbounded growth across paragraphs.
+        // setLineMetadata() is called per-line per-frame (30fps) during reading.
+        // Without this reset, all past paragraphs' line entries accumulate in the object.
+        this.lineMetadata = {};
 
         // Reset WPM State (Partially)
         // [FIX] Do NOT reset cumulative WPM stats (wpm, validWordSum, validTimeSum)
@@ -309,10 +370,48 @@ export class GazeDataManager {
         setTimeout(() => this.isCollectingLineStart = false, 200);
     }
 
+    // [FIX-iOS] Free the accumulated gaze data array AFTER replay has consumed it.
+    // Called explicitly by game.js inside the playGazeReplay onComplete callback —
+    // i.e. AFTER replay finishes and BEFORE playNextParagraph() starts.
+    //
+    // Why separate from resetTriggers():
+    //   resetTriggers() runs while gaze is already flowing (setSeesoTracking(true) fires just
+    //   before it). Clearing data + firstTimestamp there caused a timeline race condition that
+    //   broke pang detection for the entire next paragraph (confirmed in earlier test).
+    //
+    // Why firstTimestamp is NOT reset here:
+    //   firstTimestamp is the absolute game-start reference (set once during calibration).
+    //   t = Date.now() - firstTimestamp → always increases monotonically.
+    //   If we null firstTimestamp, the next paragraph's t resets to 0.
+    //   Then lastPosPeakTime=0 (from resetTriggers) and t=0 → timeSincePeak=0 < 600ms
+    //   → pang detection blocked. Keeping firstTimestamp means t continues from where
+    //   para 0 left off (e.g. 90,000ms), so timeSincePeak = 90,000 >> 600 → no block.
+    //
+    // What this prevents on iOS:
+    //   Without this, this.data carries ALL paragraphs' gaze entries into the next paragraph.
+    //   3 paragraphs × 9000 entries = up to 27,000 objects in the array → ~1-2MB overhead
+    //   that compounds with SeeSo WASM (100-190MB) to push past iOS OOM threshold.
+    clearGazeData() {
+        const prev = this.data ? this.data.length : 0;
+        this.data = [];
+        this.buffer = [];
+        // NOTE: firstTimestamp intentionally NOT reset — see comment above.
+        this.lastPreprocessIndex = 0;
+        this.lastUploadedIndex = 0;
+        // [FIX-iOS] Release replayData reference. Firebase upload has already consumed it
+        // (uploadToCloud runs at replay START, clearGazeData runs at replay END).
+        // Without this, the old gaze array (9000 entries ~0.5MB) lives in replayData
+        // indefinitely, preventing GC across all paragraphs.
+        this.replayData = null;
+        console.log(`[GazeDataManager] clearGazeData: freed ${prev} entries + replayData. Timeline continues from t=${Date.now() - (this.firstTimestamp || Date.now())}ms.`);
+    }
+
+
     // NEW: Retrieve Pang Logs for Replay
     getPangLogs() {
         return this.pangLog || [];
     }
+
 
     exportCSV(startTime = 0, endTime = Infinity) {
         if (!this.data || this.data.length === 0) {
@@ -325,7 +424,7 @@ export class GazeDataManager {
         const targetYMap = {};
         if (window.Game && window.Game.typewriter && window.Game.typewriter.lineYData) {
             window.Game.typewriter.lineYData.forEach(item => {
-                targetYMap[item.lineIndex] = item.y;
+                targetYMap[item.line] = item.y;
             });
         }
 
@@ -334,7 +433,7 @@ export class GazeDataManager {
         const lineYAvg = {};
         this.data.forEach(d => {
             if (d.t < startTime || d.t > endTime) return;
-            const lIdx = d.lineIndex;
+            const lIdx = d.line;
             if (lIdx !== undefined && lIdx !== null) {
                 if (d.gy !== undefined && d.gy !== null) {
                     if (!lineYSum[lIdx]) { lineYSum[lIdx] = 0; lineYCount[lIdx] = 0; }
@@ -351,7 +450,7 @@ export class GazeDataManager {
         let csv = "RelativeTimestamp_ms,RawX,RawY,SmoothX,SmoothY,VelX,VelY,Type,ReturnSweep,LineIndex,CharIndex,InkY_Px,AlgoLineIndex,TargetY_Px,AvgCoolGazeY_Px,ReplayX,ReplayY,InkSuccess,DidFire,ReturnSweepState,TriggerType,Debug_Median,Debug_Threshold,Debug_RealtimeVX\n";
         this.data.forEach(d => {
             if (d.t < startTime || d.t > endTime) return;
-            const lIdx = d.lineIndex;
+            const lIdx = d.line;
             let targetY = "";
             let avgY = "";
             if (lIdx !== undefined && lIdx !== null) {
@@ -369,7 +468,7 @@ export class GazeDataManager {
                 d.vx ? d.vx.toFixed(4) : "", d.vy ? d.vy.toFixed(4) : "",
                 d.type,
                 (d.isReturnSweep ? "TRUE" : ""),
-                (d.lineIndex !== undefined && d.lineIndex !== null) ? d.lineIndex : "",
+                (d.line !== undefined && d.line !== null) ? d.line : "",
                 (d.charIndex !== undefined && d.charIndex !== null) ? d.charIndex : "",
                 (d.inkY !== undefined && d.inkY !== null) ? d.inkY.toFixed(0) : "",
                 (d.detectedLineIndex !== undefined) ? d.detectedLineIndex : "",
@@ -501,7 +600,7 @@ export class GazeDataManager {
             RawX: chartData.map(d => d.x), RawY: chartData.map(d => d.y),
             SmoothX: chartData.map(d => d.gx), SmoothY: chartData.map(d => d.gy),
             VelX: chartData.map(d => d.vx), VelY: chartData.map(d => d.vy),
-            LineIndex: chartData.map(d => d.lineIndex || null),
+            LineIndex: chartData.map(d => d.line || null),
             AlgoLineIndex: chartData.map(d => d.detectedLineIndex || null)
         };
 
@@ -673,24 +772,24 @@ export class GazeDataManager {
 
                     // -- STEP D: LOGIC GUARD (V10.0 - SMART & SIMPLE) --
 
-                    if (d0.lineIndex !== undefined && d0.lineIndex !== null) {
+                    if (d0.line !== undefined && d0.line !== null) {
 
                         // Rule 1: START LINE BLOCK
-                        if (d0.lineIndex === 0) {
+                        if (d0.line === 0) {
                             return false;
                         }
 
                         // Rule 2: Max Reach Check (Monotonic)
-                        if (d0.lineIndex <= this.maxLineIndexReached) {
+                        if (d0.line <= this.maxLineIndexReached) {
                             // DEBUG: Log rejection
-                            // console.log(`[RS Reject] Line ${d0.lineIndex} <= Max ${this.maxLineIndexReached}`);
+                            // console.log(`[RS Reject] Line ${d0.line} <= Max ${this.maxLineIndexReached}`);
                             return false;
                         }
 
                         // Legacy Rule 3 Removed.
 
                     } else {
-                        // If lineIndex is null (transition), we act conservatively and DO NOT fire.
+                        // If line is null (transition), we act conservatively and DO NOT fire.
                         // console.log("[RS Reject] Null Line Index");
                         return false;
                     }
@@ -701,7 +800,7 @@ export class GazeDataManager {
 
                     // Update Guard State (New High Score)
                     this.lastPosPeakTime = 0;
-                    this.maxLineIndexReached = d0.lineIndex;
+                    this.maxLineIndexReached = d0.line;
 
                     return true;
                 }
@@ -724,156 +823,106 @@ export class GazeDataManager {
         d0.didFire = true;
         d0.rsTriggerType = type;
 
-        console.log(`[RS] 💥 TRIGGER! (${type}) VX:${vx.toFixed(2)} at ${d0.t}ms`);
-
         // Determine Target Line (The line just finished)
         // Return Sweep means we moved FROM line N TO line N+1. We want to mark line N.
-        const targetLine = (d0.lineIndex > 0) ? d0.lineIndex - 1 : 0;
+        const targetLine = (d0.line > 0) ? d0.line - 1 : 0;
 
-        // [NEW] Log for Replay
+        // [CRITICAL for Replay] Log this pang event.
+        // playGazeReplay() uses pangLog as its sole data source for:
+        //   - which lines to show replay path on
+        //   - when to trigger combo + score animations
+        // This is a tiny 4-field object — negligible memory cost.
         if (this.pangLog) {
-            this.pangLog.push({
-                t: d0.t,
-                lineIndex: targetLine,
-                type: type,
-                vx: vx
-            });
+            this.pangLog.push({ t: d0.t, line: targetLine, type, vx });
         }
 
-        // 1. Visual Effect (Existing)
+        // 1. Visual Effect — purple dot (lightweight, single RAF one-shot)
         if (window.Game && window.Game.typewriter && window.Game.typewriter.renderer &&
             typeof window.Game.typewriter.renderer.triggerReturnEffect === 'function') {
 
-            // [Fix 1] Only trigger visual effect if we are actively reading (screen-read active)
-            // This prevents Pang effects during Boss Battles or Transitions.
+            // Only trigger visual effect if we are actively reading (screen-read active)
             const readScreen = document.getElementById('screen-read');
             if (readScreen && readScreen.classList.contains('active')) {
                 window.Game.typewriter.renderer.triggerReturnEffect(targetLine);
             }
         }
 
-        // 2. Game Reward (New: Ink +10) via Event Bus
-        // DECOUPLED: No direct Game.addInk call.
-        if (bus) {
-            bus.emit('pang');
-        }
+        // 2. Game Reward (Ink) — handled directly in TextRenderer._animateScoreToHud() via window.Game.addInk(score).
+        // bus.emit('pang') was removed: no listener (bus.on('pang')) existed anywhere in the codebase — dead code.
 
         // --- RGT: Update 'b' (Global Max X) & Reset 'a' ---
-        // 1. Update Global Max (b) with current X (End of Line)
         if (d0.x > this.globalMaxX) {
             this.globalMaxX = d0.x;
-            // console.log(`[RGT] New Global Max (b): ${this.globalMaxX}`);
         }
 
-        // 2. Start Collecting New Min X (a) for Next Line
         this.currentLineMinX = 99999;
         this.isCollectingLineStart = true;
-        setTimeout(() => {
-            this.isCollectingLineStart = false;
-            // console.log(`[RGT] Line Start (a) Locked: ${this.currentLineMinX}`);
-        }, 200);
+        setTimeout(() => { this.isCollectingLineStart = false; }, 200);
 
-        // --- 3. GAZE-BASED WPM CALCULATION (User Spec) ---
-        // Logic:
-        // 1. Only lines with Purple Circle (RS) are valid.
-        // 2. Measure Time Interval & Word Count for valid lines.
-        // 3. Accumulate and Calculate WPM.
+        // WPM calculation deferred to avoid O(N) scan on the hot gaze callback path.
+        // WPM updates are best-effort; we defer 100ms to clear the gaze frame cost.
+        this.lastRSTime = d0.t;
+        this.lastRSLine = targetLine;
+        this.pangCountInPara++;
+        setTimeout(() => { this._calcWPMForLine(targetLine, d0.t); }, 100);
+    }
 
-        if (window.Game && window.Game.typewriter && window.Game.typewriter.renderer) {
-            const renderer = window.Game.typewriter.renderer;
-            const lines = renderer.lines;
 
-            // Check 2.3: Skip Last Line
-            // If targetLine is the last line (or greater), we ignore it per user request.
-            // (Last line usually doesn't have a distinct RS to a "next" line, or ends the paragraph)
-            if (lines && lines.length > 0 && targetLine < lines.length - 1) {
+    // WPM calculation — runs deferred (off the 30fps gaze hot path)
+    _calcWPMForLine(targetLine, now) {
+        if (!window.Game || !window.Game.typewriter || !window.Game.typewriter.renderer) return;
+        const renderer = window.Game.typewriter.renderer;
+        const lines = renderer.lines;
+        if (!lines || lines.length === 0) return;
+        if (targetLine >= lines.length - 1) return; // skip last line
 
-                // Get Word Count for this line
-                const lineObj = lines[targetLine];
-                const wordCount = (lineObj && lineObj.wordIndices) ? lineObj.wordIndices.length : 0;
+        const lineObj = lines[targetLine];
+        const wordCount = (lineObj && lineObj.wordIndices) ? lineObj.wordIndices.length : 0;
+        if (wordCount === 0) return;
 
-                let duration = 0;
-                const now = d0.t;
+        // Time calculation — use lastRSTime chain when possible (O(1)), otherwise O(N) scan
+        let duration = 0;
+        if (this.lastRSLine === targetLine - 1 && this.lastRSTime > 0 &&
+            // Ensure lastRSTime is from THIS deferred call's now, not the stored one
+            this._prevRSTime && this._prevRSTime > 0) {
+            duration = now - this._prevRSTime;
+        } else {
+            // Backward scan — cap at 800 entries (was 1500)
+            const limit = Math.max(this.searchStartIndex || 0, this.data.length - 800);
+            let startTime = now;
+            for (let i = this.data.length - 1; i >= limit; i--) {
+                const d = this.data[i];
+                if (d.line === targetLine) { startTime = d.t; }
+                else if (d.line < targetLine) break;
+            }
+            if (startTime === now && targetLine === 0 && this.firstContentTime) {
+                startTime = this.firstContentTime;
+            }
+            duration = now - startTime;
+        }
+        this._prevRSTime = now;
 
-                // Determine Time Interval
-                // Case 2.2: Continuous Chain (Previous line was also valid RS)
-                if (this.lastRSLine === targetLine - 1 && this.lastRSTime > 0) {
-                    duration = now - this.lastRSTime;
-                    // console.log(`[WPM] Chain: Line ${targetLine} (Duration: ${duration}ms)`);
-                }
-                // Case 2.1: Gap or First Line
-                else {
-                    // Find "First Char Time" -> Backward Search in Data for start of this line
-                    let startTime = now;
-                    // Look back up to 20 seconds, but NOT beyond current paragraph start
-                    const limit = Math.max(this.searchStartIndex || 0, this.data.length - 1500);
-                    for (let i = this.data.length - 1; i >= limit; i--) {
-                        if (this.data[i].lineIndex === targetLine) {
-                            startTime = this.data[i].t;
-                        } else if (this.data[i].lineIndex < targetLine) {
-                            // Moved to previous line, stop
-                            break;
-                        }
-                    }
+        if (duration < 100 || wordCount === 0) return;
+        if (this.pangCountInPara <= 1) return; // skip first pang (warm-up)
+        if (targetLine === 0) return;           // skip line 0
 
-                    // Fallback: If startTime is still now (scan failed), use firstContentTime for line 0
-                    if (startTime === now && targetLine === 0 && this.firstContentTime) {
-                        startTime = this.firstContentTime;
-                    }
+        this.validTimeSum += duration;
+        this.validWordSum += wordCount;
 
-                    duration = now - startTime;
-                    // console.log(`[WPM] Gap/First: Line ${targetLine} (Start: ${startTime}, End: ${now}, Dur: ${duration}ms)`);
-                }
-
-                // Sanity Check: Ignore impossibly short lines (< 100ms) to prevent noise
-                if (duration > 100 && wordCount > 0) {
-
-                    // [NEW] Ignore First Pang of Each Paragraph
-                    // The first transition (whether 0->1 or 0->2 skip) is often unstable or includes warm-up.
-                    this.pangCountInPara++;
-
-                    if (this.pangCountInPara > 1) {
-                        // [FIX] Exclude Line 0 logic is now redundant if we skip first pang, 
-                        // but kept for safety if pangCount logic changes.
-                        if (targetLine > 0) {
-                            this.validTimeSum += duration;
-                            this.validWordSum += wordCount;
-                        }
-                    } else {
-                        console.log(`[WPM] Skipping First Pang of Paragraph (Line ${targetLine})`);
-                    }
-
-                    // 4. Calculate WPM (Only if we have valid lines > 0)
-                    const minutes = this.validTimeSum / 60000;
-                    if (minutes > 0 && this.validWordSum > 0) {
-                        this.wpm = Math.round(this.validWordSum / minutes);
-
-                        // [NEW] WPM Data Logging
-                        if (!this.wpmData) this.wpmData = [];
-                        this.wpmData.push({
-                            paraIndex: (this.context && this.context.paraIndex !== undefined) ? this.context.paraIndex : -1, // [NEW] Tag Paragraph
-                            lineIndex: targetLine,
-                            startTime: Math.round(now - duration), // Keep raw data in log
-                            endTime: now,
-                            duration: duration,
-                            words: wordCount,
-                            wpm: this.wpm // This will be the cumulative WPM (unchanged for Line 0)
-                        });
-
-                        console.log(`[WPM] Updated: ${this.wpm} (Line: ${targetLine}, Words: ${this.validWordSum}, Time: ${this.validTimeSum}ms)`);
-                    }
-
-                    // Update State
-                    this.lastRSTime = now;
-                    this.lastRSLine = targetLine;
-
-                    // 5. Real-time Update HUD
-                    if (window.Game && window.Game.typewriter && typeof window.Game.typewriter.updateWPM === 'function') {
-                        window.Game.typewriter.updateWPM();
-                    }
-                }
-            } else {
-                console.log(`[WPM] Skipping Last/Invalid Line: ${targetLine} (Total: ${lines.length})`);
+        const minutes = this.validTimeSum / 60000;
+        if (minutes > 0 && this.validWordSum > 0) {
+            this.wpm = Math.round(this.validWordSum / minutes);
+            if (!this.wpmData) this.wpmData = [];
+            this.wpmData.push({
+                paraIndex: (this.context && this.context.pIdx !== undefined) ? this.context.pIdx : (this.context.paraIndex || -1),
+                line: targetLine,
+                duration,
+                words: wordCount,
+                wpm: this.wpm
+            });
+            // Update HUD (best-effort)
+            if (window.Game && window.Game.typewriter && typeof window.Game.typewriter.updateWPM === 'function') {
+                window.Game.typewriter.updateWPM();
             }
         }
     }

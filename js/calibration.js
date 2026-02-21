@@ -392,6 +392,18 @@ export class CalibrationManager {
 
                 logI("cal", `onCalibrationNextPoint (#${this.state.pointCount}) x=${x} y=${y}`);
 
+                // [SDK FIX] Immediately start collecting samples for this calibration point.
+                // The SDK requires startCollectSamples() before it gathers gaze data.
+                // Previously wired to OK button click only → calibration hung at 0%.
+                try {
+                    if (typeof seeso.startCollectSamples === "function") {
+                        seeso.startCollectSamples();
+                        logI("cal", `[SDK] startCollectSamples() auto-called (point #${this.state.pointCount})`);
+                    }
+                } catch (e) {
+                    logI("cal", "[SDK] startCollectSamples threw:", e);
+                }
+
                 // Update UI: Text ABOVE Button
                 const statusEl = document.getElementById("calibration-status");
                 if (statusEl) {
@@ -500,6 +512,13 @@ export class CalibrationManager {
 
         const calScreen = document.getElementById("screen-calibration");
         if (calScreen) calScreen.style.display = 'none';
+
+        // [FIX-iOS] Stop calibration RAF loop BEFORE triggering game start.
+        // Without this, overlay.calRunning stays true forever, leaking an infinite RAF loop
+        // that stacks on top of game loops and causes iOS to kill the WebContent process.
+        if (typeof this.ctx.stopCalibrationLoop === 'function') {
+            this.ctx.stopCalibrationLoop();
+        }
 
         if (this.ctx.onCalibrationFinish) {
             this.ctx.onCalibrationFinish();

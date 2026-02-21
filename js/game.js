@@ -16,6 +16,75 @@ const Game = {
     scoreManager: null,
     sceneManager: null,
 
+    // [New] Global Resource Tracker
+    activeIntervals: [],
+    // [FIX-iOS] Track RAF handles so clearAllResources() can cancel them all.
+    // Without this, RAF loops accumulate across screen transitions -> iOS kill.
+    activeRAFs: [],
+
+    trackInterval(id) {
+        if (id) this.activeIntervals.push(id);
+        return id;
+    },
+
+    trackRAF(id) {
+        if (id) this.activeRAFs.push(id);
+        return id;
+    },
+
+    clearAllResources() {
+        const intervalCount = this.activeIntervals.length;
+        const rafCount = this.activeRAFs.length;
+        if (intervalCount > 0 || rafCount > 0) {
+            console.log(`[Game] Clearing Resources: Intervals=${intervalCount}, RAFs=${rafCount}`);
+            this.activeIntervals.forEach(id => clearInterval(id));
+            this.activeIntervals = [];
+            // [FIX-iOS] Cancel all tracked RAF loops on screen transition.
+            this.activeRAFs.forEach(id => cancelAnimationFrame(id));
+            this.activeRAFs = [];
+        }
+        // [FIX] Also cancel UIManager's in-flight score-counter RAF loops
+        if (this.uiManager && typeof this.uiManager.cancelAnims === 'function') {
+            this.uiManager.cancelAnims();
+        }
+        // [FIX #9] Remove transient body-level DOM nodes that may be orphaned
+        // when RAF/timeout is cancelled mid-flight during screen transitions.
+        // These classes are appended to document.body by:
+        //   - spawnFloatingText() → .floating-text
+        //   - _animateScoreToHud() → .flying-ink (also handled by TextRenderer._activeFlyingInkNodes)
+        //   - battle animations → .replay-mini-score
+        const TRANSIENT_SELECTORS = ['.floating-text', '.flying-ink', '.replay-mini-score'];
+        TRANSIENT_SELECTORS.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+                try { el.remove(); } catch (e) { /* silent */ }
+            });
+        });
+    },
+
+    // [Restored] Floating Text Effect (Required for Boss Battle)
+    spawnFloatingText(targetEl, text, type = "normal") {
+        if (!targetEl) return;
+        const rect = targetEl.getBoundingClientRect();
+
+        const floatEl = document.createElement("div");
+        floatEl.innerText = text;
+        floatEl.className = `floating-text ${type}`;
+        floatEl.style.left = (rect.left + rect.width / 2) + "px";
+        floatEl.style.top = (rect.top) + "px";
+
+        document.body.appendChild(floatEl);
+
+        // Animate
+        requestAnimationFrame(() => {
+            floatEl.style.transform = "translate(-50%, -50px)";
+            floatEl.style.opacity = "0";
+        });
+
+        setTimeout(() => {
+            floatEl.remove();
+        }, 1000);
+    },
+
     state: {
         // Renamed/Removed: gem/ink/rune to ScoreManager
         currentWordIndex: 0,
@@ -129,17 +198,107 @@ const Game = {
         this.uiManager.showToast(msg, duration);
     },
 
-    onCalibrationFinish() {
-        console.log("Calibration done. Entering Reading Rift...");
-        setTimeout(() => {
-            this.switchScreen("screen-read");
-        }, 1000);
-    },
 
     // --- Browser Detection Moved to IntroManager ---
 
+    // ─────────────────────────────────────────────────────────────────────
+    // SCREEN LIFECYCLE CONTRACT
+    // Each screen declares exactly what it owns and how to unmount.
+    // switchScreen() enforces this: UNMOUNT previous → transition → MOUNT next.
+    //
+    // Rule: if a screen allocates a resource, it MUST declare it here.
+    // No heuristics, no timeouts, no error thresholds — just deterministic cleanup.
+    // ─────────────────────────────────────────────────────────────────────
+    SCREEN_CLEANUP: {
+
+        // ── Reading Screen ───────────────────────────────────────────────
+        'screen-read': () => {
+            // 1. Stop all TextRenderer animations (timeouts + RAFs)
+            const renderer = window.Game?.typewriter?.renderer;
+            if (renderer && typeof renderer.cancelAllAnimations === 'function') {
+                renderer.cancelAllAnimations();
+                console.log('[Lifecycle] screen-read: TextRenderer cleared');
+            }
+            // 2. Remove all transient DOM overlays created during reading
+            //    (Pang markers, mini scores, flying ink, impact flashes)
+            const OVERLAYS = [
+                '#pang-marker-layer',
+                '#replay-canvas',
+            ];
+            OVERLAYS.forEach(sel => {
+                document.querySelectorAll(sel).forEach(el => el.remove());
+            });
+            document.querySelectorAll('.replay-mini-score, .flying-ink').forEach(el => el.remove());
+            console.log('[Lifecycle] screen-read: DOM overlays cleared');
+        },
+
+        // ── Calibration Screen ───────────────────────────────────────────
+        'screen-calibration': () => {
+            // Cal RAF loop is managed by app.js overlay.calRunning / stopCalibrationLoop.
+            // This is already called by CalibrationManager.finishSequence().
+            // Nothing extra needed here — cal cleanup is handled at the app.js level.
+            console.log('[Lifecycle] screen-calibration: (managed by app.js)');
+        },
+
+        // ── Alice Battle Screen ──────────────────────────────────────────
+        'screen-alice-battle': () => {
+            if (window.AliceBattleRef && typeof window.AliceBattleRef.destroy === 'function') {
+                window.AliceBattleRef.destroy();
+                console.log('[Lifecycle] screen-alice-battle: AliceBattleRef destroyed');
+            }
+        },
+
+        // ── Mid-Boss / Quiz Screens ──────────────────────────────────────
+        'screen-battle': () => {
+            // Remove any battle-specific animated elements
+            document.querySelectorAll('.battle-fx, .battle-lightning').forEach(el => el.remove());
+        },
+
+        // ── Mid-Boss Screen ──────────────────────────────────────────────
+        'screen-boss': () => {
+            // [FIX #4] Reset pointerEvents lock from checkBossAnswer() answer-disable flow
+            const vs = document.getElementById('screen-boss');
+            if (vs) vs.style.pointerEvents = 'auto';
+        },
+
+        // ── Rift / Intro Screens ─────────────────────────────────────────
+        'screen-rift-intro': () => {
+            // The SceneManager.resetRiftIntro() handles DOM, nothing extra.
+        },
+
+        // ── Score / Share Screens ─────────────────────────────────────────
+        'screen-new-score': () => {
+            // Cancel any in-flight score-counter animations when leaving this screen
+            if (window.Game?.uiManager?.cancelAnims) {
+                window.Game.uiManager.cancelAnims();
+            }
+        },
+
+        // ── Default: no specific cleanup needed ──────────────────────────
+        _default: () => { },
+    },
+
+    // Central cleanup dispatcher — call before mounting new screen
+    _unmountScreen(screenId) {
+        const cleanup = this.SCREEN_CLEANUP[screenId] || this.SCREEN_CLEANUP._default;
+        try {
+            cleanup();
+        } catch (e) {
+            console.error(`[Lifecycle] unmount error for ${screenId}:`, e);
+        }
+    },
+
     switchScreen(screenId) {
-        // [FIX] Ensure clean state transition
+        const prevScreen = document.querySelector('.screen.active')?.id || 'unknown';
+        console.log(`[Scene] ${prevScreen} → ${screenId}`);
+
+        // ── STEP 1: UNMOUNT previous screen (deterministic resource cleanup) ──
+        // Always runs: Game-global resources (RAFs, Intervals)
+        this.clearAllResources();
+        // Screen-specific owned resources
+        this._unmountScreen(prevScreen);
+
+        // ── STEP 2: DOM Transition ────────────────────────────────────────
         document.querySelectorAll('.screen').forEach(el => {
             el.classList.remove('active');
             el.style.display = 'none';
@@ -147,26 +306,35 @@ const Game = {
 
         const target = document.getElementById(screenId);
         if (target) {
-            target.style.display = 'flex'; // Force flex
-            // Use timeout to allow display change to register before adding class (for transitions)
-            requestAnimationFrame(() => {
-                target.classList.add('active');
-            });
+            target.style.display = 'flex';
+            requestAnimationFrame(() => target.classList.add('active'));
         }
 
-        // [FIX] HUD Visibility Control
-        const topHud = document.querySelector(".hud-container");
+        // ── STEP 3: HUD Visibility ────────────────────────────────────────
+        const topHud = document.querySelector('.hud-container');
         if (topHud) {
-            // Hide HUD on Score and Share screens
-            if (screenId === "screen-new-score" || screenId === "screen-home" || screenId === "screen-new-share") {
-                topHud.style.opacity = "0";
-                topHud.style.pointerEvents = "none";
-            } else {
-                topHud.style.opacity = "1";
-                topHud.style.pointerEvents = "auto";
+            const hideHud = ['screen-new-score', 'screen-home', 'screen-new-share'].includes(screenId);
+            topHud.style.opacity = hideHud ? '0' : '1';
+            topHud.style.pointerEvents = hideHud ? 'none' : 'auto';
+        }
+
+        // ── STEP 4: Release camera + SDK on terminal screens ──────────────
+        // Game is over — shut down eye tracking immediately,
+        // rather than waiting for beforeunload.
+        // ── STEP 4: Release camera + SDK on terminal screens ──────────────
+        // Fire shutdownEyeTracking() ONLY after Firebase upload is complete.
+        // screen-new-score: claim button → uploadToCloud() is still running → DO NOT shutdown yet.
+        // screen-new-share / screen-new-signup: upload is done at this point → safe to shutdown.
+        // beforeunload (app.js) also covers tab close / refresh as a safety net.
+        const SHUTDOWN_SCREENS = ['screen-new-share', 'screen-new-signup'];
+        if (SHUTDOWN_SCREENS.includes(screenId)) {
+            if (typeof window.shutdownEyeTracking === 'function') {
+                window.shutdownEyeTracking();
+                console.log('[Lifecycle] Eye tracking shut down on terminal screen:', screenId);
             }
         }
     },
+
 
     updateUI() {
         if (this.scoreManager) {
@@ -259,14 +427,15 @@ const Game = {
                 p.style.top = curY + 'px';
                 p.style.opacity = 1 - Math.pow(ease, 4);
 
-                window.requestAnimationFrame(animate);
+                // [FIX-iOS] Track RAF so clearAllResources() can cancel it if screen changes
+                Game.trackRAF(window.requestAnimationFrame(animate));
             } else {
                 if (p.parentNode) p.remove();
                 if (type === 'gem') Game.addGems(amount);
                 if (type === 'ink') Game.addInk(amount);
             }
         };
-        window.requestAnimationFrame(animate);
+        Game.trackRAF(window.requestAnimationFrame(animate));
     },
 
     // --- 1.2 WPM Selection (Delegated) ---
@@ -316,14 +485,12 @@ const Game = {
 
         // Typewriter Gaze Feedback
         if (this.typewriter) {
-            // New Ink Logic
+            // Gaze Stats (Hit Test + Line Progress)
             if (typeof this.typewriter.updateGazeStats === "function") {
                 this.typewriter.updateGazeStats(x, y);
             }
-            // Legacy Logic (if exists)
-            if (typeof this.typewriter.checkGazeDistance === "function") {
-                this.typewriter.checkGazeDistance(x, y);
-            }
+            // [FIX-iOS] Removed checkGazeDistance() — it just called updateGazeStats() again,
+            // causing hitTest to run TWICE per gaze frame (2x DOM rect access).
 
             // [RGT] Check Responsive Words
             if (this.typewriter.renderer && typeof this.typewriter.renderer.checkRuneTriggers === 'function') {
@@ -399,25 +566,64 @@ const Game = {
 
         this.switchScreen("screen-new-score");
 
-        // 2. Update UI Elements directly
-        const elInk = document.getElementById('report-ink-score');
-        const elRune = document.getElementById('report-rune-score');
-        const elGem = document.getElementById('report-gem-score');
-        const elInkCount = document.getElementById('report-ink-count');
-        const elRuneCount = document.getElementById('report-rune-count');
-        const elGemCount = document.getElementById('report-gem-count');
+        // 2. Reset Animation States (Invisible initially)
+        const rowStats = document.getElementById("report-stats-row");
+        const rowResources = document.getElementById("report-resource-row");
+        const secReward = document.getElementById("reward-section");
 
-        if (elInk) elInk.innerText = "+" + finalInk;
-        if (elRune) elRune.innerText = "+" + finalRune;
-        if (elGem) elGem.innerText = "+" + finalGem;
+        [rowStats, rowResources, secReward].forEach(el => {
+            if (el) {
+                el.style.opacity = "0";
+                el.style.transform = "translateY(30px)";
+                el.style.transition = "none"; // Disable transition for reset
+            }
+        });
 
-        // Show totals
-        if (elInkCount) elInkCount.innerText = "Current: " + finalInk;
-        if (elRuneCount) elRuneCount.innerText = "Current: " + finalRune;
-        if (elGemCount) elGemCount.innerText = "Current: " + finalGem;
+        // 3. Start Sequence
+        // Force reflow
+        if (rowStats) void rowStats.offsetHeight;
 
-        // 3. Animate WPM
-        this.animateValue("report-wpm", 0, finalWPM, 1500);
+        // Restore transitions
+        [rowStats, rowResources, secReward].forEach(el => {
+            if (el) el.style.transition = "all 0.8s cubic-bezier(0.22, 1, 0.36, 1)";
+        });
+
+        // Step 1: Speed & Rank (Start immediately)
+        setTimeout(() => {
+            if (rowStats) {
+                rowStats.style.opacity = "1";
+                rowStats.style.transform = "translateY(0)";
+            }
+            this.animateValue("report-wpm", 0, finalWPM, 1500);
+        }, 100);
+
+        // Step 2: Resources (Ink, Rune, Gem) - Delay 800ms
+        setTimeout(() => {
+            if (rowResources) {
+                rowResources.style.opacity = "1";
+                rowResources.style.transform = "translateY(0)";
+            }
+            const elInk = document.getElementById('report-ink-score');
+            const elRune = document.getElementById('report-rune-score');
+            const elGem = document.getElementById('report-gem-score');
+
+            if (elInk) elInk.innerText = "0";
+            if (elRune) elRune.innerText = "0";
+            if (elGem) elGem.innerText = "0";
+
+            this.animateValue("report-ink-score", 0, finalInk, 1500, "");
+            this.animateValue("report-rune-score", 0, finalRune, 1500, "");
+            this.animateValue("report-gem-score", 0, finalGem, 1500, "");
+        }, 900);
+
+        // Step 3: Golden Key (Reward) - Delay 2000ms
+        setTimeout(() => {
+            if (secReward) {
+                secReward.style.opacity = "1";
+                secReward.style.transform = "translateY(0)";
+            }
+        }, 2200);
+
 
         // 4. Calculate Rank based on total score (Simple Mock Logic)
         const totalScore = finalInk + (finalRune * 10) + (finalGem * 5);
@@ -438,23 +644,135 @@ const Game = {
             if (btnClaim.parentNode) btnClaim.parentNode.replaceChild(newBtn, btnClaim);
 
             newBtn.onclick = () => {
-                const email = emailInput ? emailInput.value : "";
+                const email = emailInput ? emailInput.value.trim() : "";
+
                 if (!email || !email.includes("@")) {
                     alert("Please enter a valid email address.");
                     return;
                 }
 
-                // Simulate API Call
-                newBtn.innerText = "Sending...";
-                newBtn.disabled = true;
+                // 1. Initialize Firebase if needed
+                if (typeof firebase === "undefined") {
+                    alert("System Error: Firebase SDK not loaded.");
+                    return;
+                }
 
-                setTimeout(() => {
-                    alert("Reward Claimed! Check your email.");
-                    // Go to Share Screen
-                    Game.switchScreen("screen-new-share");
-                }, 1500);
+                if (!firebase.apps.length) {
+                    if (window.FIREBASE_CONFIG) {
+                        try {
+                            firebase.initializeApp(window.FIREBASE_CONFIG);
+                        } catch (e) {
+                            console.error("Firebase Init Error:", e);
+                            alert("Database Connection Failed.");
+                            return;
+                        }
+                    } else {
+                        alert("System Error: Firebase Config missing.");
+                        return;
+                    }
+                }
+
+                // 2. Prepare Data
+                const now = new Date();
+                // KST (UTC+9) formatting
+                const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+                const kstStr = kstDate.toISOString().replace('T', ' ').slice(0, 19);
+
+                const reportData = {
+                    email: email,
+                    timestamp: kstStr,
+                    wpm: finalWPM,
+                    rank: rank,
+                    ink: finalInk,
+                    rune: finalRune,
+                    gem: finalGem,
+                    device: navigator.userAgent
+                };
+
+                // 3. Save to Realtime Database
+                const originalText = "CLAIM REWARD";
+                newBtn.disabled = true;
+                newBtn.innerText = "⏳ SAVING...";
+                newBtn.style.opacity = "0.7";
+
+                // Use Realtime Database "warden_leads"
+                const db = firebase.database();
+                const leadsRef = db.ref("warden_leads");
+                const newLeadRef = leadsRef.push(); // Generate key first
+
+                // Add Session ID reference to report data
+                reportData.sessionId = newLeadRef.key;
+
+                // Promise Array for Parallel saving
+                const promises = [];
+
+                // 1. Save Lead Data (Summary)
+                promises.push(newLeadRef.set(reportData));
+
+                // 2. Save Full Gaze Data (Detail) - if available
+                if (window.gazeDataManager) {
+                    newBtn.innerText = "⏳ DATA SYNC...";
+                    console.log("[Firebase] Starting Gaze Data Upload for Session:", newLeadRef.key);
+                    // Upload to separate path 'sessions/{key}' to keep leads light
+                    promises.push(window.gazeDataManager.uploadToCloud(newLeadRef.key));
+                }
+
+                Promise.all(promises)
+                    .then(() => {
+                        // REPLACED: window.alert -> Custom Modal
+                        this.showSuccessModal(() => {
+                            // On Confirm action
+                            // Game.switchScreen("screen-new-share"); 
+                            // Or refresh, or whatever the next step is.
+                            // Assuming "screen-new-share" is next based on context.
+                            this.goToNewShare();
+                        });
+
+                        newBtn.innerText = "✅ CLAIMED";
+                        newBtn.style.background = "#4CAF50";
+                        if (emailInput) emailInput.disabled = true;
+                    })
+                    .catch((error) => {
+                        console.error("Firebase Save Error:", error);
+                        window.alert("Transmission Failed: " + error.message);
+                        newBtn.disabled = false;
+                        newBtn.innerText = originalText;
+                        newBtn.style.opacity = "1";
+                    });
             };
         }
+    },
+
+    // NEW: Custom Success Modal Logic
+    showSuccessModal(onConfirm) {
+        const modal = document.getElementById("success-modal");
+        const btn = document.getElementById("btn-modal-confirm");
+        if (!modal || !btn) {
+            window.alert("Access Granted! (Modal Missing)");
+            if (onConfirm) onConfirm();
+            return;
+        }
+
+        // Show
+        modal.style.display = "flex";
+        // Force Reflow
+        void modal.offsetHeight;
+
+        modal.style.opacity = "1";
+        const content = modal.firstElementChild;
+        if (content) content.style.transform = "scale(1)";
+
+        // Bind Action
+        btn.onclick = () => {
+            // Hide Animation
+            modal.style.opacity = "0";
+            if (content) content.style.transform = "scale(0.9)";
+
+            setTimeout(() => {
+                modal.style.display = "none";
+                if (onConfirm) onConfirm();
+            }, 300);
+        };
     },
 
     goToNewSignup() {
@@ -472,9 +790,8 @@ const Game = {
     },
 
     // Utilities
-    // Utilities
-    animateValue(id, start, end, duration, suffix = "") {
-        this.uiManager.animateValue(id, start, end, duration, "", suffix);
+    animateValue(id, start, end, duration, prefix = "", suffix = "") {
+        this.uiManager.animateValue(id, start, end, duration, prefix, suffix);
     }
 };
 
@@ -556,6 +873,13 @@ Game.typewriter = {
     },
 
     playNextParagraph() {
+        // [iOS Gate] Open gaze processing gate — start accepting gaze data for this paragraph.
+        // NOTE: SeeSo SDK itself stays running continuously (iOS cannot restart mid-session).
+        // This simply sets window._gazeActive = true so the gaze callback resumes processing.
+        if (typeof window.setSeesoTracking === 'function') {
+            window.setSeesoTracking(true, `reading para ${this.currentParaIndex}`);
+        }
+
         // [SAFETY FIX] Reset Scroll Position to (0,0) BEFORE rendering new content.
         // This prevents lingering scroll from previous paragraphs from affecting lockLayout coordinates.
         window.scrollTo(0, 0);
@@ -597,6 +921,7 @@ Game.typewriter = {
         this.renderer.prepareDynamic({ paragraphs: [paraData] }, currentWPM);
 
         this.chunkIndex = 0;
+        this._lineStartSet = null; // [FIX] Reset cached Set for new paragraph layout
         this.lineStats.clear(); // Reset reading stats for new page
 
         // [FIX] Register Cursor with SceneManager (Cursor is recreated directly in prepare())
@@ -714,10 +1039,15 @@ Game.typewriter = {
                 if (this.renderer && this.renderer.chunks && this.renderer.lines) {
                     const currentChunkIndices = this.renderer.chunks[this.chunkIndex];
                     if (currentChunkIndices) {
-                        // Check if any word in this chunk is a start of a line (excluding the very first word of text)
-                        hadLineBreak = currentChunkIndices.some(wordIdx => {
-                            return wordIdx > 0 && this.renderer.lines.some(line => line.startIndex === wordIdx);
-                        });
+                        // [FIX-iOS] Use Set for O(1) lookup instead of O(N×M) nested some().
+                        // Old code: chunks.some(w => lines.some(l => l.startIndex === w))
+                        // = chunkSize × lineCount comparisons per tick.
+                        if (!this._lineStartSet) {
+                            this._lineStartSet = new Set(this.renderer.lines.map(l => l.startIndex));
+                        }
+                        hadLineBreak = currentChunkIndices.some(wordIdx =>
+                            wordIdx > 0 && this._lineStartSet.has(wordIdx)
+                        );
                     }
                 }
 
@@ -797,6 +1127,14 @@ Game.typewriter = {
         return new Promise((resolve) => {
             console.log("[triggerGazeReplay] Preparing Gaze Replay...");
 
+            // [iOS Gate] Close gaze processing gate — stop processing gaze data during replay.
+            // NOTE: SeeSo SDK itself stays running (iOS cannot restart after stopTracking).
+            // This simply sets window._gazeActive = false so onGaze/processGaze are skipped.
+            // Gaze callbacks still fire from SDK but are ignored until next paragraph.
+            if (typeof window.setSeesoTracking === 'function') {
+                window.setSeesoTracking(false, 'gaze replay start');
+            }
+
             // [CHANGED] Upload Data to Firebase NOW (Background Sync)
             // We do this here because Replay start signifies "Paragraph Done".
             if (window.gazeDataManager && Game.sessionId) {
@@ -836,6 +1174,15 @@ Game.typewriter = {
 
             console.log(`[Replay] Found ${sessionData.length} points.`);
 
+            // [FIX] Cancel all pending fadeOut timers before replay starts.
+            // During reading, tick() schedules scheduleFadeOut(chunkIndex, 3000) for every chunk.
+            // Without this call, those timers fire mid-replay and erase visible text
+            // (especially the last 3-4 lines which are revealed latest and time out soonest).
+            if (this.renderer && typeof this.renderer.cancelAllAnimations === 'function') {
+                this.renderer.cancelAllAnimations();
+                console.log('[Replay] Cleared all pending fadeOut timers before replay.');
+            }
+
             // Hide Cursor during replay for cleaner view
             if (this.renderer && this.renderer.cursor) this.renderer.cursor.style.opacity = "0";
 
@@ -859,10 +1206,18 @@ Game.typewriter = {
                     // Restore cursor opacity just in case (though screen switch follows)
                     if (this.renderer.cursor) this.renderer.cursor.style.opacity = "1";
 
-                    // Optional: Restore active state? 
-                    // No need, we are moving to the next screen (Boss Battle).
+                    // [FIX-iOS] Free gaze data now — replay has already consumed sessionData.
+                    // Next paragraph will start with an empty array (fresh t=0 timeline).
+                    // Called here to avoid the race condition of clearing inside resetTriggers()
+                    // while gaze data is already flowing in from setSeesoTracking(true).
+                    const gdm = window.gazeDataManager;
+                    if (gdm && typeof gdm.clearGazeData === 'function') {
+                        gdm.clearGazeData();
+                    }
+
                     resolve();
                 });
+
             } else {
                 console.warn("Renderer does not support playGazeReplay.");
                 resolve();
@@ -1018,119 +1373,164 @@ Game.typewriter = {
         this.updateGazeStats(x, y);
     },
 
+    // [Feature] Floating Text Effect (Restored)
+    spawnFloatingText(element, text, type = "normal") {
+        if (!element) return;
+
+        const floatEl = document.createElement("div");
+        floatEl.textContent = text;
+        floatEl.className = "floating-text " + type;
+
+        // Style
+        floatEl.style.position = "absolute";
+        floatEl.style.left = "50%";
+        floatEl.style.top = "50%";
+        floatEl.style.transform = "translate(-50%, -50%)"; // Center
+        floatEl.style.color = type === "error" ? "#ff5252" : (type === "success" ? "#69f0ae" : "#fff");
+        floatEl.style.fontSize = "1.5rem";
+        floatEl.style.fontWeight = "bold";
+        floatEl.style.pointerEvents = "none";
+        floatEl.style.whiteSpace = "nowrap";
+        floatEl.style.textShadow = "0 2px 4px rgba(0,0,0,0.8)";
+        floatEl.style.zIndex = "1000";
+        floatEl.style.opacity = "1";
+        floatEl.style.transition = "all 1s ease-out";
+
+        element.appendChild(floatEl);
+
+        // Animate
+        requestAnimationFrame(() => {
+            floatEl.style.top = "20%"; // Move Up
+            floatEl.style.opacity = "0";
+        });
+
+        // Cleanup
+        setTimeout(() => {
+            if (floatEl.parentNode) floatEl.parentNode.removeChild(floatEl);
+        }, 1000);
+    },
+
     checkBossAnswer(optionIndex) {
-        const currentIndex = this.currentParaIndex;
-        // Debugging
-        const quiz = this.quizzes[currentIndex];
+        try {
+            // [Safety] Find Quiz Data (Safely)
+            const quiz = (this.currentChapter && this.currentChapter.boss_quiz)
+                ? this.currentChapter.boss_quiz
+                : (this.quizzes ? this.quizzes[this.currentParaIndex] : null);
 
-        // Correct Answer Check
-        // Correct Answer Check
-        if (optionIndex === quiz.a) {
-            // [FIX] Disable ALL buttons immediately to prevent double-click / race conditions
-            const allBtns = document.querySelectorAll("#boss-options button");
-            allBtns.forEach(b => b.disabled = true);
-
-            // SUCCESS
-            // logic moved to flying resource callback
-            // Game.addGems(10); 
-
-            // Trigger Visuals
-            const btn = allBtns[optionIndex];
-            if (btn && typeof Game.spawnFlyingResource === 'function') {
-                const rect = btn.getBoundingClientRect();
-                Game.spawnFlyingResource(rect.left + rect.width / 2, rect.top + rect.height / 2, 10, 'gem');
-            } else {
-                Game.addGems(10); // Fallback
-                console.log("Boss Defeated! +10 Gems");
+            if (!quiz) {
+                console.warn("[Game] No quiz data found for index " + this.currentParaIndex);
+                this.forceAdvanceStage(); // Safety Fallback
+                return;
             }
 
-            // Hide Boss UI after animation (1.0s delay)
-            const villainScreen = document.getElementById("screen-boss");
-            if (villainScreen) {
-                // Just prevent interaction immediately
-                villainScreen.style.pointerEvents = "none";
-            }
-            // Logic for next screen is handled below with delay
+            // Correct Answer?
+            if (optionIndex === quiz.a) {
+                // [FIX] Disable ALL buttons immediately
+                const allBtns = document.querySelectorAll("#boss-options button, #boss-quiz-options button");
+                allBtns.forEach(b => b.disabled = true);
 
-            // Check if this was the Last Paragraph
-            if (this.currentParaIndex >= this.paragraphs.length - 1) {
-                // [CHANGED] Instead of Victory, go to FINAL BOSS
-                console.log("[Game] All paragraphs done. Summoning ARCH-VILLAIN...");
-                setTimeout(() => {
-                    // 1. FORCE HIDE MID BOSS SCREEN
-                    const vs = document.getElementById("screen-boss");
-                    if (vs) {
-                        vs.style.display = "none";
-                        vs.classList.remove("active");
-                        vs.style.pointerEvents = "auto";
-                    }
+                // SUCCESS
+                // 1. Logic moved to flying resource callback if possible
 
-                    // 2. Log Transition
-                    console.log("Direct Trigger Final Boss (v14.1.32)! Skip GameLogic.");
+                // Trigger Visuals
+                const btn = document.querySelectorAll("#boss-quiz-options button")[optionIndex];
+                if (btn && typeof Game.spawnFlyingResource === 'function') {
+                    const rect = btn.getBoundingClientRect();
+                    Game.spawnFlyingResource(rect.left + rect.width / 2, rect.top + rect.height / 2, 10, 'gem');
+                } else {
+                    Game.addGems(10);
+                    // Try Floating Text
+                    try {
+                        this.spawnFloatingText(document.querySelector(".boss-dialog-box"), "+10 Gems!", "success");
+                    } catch (e) { }
+                }
 
-                    // 3. FORCE SWITCH SCREEN (Manual)
-                    const aliceScreen = document.getElementById("screen-alice-battle");
-                    if (aliceScreen) {
-                        // Hide all screens
-                        document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-                        // Show Alice Screen
-                        aliceScreen.classList.add('active');
-                        aliceScreen.style.display = "flex";
-                    } else {
-                        console.error("ERROR: screen-alice-battle element missing!");
-                    }
+                // Hide Boss UI after animation (1.0s delay)
+                const villainScreen = document.getElementById("screen-boss");
+                if (villainScreen) villainScreen.style.pointerEvents = "none";
 
-                    // 4. INIT ALICE BATTLE (WITH DATA)
+                // Check if Last Paragraph
+                if (this.currentParaIndex >= this.paragraphs.length - 1) {
+                    // GO TO FINAL BOSS
+                    console.log("[Game] All paragraphs done. Summoning ARCH-VILLAIN...");
                     setTimeout(() => {
-                        if (window.AliceBattleRef) {
-                            const currentStats = {
-                                ink: Game.state.ink,
-                                rune: Game.state.rune,
-                                gem: Game.state.gems
-                            };
-                            window.AliceBattleRef.init(currentStats);
-                        } else {
-                            console.error("FATAL: AliceBattleRef NOT FOUND!");
-                        }
-                    }, 100);
+                        this.triggerFinalBossBattleSequence();
+                    }, 1000);
+                } else {
+                    // GO TO NEXT PARAGRAPH
+                    const villainModal = document.getElementById("villain-modal");
+                    if (villainModal) villainModal.style.display = "none";
 
-                }, 1000);
-            } else {
-                // GO TO NEXT PARAGRAPH
-                // Force hide villain modal if exists
-                const villainModal = document.getElementById("villain-modal");
-                if (villainModal) villainModal.style.display = "none";
+                    this.currentParaIndex++;
+                    console.log(`[Game] Advancing to Stage ${this.currentParaIndex + 1}...`);
 
-                this.currentParaIndex++;
-                console.log(`[Game] Advancing to Stage ${this.currentParaIndex + 1}...`);
+                    // Reset State
+                    this.chunkIndex = 0;
+                    this.lineStats.clear();
 
-                // Reset State for Next Paragraph
-                this.chunkIndex = 0;
-                this.lineStats.clear();
-                // Note: Do NOT resume 'isPaused' here. It will be resumed inside playNextParagraph() after content is ready.
-
-                // Ensure clean transition with shorter delay (1.5s) per request
-                setTimeout(() => {
-                    Game.switchScreen("screen-read");
-                    // Wait a bit for screen transition before starting text
                     setTimeout(() => {
-                        this.chunkIndex = 0; // Double ensure reset
-                        this.playNextParagraph();
-                    }, 500);
-                }, 1500); // Reduced from 3000 to 1500
-            }
-        } else {
-            // FAILURE
-            Game.addGems(-10); // -10 Gem (Penalty)
-            Game.spawnFloatingText(document.querySelector(".boss-dialog-box"), "-10 Gems", "error");
+                        Game.switchScreen("screen-read");
+                        setTimeout(() => {
+                            this.chunkIndex = 0;
+                            this.playNextParagraph();
+                        }, 500);
+                    }, 1500);
+                }
+            } else {
+                // FAILURE
+                Game.addGems(-10);
+                try {
+                    this.spawnFloatingText(document.querySelector(".boss-dialog-box"), "-10 Gems", "error");
+                } catch (e) { console.warn("FloatingText failed", e); }
 
-            const btn = document.querySelectorAll("#boss-quiz-options button")[optionIndex];
-            if (btn) {
-                btn.style.background = "#c62828";
-                btn.innerText += " (Wrong)";
-                btn.disabled = true;
+                const btns = document.querySelectorAll("#boss-quiz-options button");
+                if (btns && btns[optionIndex]) {
+                    btns[optionIndex].style.background = "#c62828";
+                    btns[optionIndex].innerText += " (Wrong)";
+                    btns[optionIndex].disabled = true;
+                }
             }
+        } catch (e) {
+            console.error("[Game] checkBossAnswer Critical Error:", e);
+            alert("Error processing answer. Moving to next stage.");
+            // Force Advance
+            this.forceAdvanceStage();
         }
+    },
+
+    // [New] Helper to force advance on error
+    forceAdvanceStage() {
+        this.currentParaIndex++;
+        setTimeout(() => {
+            Game.switchScreen("screen-read");
+            setTimeout(() => { this.playNextParagraph(); }, 500);
+        }, 1000);
+    },
+
+    // Extracted Helper: Trigger Final Boss
+    triggerFinalBossBattleSequence() {
+        console.log("[FinalBoss] Triggering Final Boss via switchScreen() lifecycle (v26)");
+
+        // [FIX #4] Use switchScreen() instead of direct DOM manipulation.
+        // Previous code bypassed clearAllResources() + _unmountScreen(), leaving
+        // TextRenderer RAFs and intervals alive → accumulated → iOS crash on Final Boss.
+        // switchScreen() enforces: UNMOUNT prev → DOM transition → MOUNT next.
+        this.switchScreen('screen-alice-battle');
+
+        // Init AliceBattle after a short frame delay (screen needs to layout first)
+        setTimeout(() => {
+            if (window.AliceBattleRef) {
+                const currentStats = {
+                    ink: Game.state.ink,
+                    rune: Game.state.rune,
+                    gem: Game.state.gems
+                };
+                window.AliceBattleRef.init(currentStats);
+                console.log("[FinalBoss] AliceBattleRef.init() called with stats:", currentStats);
+            } else {
+                console.error("[FinalBoss] FATAL: AliceBattleRef NOT FOUND!");
+            }
+        }, 150); // 150ms: enough for switchScreen RAF to apply 'active' class
     },
 
     // [State] Simple Battle System (Delegated to GameLogic)

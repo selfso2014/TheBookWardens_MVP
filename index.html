@@ -1,10 +1,24 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SeeSo Eye Tracking Web Demo</title>
+  <title>The Book Wardens</title>
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://selfso2014.github.io/TheBookWardens_MVP/">
+  <meta property="og:title" content="The Book Wardens">
+  <meta property="og:description" content="Reading is a game powered by your eyes.">
+  <meta property="og:image" content="https://selfso2014.github.io/TheBookWardens_MVP/TheBookWardens.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://selfso2014.github.io/TheBookWardens_MVP/">
+  <meta property="twitter:title" content="The Book Wardens">
+  <meta property="twitter:description" content="Reading is a game powered by your eyes.">
+  <meta property="twitter:image" content="https://selfso2014.github.io/TheBookWardens_MVP/TheBookWardens.png">
   <script>
     if (location.hostname !== "localhost" && location.hostname !== "127.0.0.1" && location.protocol !== "https:") {
       location.replace(`https:${location.href.substring(location.protocol.length)}`);
@@ -18,13 +32,13 @@
   <link rel="stylesheet" href="./css/fx.css" />
   <link rel="stylesheet" href="./css/rift.css" />
 
-  <!-- FIREBASE SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <script src="./js/firebase-config.js"></script>
+  <!-- [FIX-iOS] Firebase v10 compat removed (was duplicate alongside v8 below).
+       firebase-config.js was executing twice and two SDK instances lived in memory.
+       v8 compat (Realtime Database) below is the canonical single load. -->
   <link rel="stylesheet" href="./css/rift-book.css" />
   <link rel="stylesheet" href="./css/alice-battle.css?v=v14.1.0" />
   <link rel="stylesheet" href="./css/loading-modal.css" />
+
 
   <!-- Firebase SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -367,7 +381,9 @@
 <body>
   <!-- 1. Eye Tracking Layer (Background/Debug) -->
   <div id="stage">
-    <video id="preview" autoplay muted playsinline></video>
+    <video id="camera-preview" autoplay muted playsinline></video>
+    <!-- SDK(seeso.js)가 id="preview" canvas를 내부에서 찾음 → video와 충돌 방지를 위해 분리 -->
+    <canvas id="preview" style="display:none; position:absolute; top:0; left:0;"></canvas>
     <canvas id="output"></canvas>
   </div>
 
@@ -542,10 +558,11 @@
     </section>
 
     <!-- SCREEN 1: WORD FORGE (Vocab) -->
-    <section id="screen-wpm" class="screen">
-      <div style="text-align: center; margin-bottom: 30px;">
+    <section id="screen-wpm" class="screen" style="padding-top: 100px;">
+      <div style="text-align: center; margin-bottom: 15px;">
         <h2 style="color: var(--primary-accent); margin-bottom: 10px;">Reading Velocity</h2>
-        <p style="color: #bbb;">Select your comfortable reading speed.</p>
+        <p style="color: #bbb; margin-bottom: 2px;">Select your comfortable reading speed.</p>
+        <p style="color: #777; font-size: 0.8rem;">(WPM: Words Per Minute)</p>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 320px;">
@@ -660,91 +677,10 @@
 
       <div id="book-content" class="book-container"
         style="height: 75vh; overflow: hidden; padding: 20px; border: 1px solid #444; border-radius: 8px; background: rgba(0,0,0,0.3); position: relative; width: 100%;">
-        <!-- Text will be injected here by JS -->
-        <p>Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once
-          or twice she had peeped into the book her sister was reading, but it had no <span
-            class="rift-word">pictures</span> or <span class="rift-word">conversations</span> in it,
-          “and what is the use of a book,” thought Alice “without <span class="rift-word">pictures</span> or <span
-            class="rift-word">conversations</span>?”</p>
-        <p>So she was considering in her own mind (as well as she could, for the hot day made her feel very sleepy and
-          stupid), whether the pleasure of making a <span class="rift-word">daisy-chain</span> would be worth the
-          trouble of getting up and picking the
-          daisies, when suddenly a <span class="rift-word">White Rabbit</span> with <span class="rift-word">pink
-            eyes</span> ran close by her.</p>
-        <p>There was nothing so VERY remarkable in that; nor did Alice think it so VERY much out of the way to hear the
-          Rabbit say to itself, “Oh dear! Oh dear! I shall be late!” (when she thought it over afterwards, it occurred
-          to her that she ought to have wondered at this, but at the time it all seemed quite natural); but when the
-          Rabbit actually TOOK A <span class="rift-word">WATCH</span> OUT OF ITS <span
-            class="rift-word">WAISTCOAT-POCKET</span>, and looked at it, and then hurried on, Alice started
-          to her feet, for it flashed across her mind that she had never before seen a rabbit with either a
-          <span class="rift-word">waistcoat-pocket</span>, or a <span class="rift-word">watch</span> to take out of it,
-          and <span class="rift-word">burning with curiosity</span>, she ran across the field after it,
-          and fortunately was just in time to see it pop down a large <span class="rift-word">rabbit-hole</span> under
-          the hedge.
-        </p>
-        <p>In another moment down went Alice after it, never once considering how in the world she was to get out again.
-        </p>
-        <p>The <span class="rift-word">rabbit-hole</span> went straight on like a tunnel for some way, and then dipped
-          suddenly down, so suddenly that
-          Alice had not a moment to think about stopping herself before she found herself falling down a very <span
-            class="rift-word">deep well</span>.
-        </p>
-        <p>Either the well was very deep, or she fell very slowly, for she had plenty of time as she went down to look
-          about her and to wonder what was going to happen next. First, she tried to look down and make out what she was
-          coming to, but it was too dark to see anything; then she looked at the sides of the well, and noticed that
-          they were filled with <span class="rift-word">cupboards</span> and <span
-            class="rift-word">book-shelves</span>;
-          here and there she saw <span class="rift-word">maps</span> and <span class="rift-word">pictures</span> hung
-          upon
-          pegs. She
-          took down a jar from one of the shelves as she passed; it was labelled “<span class="rift-word">ORANGE
-            MARMALADE</span>”, but to her great
-          disappointment it was <span class="rift-word">empty</span>: she did not like to drop the jar for fear of
-          killing somebody, so managed to put
-          it into one of the cupboards as she fell past it.</p>
-        <p>“Well!” thought Alice to herself, “after such a fall as this, I shall think nothing of tumbling down stairs!
-          How <span class="rift-word">brave</span> they’ll all think me at home! Why, I wouldn’t say anything about it,
-          even if I fell off the top of
-          the house!” (Which was very likely true.)</p>
-        <p>Down, down, down. Would the fall NEVER come to an end! “I wonder how many miles I’ve fallen by this time?”
-          she said aloud. “I must be getting somewhere near the <span class="rift-word">centre of the earth</span>. Let
-          me see: that would be four
-          thousand miles down, I think—” (for, you see, Alice had learnt several things of this sort in her lessons in
-          the schoolroom, and though this was not a VERY good opportunity for showing off her knowledge, as there was no
-          one to listen to her, still it was good practice to say it over) “—yes, that’s about the right distance—but
-          then I wonder what <span class="rift-word">Latitude</span> or <span class="rift-word">Longitude</span> I’ve
-          got to?” (Alice had no idea what <span class="rift-word">Latitude</span> was, or <span
-            class="rift-word">Longitude</span>
-          either, but thought they were nice grand words to say.)</p>
-        <p>Presently she began again. “I wonder if I shall fall right through the earth! How funny it’ll seem to come
-          out among the people that walk with their heads downward! The <span class="rift-word">Antipathies</span>, I
-          think—” (she was rather glad
-          there WAS no one listening, this time, as it didn’t sound at all the right word) “—but I shall have to ask
-          them what the name of the country is, you know. Please, Ma’am, is this <span class="rift-word">New
-            Zealand</span> or <span class="rift-word">Australia</span>?” (and she
-          tried to <span class="rift-word">curtsey</span> as she spoke—fancy <span class="rift-word">curtseying</span>
-          as you’re falling through the air! Do you think you could
-          manage it?) “And what an ignorant little girl she’ll think me for asking! No, it’ll never do to ask: perhaps I
-          shall see it written up somewhere.”</p>
-        <p>Down, down, down. There was nothing else to do, so Alice soon began talking again. “<span
-            class="rift-word">Dinah</span>’ll miss me very
-          much to-night, I should think!” (<span class="rift-word">Dinah</span> was the cat.) “I hope they’ll remember
-          her <span class="rift-word">saucer of milk</span> at tea-time.
-          <span class="rift-word">Dinah</span> my dear! I wish you were down here with me! There are no mice in the air,
-          I’m afraid, but you might
-          catch a <span class="rift-word">bat</span>, and that’s very like a mouse, you know. But do cats eat <span
-            class="rift-word">bats</span>, I wonder?” And here Alice began to
-          get rather sleepy, and went on saying to herself, in a dreamy sort of way, “Do cats eat <span
-            class="rift-word">bats</span>? Do cats eat
-          <span class="rift-word">bats</span>?” and sometimes, “Do <span class="rift-word">bats</span> eat cats?” for,
-          you see, as she couldn’t answer either question, it didn’t much
-          matter which way she put it. She felt that she was dozing off, and had just begun to dream that she was
-          walking hand in hand with <span class="rift-word">Dinah</span>, and saying to her very earnestly, “Now, <span
-            class="rift-word">Dinah</span>, tell me the truth: did you
-          ever eat a <span class="rift-word">bat</span>?” when suddenly, thump! thump! down she came upon a heap of
-          sticks and dry leaves, and the fall
-          was over.
-        </p>
+        <!-- [FIX-iOS] Static <p> tags removed.
+             prepareDynamic() in TextRendererV2.js wipes this container via innerHTML=''''
+             immediately on game start, so these tags were parsed and rendered by the browser
+             only to be discarded. Removing them saves initial DOM construction overhead. -->
       </div>
 
       <!-- Footer Info: Removed WPM (Moved to Top HUD) -->
@@ -945,78 +881,102 @@
 
     <!-- NEW SCENE 2: MISSION ACCOMPLISHED (Score Report) -->
     <section id="screen-new-score" class="screen"
-      style="text-align: center; background: radial-gradient(circle at center, #1a103c 0%, #000 90%); height: 100vh; overflow: hidden; padding: 60px 10px 10px 10px; box-sizing: border-box;">
+      style="text-align: center; background: radial-gradient(circle at center, #1a103c 0%, #000 90%); height: 100vh; overflow: hidden; padding: 10px 20px; box-sizing: border-box; display: none; flex-direction: column;">
 
       <!-- HEADER -->
       <h2
         style="color: #ffd700; margin: 0 0 10px 0; font-family: 'Cinzel', serif; font-size: 1.8rem; text-shadow: 0 0 20px gold; font-weight: bold; letter-spacing: 2px; flex: 0 0 auto;">
         MISSION REPORT</h2>
 
-      <!-- ROW 1: STATS -->
-      <div style="flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 5px;">
-        <!-- WPM -->
-        <div
-          style="background: rgba(0,229,255,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 229, 255, 0.4);">
-          <div style="color: #888; font-size: 0.7rem;">SPEED</div>
-          <div style="display:flex; align-items:baseline; justify-content:center;">
-            <span id="report-wpm" style="font-size: 1.5rem; font-weight: bold; color: #00e5ff;">0</span>
-            <span style="font-size: 0.7rem; color: #00e5ff; margin-left:3px;">WPM</span>
+      <!-- GROUP A: STATS & RESOURCES (Flex 4) -->
+      <div
+        style="flex: 4; display: flex; flex-direction: column; justify-content: center; gap: 10px; margin-bottom: 10px;">
+
+        <!-- ROW 1: STATS -->
+        <div id="report-stats-row"
+          style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; opacity: 0; transform: translateY(20px); transition: all 0.8s ease-out;">
+          <!-- WPM -->
+          <div
+            style="background: rgba(0,229,255,0.1); padding: 12px; border-radius: 12px; border: 1px solid rgba(0, 229, 255, 0.4); display: flex; flex-direction: column; justify-content: center;">
+            <div style="color: #888; font-size: 0.8rem; margin-bottom: 3px;">SPEED</div>
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+              <span id="report-wpm"
+                style="font-size: 1.8rem; font-weight: bold; color: #00e5ff; line-height: 1;">0</span>
+              <div style="font-size: 0.6rem; color: rgba(0, 229, 255, 0.6); margin-top: 2px;">Words Per Minute</div>
+            </div>
+          </div>
+          <!-- RANK -->
+          <div
+            style="background: rgba(255,215,0,0.1); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,215,0,0.4); display: flex; flex-direction: column; justify-content: center;">
+            <div style="color: #888; font-size: 0.8rem; margin-bottom: 3px;">RANK</div>
+            <div id="report-rank-text" style="font-size: 1.8rem; font-weight: bold; color: gold;">Novice</div>
           </div>
         </div>
-        <!-- RANK -->
-        <div
-          style="background: rgba(255,215,0,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,215,0,0.4);">
-          <div style="color: #888; font-size: 0.7rem;">RANK</div>
-          <div id="report-rank-text" style="font-size: 1.4rem; font-weight: bold; color: gold;">Novice</div>
+
+        <!-- ROW 2: RESOURCES (Expanded Size) -->
+        <div id="report-resource-row"
+          style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; flex-grow: 1; opacity: 0; transform: translateY(20px); transition: all 0.8s ease-out;">
+          <!-- INK -->
+          <div
+            style="background: rgba(255,255,255,0.05); padding: 5px; border-radius: 12px; display:flex; flex-direction:column; align-items:center; justify-content: center;">
+            <img src="ink.png" style="width:53px; height:auto; margin-bottom:0px;">
+            <div id="report-ink-score" style="font-size:1.8rem; font-weight:bold; color:#00e5ff;">0</div>
+          </div>
+          <!-- RUNE -->
+          <div
+            style="background: rgba(255,255,255,0.05); padding: 5px; border-radius: 12px; display:flex; flex-direction:column; align-items:center; justify-content: center;">
+            <img src="rune.png" style="width:53px; height:auto; margin-bottom:0px;">
+            <div id="report-rune-score" style="font-size:1.8rem; font-weight:bold; color:#00ff00;">0</div>
+          </div>
+          <!-- GEM -->
+          <div
+            style="background: rgba(255,255,255,0.05); padding: 5px; border-radius: 12px; display:flex; flex-direction:column; align-items:center; justify-content: center;">
+            <img src="gem.png" style="width:53px; height:auto; margin-bottom:0px;">
+            <div id="report-gem-score" style="font-size:1.8rem; font-weight:bold; color:#d500f9;">0</div>
+          </div>
         </div>
+
       </div>
 
-      <!-- ROW 2: RESOURCES -->
-      <div style="flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-        <!-- INK -->
-        <div
-          style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; display:flex; flex-direction:column; align-items:center;">
-          <img src="ink.png" style="width:45px; height:auto; margin-bottom:5px;">
-          <div id="report-ink-count" style="font-size:0.8rem; color:#ccc;">0</div>
-          <div id="report-ink-score" style="font-size:0.9rem; font-weight:bold; color:#00e5ff;">+0</div>
-        </div>
-        <!-- RUNE -->
-        <div
-          style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; display:flex; flex-direction:column; align-items:center;">
-          <img src="rune.png" style="width:45px; height:auto; margin-bottom:5px;">
-          <div id="report-rune-count" style="font-size:0.8rem; color:#ccc;">0</div>
-          <div id="report-rune-score" style="font-size:0.9rem; font-weight:bold; color:#00ff00;">+0</div>
-        </div>
-        <!-- GEM -->
-        <div
-          style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; display:flex; flex-direction:column; align-items:center;">
-          <img src="gem.png" style="width:45px; height:auto; margin-bottom:5px;">
-          <div id="report-gem-count" style="font-size:0.8rem; color:#ccc;">0</div>
-          <div id="report-gem-score" style="font-size:0.9rem; font-weight:bold; color:#d500f9;">+0</div>
-        </div>
-      </div>
-
-      <!-- ROW 4: REWARD (Golden Key) -->
+      <!-- GROUP B: REWARD (Golden Key) (Flex 6) -->
       <div id="reward-section"
-        style="flex: 1 1 auto; background: linear-gradient(180deg, rgba(255,215,0,0.05) 0%, rgba(0,0,0,0.8) 100%); border: 1px solid rgba(255,215,0,0.2); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; justify-content: center; min-height: 0;">
+        style="flex: 6; min-height: 0; background: linear-gradient(180deg, rgba(255,215,0,0.05) 0%, rgba(0,0,0,0.8) 100%); border: 1px solid rgba(255,215,0,0.2); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 0; transform: translateY(50px); transition: all 1s cubic-bezier(0.34, 1.56, 0.64, 1);">
 
-        <div style="display:flex; justify-content:center; align-items:center; margin-bottom:5px;">
-          <div style="font-size: 3rem; margin-right:10px;">🗝️</div>
-          <div style="text-align:left;">
-            <div style="font-family: 'Cinzel', serif; color: #ffd700; font-size: 1.2rem; font-weight: bold;">GOLDEN KEY
+        <style>
+          @keyframes keyFloating {
+            0% {
+              transform: translateY(0);
+              filter: drop-shadow(0 0 15px gold);
+            }
+
+            100% {
+              transform: translateY(-10px);
+              filter: drop-shadow(0 0 25px gold);
+            }
+          }
+        </style>
+        <div
+          style="display:flex; flex-direction: column; justify-content:center; align-items:center; margin-bottom:15px; margin-top: 0px; text-align: center;">
+          <img src="goldenkey.png"
+            style="width: 110px; height: auto; margin-bottom: 5px; animation: keyFloating 2s ease-in-out infinite alternate;">
+          <div>
+            <div
+              style="font-family: 'Cinzel', serif; color: #ffd700; font-size: 1.3rem; font-weight: bold; margin-bottom: 2px;">
+              GOLDEN KEY
             </div>
-            <div style="font-size: 0.8rem; color: #ccc;">Unlocks Chapter 1</div>
+            <div style="font-size: 0.9rem; color: #ccc; max-width: 300px; line-height: 1.2;">
+              Unlock your Eye-Tracking data<br>and Secret Chapter.
+            </div>
           </div>
         </div>
 
         <!-- Form -->
-        <!-- Form (Simple Email) -->
-        <div id="bind-form" style="width: 100%; max-width: 320px; margin: 10px auto 0 auto;">
+        <div id="bind-form" style="width: 100%; max-width: 350px;">
           <input type="email" id="warden-email" placeholder="Enter Email to Claim Reward"
-            style="width: 100%; padding: 12px; margin-bottom: 10px; background: rgba(255,255,255,0.05); border: 1px solid #555; color: #fff; border-radius: 5px; text-align: center; font-size: 1rem;">
+            style="width: 100%; padding: 15px; margin-bottom: 15px; background: rgba(255,255,255,0.05); border: 1px solid #555; color: #fff; border-radius: 8px; text-align: center; font-size: 1.1rem; box-sizing: border-box;">
 
           <button id="btn-claim-reward"
-            style="width:100%; height: 50px; background:#ffd700; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size: 1.1rem; box-shadow: 0 0 15px rgba(255,215,0,0.5); transition: transform 0.1s;">
+            style="width:100%; height: 55px; background:#ffd700; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size: 1.2rem; box-shadow: 0 0 20px rgba(255,215,0,0.4); transition: transform 0.1s; color: #333;">
             CLAIM REWARD
           </button>
         </div>
@@ -1297,7 +1257,7 @@
 
   <!-- Scripts -->
   <!-- 1. Eye Tracking Core -->
-  <script type="module" src="./js/app.js?v=FINAL_FIX_NOW"></script>
+  <script type="module" src="./js/app.js?v=SDK_v25_RePatchOnRestart"></script>
   <!-- Alice Battle Logic (Latest - Single Bar Logic) -->
   <script src="./js/alice-battle-simple.js?v=FINAL_FIX_NOW"></script>
   <!-- Linked Game.AliceBattle to AliceBattleRef Logic moved to GameLogic -->
@@ -1307,6 +1267,26 @@
   <script type="module" src="./js/game.js?v=FINAL_FIX_NOW"></script>
 
   <!-- 3. Explicit Event Binding for Debug Button (With STANDALONE BATTLE LOGIC) -->
+
+  <!-- CUSTOM SUBMISSION SUCCESS MODAL -->
+  <div id="success-modal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 50000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s;">
+    <div
+      style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 15px; border: 2px solid #ffd700; text-align: center; box-shadow: 0 0 30px rgba(255, 215, 0, 0.3); max-width: 400px; width: 90%; transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
+      <div style="font-size: 3rem; margin-bottom: 15px;">🎉</div>
+      <h2
+        style="font-family: 'Cinzel', serif; color: #ffd700; margin: 0 0 10px 0; font-size: 1.8rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+        ACCESS GRANTED</h2>
+      <p style="color: #ddd; font-size: 1rem; line-height: 1.5; margin-bottom: 25px;">
+        Eye-Tracking data secured.<br>
+        The <strong>Secret Chapter</strong> key has been sent to your email.
+      </p>
+      <button id="btn-modal-confirm"
+        style="background: #ffd700; color: #1a1a2e; border: none; padding: 12px 30px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; font-family: 'Cinzel', serif; transition: all 0.2s;">
+        ENTER THE PORTAL
+      </button>
+    </div>
+  </div>
 </body>
 
 </html>

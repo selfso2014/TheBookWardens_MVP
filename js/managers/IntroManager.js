@@ -45,19 +45,28 @@ export class IntroManager {
                         const success = await window.startEyeTracking();
                         if (!success) {
                             console.error("[IntroManager] Eye Tracking Init Failed!");
-                            alert("Eye tracking failed to initialize. Please check camera permissions.");
+                            // [FIX #7] alert() → 논블로킹 메시지: iOS alert()는 async 흐름 블로킹
+                            if (typeof window.setStatus === 'function') {
+                                window.setStatus("⚠️ 카메라 초기화 실패. 카메라 권한을 확인해주세요.");
+                            }
                             this.resetStartBtn(startBtn);
                             return; // Stop here
                         }
                     } else {
                         console.error("[IntroManager] startEyeTracking function not found!");
-                        alert("System Error: Tracking module missing.");
+                        // [FIX #7] alert() → 논블로킹 메시지
+                        if (typeof window.setStatus === 'function') {
+                            window.setStatus("⚠️ 시스템 오류: 추적 모듈을 찾을 수 없습니다.");
+                        }
                         this.resetStartBtn(startBtn);
                         return;
                     }
                 } catch (e) {
                     console.error("[IntroManager] SDK Boot Error:", e);
-                    alert("Error starting eye tracking: " + e.message);
+                    // [FIX #7] alert() → 논블로킹 메시지
+                    if (typeof window.setStatus === 'function') {
+                        window.setStatus("⚠️ 시선 추적 초기화 오류: " + (e.message || e));
+                    }
                     this.resetStartBtn(startBtn);
                     return;
                 }
@@ -66,6 +75,55 @@ export class IntroManager {
                 this.startRiftIntro();
             };
         }
+
+        // --- DEBUG: Mission Report Shortcut ---
+        this.createDebugReportButton();
+    }
+
+    createDebugReportButton() {
+        // Prevent duplicate button
+        if (document.getElementById("btn-debug-report")) return;
+
+        const container = document.getElementById("screen-home");
+        if (!container) return;
+
+        const debugBtn = document.createElement("button");
+        debugBtn.id = "btn-debug-report";
+        debugBtn.innerText = "🛠 Test Report";
+        debugBtn.style.cssText = `
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid red;
+            color: white;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            z-index: 10000;
+            border-radius: 4px;
+        `;
+
+        debugBtn.onclick = (e) => {
+            e.stopPropagation(); // Prevent other clicks
+            console.log("[Debug] Jumping to Mission Report with Mock Data...");
+
+            // Mock Data for Scoring Animation Check
+            const mockScoreData = {
+                wpm: 245,      // Target WPM
+                ink: 135,      // Ink Collected
+                rune: 12,      // Runes Deciphered
+                gem: 5         // Gems Earned
+            };
+
+            if (this.game && typeof this.game.goToNewScore === 'function') {
+                this.game.goToNewScore(mockScoreData);
+            } else {
+                console.error("[Debug] Game.goToNewScore not found!");
+            }
+        };
+
+        container.appendChild(debugBtn);
     }
 
     resetStartBtn(btn) {
@@ -106,16 +164,17 @@ export class IntroManager {
         console.log("[IntroManager] Dismissing Splash -> Home Screen");
         this.game.switchScreen("screen-home");
 
-        // Safety: ensure button appears via CSS fallback (removed JS intervention)
-        /*
+        // [Mem] Free splash image after transition.
+        // Main_Intro.png is only shown on screen-splash.
+        // Once dismissed, this screen is never revisited.
+        // Setting src='' releases the decoded bitmap (~15-25MB) from iOS Safari memory.
         setTimeout(() => {
-            const btn = document.getElementById('btn-start-game');
-            if(btn) {
-                // btn.style.opacity = "1"; // CSS Animation handles this
-                // btn.style.pointerEvents = "auto";
+            const splashImg = document.querySelector('#screen-splash img');
+            if (splashImg && splashImg.src) {
+                splashImg.src = '';
+                console.log('[Mem] Main_Intro.png released from memory.');
             }
-        }, 1500);
-        */
+        }, 500);
     }
 
     async startRiftIntro() {
@@ -173,9 +232,9 @@ export class IntroManager {
         if (villainContainer) villainContainer.style.opacity = 1;
 
         // Start light meteors
-        const lightMeteorLoop = setInterval(() => {
+        const lightMeteorLoop = this.game.trackInterval(setInterval(() => {
             if (Math.random() > 0.7) this.spawnMeteor(meteorLayer);
-        }, 300);
+        }, 300));
 
         await wait(1500);
         clearInterval(lightMeteorLoop);
@@ -189,10 +248,10 @@ export class IntroManager {
         if (this.game.sceneManager) this.game.sceneManager.showStoryText("The words are fading...<br>WARDEN, RESTORE THE STORY!");
         if (textContainer) textContainer.classList.add("rift-damaged");
 
-        const heavyMeteorLoop = setInterval(() => {
+        const heavyMeteorLoop = this.game.trackInterval(setInterval(() => {
             this.spawnMeteor(meteorLayer);
             this.spawnMeteor(meteorLayer);
-        }, 100);
+        }, 100));
 
         await wait(3000);
         await wait(800);
@@ -208,6 +267,24 @@ export class IntroManager {
         this.game.state.vocabIndex = 0;
         this.game.loadVocab(0);
         this.game.switchScreen("screen-word");
+
+        // [Mem] Free rift intro images after intro completes.
+        // Book_Alice.png (~15MB) + ink_shadow_boss.png rift variant (~2MB)
+        // screen-rift-intro is shown exactly once at game start and never revisited.
+        // Note: ink_shadow_boss.png in screen-boss (villain-img) is a SEPARATE element
+        // and is intentionally NOT freed here — it's needed for repeated mid-boss battles.
+        setTimeout(() => {
+            const riftBookImg = document.getElementById('rift-book-image');
+            if (riftBookImg && riftBookImg.src) {
+                riftBookImg.src = '';
+                console.log('[Mem] Book_Alice.png (rift) released from memory.');
+            }
+            const riftVillainImg = document.querySelector('#screen-rift-intro .rift-villain-img');
+            if (riftVillainImg && riftVillainImg.src) {
+                riftVillainImg.src = '';
+                console.log('[Mem] ink_shadow_boss.png (rift) released from memory.');
+            }
+        }, 500);
     }
 
     spawnMeteor(layer) {

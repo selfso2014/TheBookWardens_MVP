@@ -376,6 +376,16 @@ export const AliceBattle = {
         updateCardDisplay();
         if (ui.gameUi) ui.gameUi.style.opacity = '1';
         if (ui.finalScreen) ui.finalScreen.classList.remove('active');
+    },
+
+    destroy() {
+        if (animFrameId) {
+            cancelAnimationFrame(animFrameId);
+            animFrameId = null;
+        }
+        window.removeEventListener('resize', resize);
+        ctx = null;
+        canvas = null;
     }
 };
 

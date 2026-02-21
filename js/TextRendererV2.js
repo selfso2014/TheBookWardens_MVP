@@ -33,6 +33,11 @@ export class TextRenderer {
 
         // [New] Animation Safety
         this.activeAnimations = []; // Store timeout IDs to cancel them on reset/page turn
+        // [FIX-iOS] Track RAF IDs to cancel them all on cleanup (prevents orphaned loops)
+        this.activeRAFs = [];
+        this._replayRAFId = null; // dedicated slot for the replay animate loop
+        // [FIX #9] Track flying-ink particle elements so cancelAllAnimations() can remove orphan DOM nodes
+        this._activeFlyingInkNodes = new Set();
 
         // Visual Elements
         this.cursor = null;
@@ -41,13 +46,49 @@ export class TextRenderer {
         this.initStyles();
     }
 
-    // [New] Safety Method: Kill all pending text reveals
+    // [New] Safety Method: Kill all pending text reveals AND RAF loops
     cancelAllAnimations() {
         if (this.activeAnimations.length > 0) {
-            console.log(`[TextRenderer] Cancelling ${this.activeAnimations.length} pending animations.`);
+            console.log(`[Life] TextRenderer: Cancelling ${this.activeAnimations.length} pending animations.`);
             this.activeAnimations.forEach(id => clearTimeout(id));
             this.activeAnimations = [];
+        } else {
+            console.log(`[Life] TextRenderer: No pending animations to cancel.`);
         }
+        // [FIX-iOS] Also cancel any tracked RAF loops
+        if (this.activeRAFs && this.activeRAFs.length > 0) {
+            console.log(`[Life] TextRenderer: Cancelling ${this.activeRAFs.length} RAFs.`);
+            this.activeRAFs.forEach(id => cancelAnimationFrame(id));
+            this.activeRAFs = [];
+        }
+        // Cancel dedicated replay RAF
+        if (this._replayRAFId) {
+            cancelAnimationFrame(this._replayRAFId);
+            this._replayRAFId = null;
+        }
+        // [FIX #9] Remove orphaned flying-ink particle nodes from body.
+        // When RAF is force-cancelled, p.remove() inside animate() never fires.
+        // _activeFlyingInkNodes tracks every live particle so we can clean them up here.
+        if (this._activeFlyingInkNodes && this._activeFlyingInkNodes.size > 0) {
+            console.log(`[Life] TextRenderer: Removing ${this._activeFlyingInkNodes.size} orphaned flying-ink nodes.`);
+            this._activeFlyingInkNodes.forEach(node => {
+                try { if (node.parentNode) node.remove(); } catch (e) { /* silent */ }
+            });
+            this._activeFlyingInkNodes.clear();
+        }
+        // IMPORTANT: Do NOT touch this.cursor or this.impactElement here.
+        // cancelAllAnimations() is called on every showPage() / prepareDynamic() / prepare() during reading.
+        // Setting cursor=null kills triggerReturnEffect() (its first guard is: if (!this.cursor) return false).
+        // cursor lifecycle: created in lockLayout(), replaced in lockLayout() on next render, removed naturally.
+        // impactElement lifecycle: lazy-created in triggerReturnEffect() with document.contains() guard.
+        // Pang-marker-layer cleanup belongs exclusively in SCREEN_CLEANUP['screen-read'] (game.js).
+    }
+
+
+    // [FIX-iOS] Track a RAF id so cancelAllAnimations() can clean it up
+    trackRAF(id) {
+        if (id) this.activeRAFs.push(id);
+        return id;
     }
 
     initStyles() {
@@ -351,10 +392,11 @@ export class TextRenderer {
         // This ensures hit-testing words on THIS page works correctly.
         // We delay slightly to allow display:block to reflow.
         return new Promise(resolve => {
-            requestAnimationFrame(() => {
+            // [FIX-iOS] Track this RAF so cancelAllAnimations() can clean it up
+            this.trackRAF(requestAnimationFrame(() => {
                 this.lockLayout(); // Recalculate lines for current page
                 resolve();
-            });
+            }));
         });
     }
 
@@ -410,8 +452,10 @@ export class TextRenderer {
         this.isLayoutLocked = true;
 
         // [CRITICAL] Reset Line Index for NEW Page / Layout Lock
-        // When we lock layout (usually means page start), the index MUST start at 0.
         this.currentVisibleLineIndex = 0;
+
+        // [OPTIMIZATION] Cache line start indices for O(1) lookup in revealChunk
+        this._lineStartSet = new Set(this.lines.map(l => l.startIndex));
 
         console.log(`[TextRenderer] Layout Locked: ${this.words.length} words (checked), ${this.lines.length} lines created.`);
         if (this.lines.length > 0) {
@@ -463,81 +507,100 @@ export class TextRenderer {
         if (chunkIndex < 0 || chunkIndex >= this.chunks.length) return Promise.resolve();
 
         const indices = this.chunks[chunkIndex];
+        const startTime = Date.now();
+
         return new Promise((resolve) => {
-            let cumulativeDelay = 0; // Cumulative time tracker
-
-            indices.forEach((wordIdx, i) => {
+            const wordsToReveal = indices.map((wordIdx, i) => {
                 const w = this.words[wordIdx];
-                // Check if this word starts a new visual line
-                const isLineStart = this.lines.some(l => l.startIndex === w.index);
-
-                // --- LINE CHANGE PAUSE (450ms) ---
-                // If it's a new line (and not the very first word of the text), 
-                // add a "breathing pause" to allow the eye to catch up.
-                if (isLineStart && w.index > 0) {
-                    cumulativeDelay += 450;
-                }
-
-                // Calculate execution time for this word
-                const revealTime = cumulativeDelay;
-
-                // 1. Move Cursor Early (Visual Cue)
-                if (isLineStart) {
-                    const cursorMoveTime = Math.max(0, revealTime - 200);
-                    const tid1 = setTimeout(() => {
-                        this.updateCursor(w, 'start');
-                        // SYNC: Tell GazeDataManager...
-                        if (typeof w.lineIndex === 'number' && this.lines[w.lineIndex]) {
-                            this.currentVisibleLineIndex = w.lineIndex;
-                            // [COORDINATION] Robust Gaze Manager Lookup
-                            const gm = (window.Game && window.Game.gazeManager) || window.gazeDataManager;
-                            if (gm && typeof gm.setContext === 'function') {
-                                gm.setContext({
-                                    lineIndex: w.lineIndex,
-                                    lineY: this.lines[w.lineIndex].visualY
-                                });
-                            }
-                        }
-                    }, cursorMoveTime);
-                    this.activeAnimations.push(tid1);
-                }
-
-                // 2. Reveal Word
-                const tid2 = setTimeout(() => {
-                    w.element.style.opacity = "1";
-                    w.element.style.visibility = "visible";
-                    w.element.classList.add("revealed");
-
-                    // Update Line Index Context
-                    if (typeof w.lineIndex === 'number') {
-                        if (w.lineIndex !== this.currentVisibleLineIndex) {
-                            this.currentVisibleLineIndex = w.lineIndex;
-                            // [COORDINATION] Robust Gaze Manager Lookup
-                            const gm = (window.Game && window.Game.gazeManager) || window.gazeDataManager;
-                            if (gm && typeof gm.setContext === 'function' && this.lines[w.lineIndex]) {
-                                gm.setContext({
-                                    lineIndex: w.lineIndex,
-                                    lineY: this.lines[w.lineIndex].visualY
-                                });
-                            }
-                        }
-                    }
-
-                    // Move Cursor to End of Word
-                    this.updateCursor(w, 'end');
-                }, revealTime);
-                this.activeAnimations.push(tid2);
-
-                // Increment base time
-                cumulativeDelay += interval;
+                const isLineStart = this._lineStartSet && this._lineStartSet.has(w.index);
+                return { word: w, isLineStart, indexInChunk: i };
             });
 
-            // Cleanup Logic? (Optional, but good for memory)
-            // For now, simple centralized clearance on reset is enough.
+            let revealedCount = 0;
+            let cumulativeDelay = 0;
+            const revealData = wordsToReveal.map(item => {
+                if (item.isLineStart && item.word.index > 0) {
+                    cumulativeDelay += 450; // Line break pause
+                }
+                const revealTime = cumulativeDelay;
+                cumulativeDelay += interval;
+                return { ...item, revealTime };
+            });
 
-            // Resolve Promise after the last word is shown
-            const finalTid = setTimeout(resolve, cumulativeDelay + 100);
-            this.activeAnimations.push(finalTid);
+            const animateReveal = () => {
+                const now = Date.now();
+                const elapsed = now - startTime;
+                let allDone = true;
+
+                revealData.forEach(item => {
+                    if (item.done) return;
+                    allDone = false;
+
+                    // 1. Move Cursor Early (200ms before reveal if it's a line start)
+                    if (item.isLineStart && !item.cursorMoved && elapsed >= Math.max(0, item.revealTime - 200)) {
+                        this.updateCursor(item.word, 'start');
+                        if (typeof item.word.lineIndex === 'number') {
+                            this.currentVisibleLineIndex = item.word.lineIndex;
+                            const gm = (window.Game && window.Game.gazeManager) || window.gazeDataManager;
+                            if (gm?.setContext && this.lines[item.word.lineIndex]) {
+                                gm.setContext({
+                                    lineIndex: item.word.lineIndex,
+                                    lineY: this.lines[item.word.lineIndex].visualY
+                                });
+                            }
+                        }
+                        item.cursorMoved = true;
+                    }
+
+                    // 2. Reveal Word
+                    if (elapsed >= item.revealTime) {
+                        const w = item.word;
+                        w.element.style.opacity = "1";
+                        w.element.style.visibility = "visible";
+                        w.element.classList.add("revealed");
+
+                        if (typeof w.lineIndex === 'number' && w.lineIndex !== this.currentVisibleLineIndex) {
+                            this.currentVisibleLineIndex = w.lineIndex;
+                            const gm = (window.Game && window.Game.gazeManager) || window.gazeDataManager;
+                            if (gm?.setContext && this.lines[w.lineIndex]) {
+                                gm.setContext({
+                                    lineIndex: w.lineIndex,
+                                    lineY: this.lines[w.lineIndex].visualY
+                                });
+                            }
+                        }
+                        this.updateCursor(w, 'end');
+                        item.done = true;
+                        revealedCount++;
+                    }
+                });
+
+                if (revealedCount < revealData.length) {
+                    // [FIX-iOS] Self-cleaning RAF slot.
+                    // Old: push() every frame, never remove → activeRAFs grew O(frames) during reading.
+                    // New: single rolling slot — remove previous id before registering next.
+                    if (currentRevealRAFId !== null) {
+                        const idx = this.activeRAFs.indexOf(currentRevealRAFId);
+                        if (idx !== -1) this.activeRAFs.splice(idx, 1);
+                    }
+                    currentRevealRAFId = requestAnimationFrame(animateReveal);
+                    this.activeRAFs.push(currentRevealRAFId);
+                } else {
+                    // Done — remove slot from tracking
+                    if (currentRevealRAFId !== null) {
+                        const idx = this.activeRAFs.indexOf(currentRevealRAFId);
+                        if (idx !== -1) this.activeRAFs.splice(idx, 1);
+                        currentRevealRAFId = null;
+                    }
+                    // Resolve after a small buffer
+                    const finalTid = setTimeout(resolve, 100);
+                    this.activeAnimations.push(finalTid);
+                }
+            };
+
+            // [FIX-iOS] Single rolling slot for this chunk's reveal RAF
+            let currentRevealRAFId = requestAnimationFrame(animateReveal);
+            this.activeRAFs.push(currentRevealRAFId);
         });
     }
 
@@ -587,7 +650,10 @@ export class TextRenderer {
     }
 
     scheduleFadeOut(chunkIndex, delayMs) {
-        setTimeout(() => this.fadeOutChunk(chunkIndex), delayMs);
+        // [FIX] Track in activeAnimations so cancelAllAnimations() can cancel pending fadeOuts.
+        // Previously untracked: fadeOut timers fired during replay, wiping visible text.
+        const tid = setTimeout(() => this.fadeOutChunk(chunkIndex), delayMs);
+        this.activeAnimations.push(tid);
     }
 
     // --- RGT (Relative Gaze Trigger) Logic ---
@@ -718,14 +784,10 @@ export class TextRenderer {
     triggerReturnEffect(lineIndex = null) {
         if (!this.cursor) return false;
 
-        // --- Faster Animation (50ms) ---
-        // Cooldown is handled by game.js (1.5s logic)
-        // Here we just prevent visual glitching if called extremely fast (< 50ms)
+        // Cooldown: prevent visual glitching if called extremely fast (<50ms)
         const now = Date.now();
         if (this.lastRenderTime && (now - this.lastRenderTime < 50)) return false;
         this.lastRenderTime = now;
-
-        console.log("[TextRenderer] 🔥 Return Visual Triggered! Line:", lineIndex);
 
         let targetY;
 
@@ -772,26 +834,23 @@ export class TextRenderer {
 
         const impact = this.impactElement;
 
-        // Reset Style (Instant)
+        // Reset Style instantly (no reflow needed — CSS transition handles it)
         impact.style.transition = "none";
         impact.style.width = "10px";
         impact.style.height = "10px";
         impact.style.opacity = "1";
-        impact.style.left = (window.innerWidth - 20) + "px"; // [FIX] Right Edge
+        impact.style.left = (window.innerWidth - 20) + "px";
         impact.style.top = targetY + "px";
-        impact.style.transform = "translate(-50%, -50%) scale(1.0)"; // Start Small (10px)
+        impact.style.transform = "translate(-50%, -50%) scale(1.0)";
 
-        // Force Reflow
-        void impact.offsetWidth;
-
-        // Animate: Visible Flash (0.2s for Snappy feedback)
-        // Changed from 0.5s to 0.2s per user request.
-        impact.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-in";
-
-        requestAnimationFrame(() => {
-            impact.style.transform = "translate(-50%, -50%) scale(2.0)"; // End at 20px
+        // Animate: schedule via RAF (one-shot, tracked for cleanup)
+        // Note: we skip void offsetWidth to avoid forced layout recalculation on every pang.
+        // The next-frame transition start is handled by the browser's rendering pipeline.
+        this.trackRAF(requestAnimationFrame(() => {
+            impact.style.transition = "transform 0.2s ease-out, opacity 0.2s ease-in";
+            impact.style.transform = "translate(-50%, -50%) scale(2.0)";
             impact.style.opacity = "0";
-        });
+        }));
 
         if (this.validatedLines && typeof lineIndex === 'number' && lineIndex >= 0) {
             this.validatedLines.add(lineIndex);
@@ -886,16 +945,19 @@ export class TextRenderer {
             }
         };
 
-        // 1. Immediate Enforcement
+        // 1. Immediate Enforcement (one-shot)
         forceVisibility();
 
-        // 2. Continuous Enforcement (Anti-Async Guard)
-        const safetyInterval = setInterval(forceVisibility, 10);
+        // 2. Single delayed re-enforcement (NOT an interval)
+        // [FIX-iOS] The old 10ms setInterval was doing 70,000+ DOM writes → OOM Kill.
+        // One extra call at 250ms is sufficient to override any async fade-out.
+        const safetyTimer = setTimeout(forceVisibility, 250);
+        this.activeAnimations.push(safetyTimer);
 
-        console.log(`[TextRenderer] Text restored. Waiting 500ms, enforcing visibility...`);
+        console.log(`[TextRenderer] Text restored. Waiting 500ms before replay...`);
         // DELAY REPLAY START
         setTimeout(() => {
-            clearInterval(safetyInterval);
+            clearTimeout(safetyTimer);
 
             // [NEW] CRITICAL FIX: Do NOT Re-Lock Layout.
             // We use the ORIGINAL coordinates from the reading session.
@@ -938,63 +1000,65 @@ export class TextRenderer {
             // Sort Logs by Time (just in case)
             rawPangLogs.sort((a, b) => a.t - b.t);
 
-            // Iterate Logs to build PATH
-            let lastLogEndTime = 0; // To prevent overlap if needed, or track gaps
+            // [FIX-iOS] O(N+M) sorted-pointer approach instead of O(N×M) filter-per-pang.
+            // Old code: 8 pangs × gazeData.filter(9000) = 72,000 comparisons.
+            // New code: single pass through sorted gazeData with advancing pointer.
+            //
+            // [FIX-iOS] gazeData is already time-sorted: processGaze() timestamps with Date.now()
+            // and pushes sequentially, so t values are monotonically increasing.
+            // slice().sort() on a 9000-entry array creates a full copy + O(N log N) sort
+            // for no reordering benefit — eliminated to prevent JS heap spike at replay start.
+            const sortedGaze = gazeData; // Already sorted by t (Date.now() monotonic)
+            let gazePointer = 0;
+            let lastLogEndTime = 0;
 
             rawPangLogs.forEach((log, idx) => {
-                const targetLineIndex = log.lineIndex;
+                const targetLineIndex = log.line;
                 const endTime = log.t;
 
-                // Safety: Check if line exists
-                if (!visualLines[targetLineIndex]) return;
+                if (!visualLines[targetLineIndex]) { lastLogEndTime = endTime; return; }
 
-                // [ZERO-ERROR] Use the CURRENT Visual Y from the freshly locked layout
                 const targetLineObj = visualLines[targetLineIndex];
                 const fixedY = targetLineObj.visualY;
 
-                const segmentData = gazeData.filter(d => {
-                    return (
-                        d.t <= endTime &&
-                        d.t > lastLogEndTime &&
-                        typeof d.lineIndex === 'number' &&
-                        d.lineIndex === targetLineIndex
-                    );
-                });
+                while (gazePointer < sortedGaze.length && sortedGaze[gazePointer].t <= lastLogEndTime) {
+                    gazePointer++;
+                }
 
-                if (segmentData.length < 5) {
-                    // Too short segment
-                } else {
-                    // Add Jump Marker if this is not the first segment
+                const segmentData = [];
+                let scanIdx = gazePointer;
+                while (scanIdx < sortedGaze.length && sortedGaze[scanIdx].t <= endTime) {
+                    const d = sortedGaze[scanIdx];
+                    // [FIX-iOS] Updated property name: .lineIndex -> .line (compressed format)
+                    if (typeof d.line === 'number' && d.line === targetLineIndex) {
+                        segmentData.push(d);
+                    }
+                    scanIdx++;
+                }
+
+                if (segmentData.length >= 5) {
                     if (processedPath.length > 0) {
                         processedPath.push({ isJump: true });
                     }
 
-                    // --- [NEW] X-Axis Scaling Logic ---
-                    // 1. Calculate Source Range (MinX, MaxX) from actual gaze data
                     let sourceMinX = Infinity;
                     let sourceMaxX = -Infinity;
-
-                    segmentData.forEach(d => {
-                        const gx = (typeof d.gx === 'number') ? d.gx : d.x;
+                    for (let i = 0; i < segmentData.length; i++) {
+                        const gx = (typeof segmentData[i].gx === 'number') ? segmentData[i].gx : segmentData[i].x;
                         if (gx < sourceMinX) sourceMinX = gx;
                         if (gx > sourceMaxX) sourceMaxX = gx;
-                    });
+                    }
 
                     const sourceWidth = sourceMaxX - sourceMinX;
-
-                    // Target Visual Range (Text Line Width)
                     const targetLeft = targetLineObj.rect.left;
-                    const targetWidth = targetLineObj.rect.width; // Should be full width
+                    const targetWidth = targetLineObj.rect.width;
 
-                    segmentData.forEach(d => {
-                        // Use SmoothX if available, else RawX
+                    for (let i = 0; i < segmentData.length; i++) {
+                        const d = segmentData[i];
                         const gx = (typeof d.gx === 'number') ? d.gx : d.x;
-
                         let scaledX = gx;
 
-                        // Apply Scaling only if we have a valid width to map
                         if (sourceWidth > 10 && targetWidth > 0) {
-                            // Normalize (0.0 ~ 1.0)
                             let ratio = (gx - sourceMinX) / sourceWidth;
                             ratio = Math.max(0, Math.min(1, ratio));
                             scaledX = targetLeft + (ratio * targetWidth);
@@ -1003,12 +1067,12 @@ export class TextRenderer {
                         }
 
                         processedPath.push({
-                            x: scaledX, // SCALED X
-                            y: fixedY, // FORCE Y to Center of Line
-                            t: d.t, // Original Timestamp
+                            x: scaledX,
+                            y: fixedY,
+                            t: d.t,
                             isJump: false
                         });
-                    });
+                    }
                 }
 
                 lastLogEndTime = endTime;
@@ -1070,7 +1134,7 @@ export class TextRenderer {
 
                 return {
                     progressTrigger: ratio, // 0.0 ~ 1.0
-                    lineIndex: log.lineIndex,
+                    line: log.line,
                     triggered: false
                 };
             }).sort((a, b) => a.progressTrigger - b.progressTrigger);
@@ -1085,7 +1149,9 @@ export class TextRenderer {
             // No more giant UI container (_initScoreUI removed)
 
             const animate = (timestamp) => {
-                forceVisibility();
+                // [FIX-iOS] forceVisibility() was removed from this loop.
+                // It was doing 200 words × 7 style writes × 60fps = 84,000 DOM ops during replay.
+                // The single-shot + delayed call above is sufficient.
 
                 if (!startTime) startTime = timestamp;
 
@@ -1095,6 +1161,7 @@ export class TextRenderer {
                 if (progress >= 1) {
                     canvas.style.transition = "opacity 0.5s";
                     canvas.style.opacity = "0";
+                    this._replayRAFId = null;
                     setTimeout(() => { canvas.remove(); if (onComplete) onComplete(); }, 500);
                     return;
                 }
@@ -1119,9 +1186,11 @@ export class TextRenderer {
                         ctx.shadowBlur = 0;
                     }
                 }
-                requestAnimationFrame(animate);
+                // [FIX-iOS] Store RAF ID so it can be cancelled by cancelAllAnimations()
+                this._replayRAFId = requestAnimationFrame(animate);
             };
-            requestAnimationFrame(animate);
+            // [FIX-iOS] Track the initial replay RAF
+            this._replayRAFId = requestAnimationFrame(animate);
 
         }, 500);
     }
@@ -1133,7 +1202,7 @@ export class TextRenderer {
             if (!ev.triggered && progress >= ev.progressTrigger) {
                 ev.triggered = true;
 
-                const lineIdx = ev.lineIndex;
+                const lineIdx = ev.line;
                 let score = 10;
 
                 // Continuity: line == last + 1
@@ -1251,17 +1320,36 @@ export class TextRenderer {
         p.style.transition = 'transform 0.1s';
 
         document.body.appendChild(p);
+        // [FIX #9] Register this node so cancelAllAnimations() can remove it if RAF is force-cancelled
+        if (this._activeFlyingInkNodes) this._activeFlyingInkNodes.add(p);
 
-        // Animation Loop (Quadratic Bezier)
+        // [120Hz FIX] Timestamp-gate to 60fps max.
+        const TARGET_FRAME_MS = 1000 / 60;
         let startTime = null;
         const duration = 1000;
+        let lastFrameTs = 0;
+        // [FIX-iOS] Self-cleaning RAF tracking — single slot instead of push-per-frame.
+        // Old code pushed a new id every frame → activeRAFs grew unboundedly → OOM.
+        let currentRAFId = null;
 
         const animate = (timestamp) => {
             if (!startTime) startTime = timestamp;
+
+            const shouldRender = (timestamp - lastFrameTs) >= TARGET_FRAME_MS;
+            if (shouldRender) lastFrameTs = timestamp;
+
             const progress = (timestamp - startTime) / duration;
 
             if (progress >= 1) {
                 if (p.parentNode) p.remove();
+                // [FIX #9] Deregister from tracking set on natural completion
+                if (this._activeFlyingInkNodes) this._activeFlyingInkNodes.delete(p);
+                // Remove our slot from tracking
+                if (currentRAFId) {
+                    const idx = this.activeRAFs.indexOf(currentRAFId);
+                    if (idx !== -1) this.activeRAFs.splice(idx, 1);
+                    currentRAFId = null;
+                }
                 if (window.Game && typeof window.Game.addInk === 'function') {
                     window.Game.addInk(score);
                 }
@@ -1272,26 +1360,31 @@ export class TextRenderer {
                 return;
             }
 
-            // Ease-In-Out
-            const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-            const t = ease;
+            if (shouldRender) {
+                const ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                const t = ease;
+                const invT = 1 - t;
+                const currentX = (invT * invT * startX) + (2 * invT * t * cpX) + (t * t * targetX);
+                const currentY = (invT * invT * startY) + (2 * invT * t * cpY) + (t * t * targetY);
 
-            // Quadratic Bezier Formula
-            // B(t) = (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
-            const invT = 1 - t;
-            const currentX = (invT * invT * startX) + (2 * invT * t * cpX) + (t * t * targetX);
-            const currentY = (invT * invT * startY) + (2 * invT * t * cpY) + (t * t * targetY);
+                p.style.left = currentX + 'px';
+                p.style.top = currentY + 'px';
 
-            p.style.left = currentX + 'px';
-            p.style.top = currentY + 'px';
+                const scale = 1.5 - (progress * 0.5);
+                p.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            }
 
-            // Shrink slightly (1.5 -> 1.0)
-            const scale = 1.5 - (progress * 0.5);
-            p.style.transform = `translate(-50%, -50%) scale(${scale})`;
-
-            requestAnimationFrame(animate);
+            // Self-cleaning: remove old id, schedule new, track new
+            if (currentRAFId) {
+                const idx = this.activeRAFs.indexOf(currentRAFId);
+                if (idx !== -1) this.activeRAFs.splice(idx, 1);
+            }
+            currentRAFId = requestAnimationFrame(animate);
+            this.activeRAFs.push(currentRAFId);
         };
-        requestAnimationFrame(animate);
+        // Initial kick — track the first RAF id
+        currentRAFId = requestAnimationFrame(animate);
+        this.activeRAFs.push(currentRAFId);
     }
 
     _spawnReplayPulse(yPos) {

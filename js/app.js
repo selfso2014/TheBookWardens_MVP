@@ -2,6 +2,207 @@
 import { loadWebpackModule } from "./webpack-loader.js";
 import { CalibrationManager } from "./calibration.js";
 import { GazeDataManager } from "./gaze-data-manager.js"; // Import
+import EasySeeSo from "../seeso/easy-seeso.js";
+
+// [DIAG] Intercept console.error/warn to surface SDK internal errors in our debug panel.
+// SDK errors (WASM load failure, license error, etc.) never appear in logI/logW/logE.
+// Must be set up BEFORE SDK loads.
+const _origConsoleError = console.error.bind(console);
+const _origConsoleWarn = console.warn.bind(console);
+const _origConsoleLog = console.log.bind(console);
+
+console.error = function (...args) {
+  const msg = args.map(a => {
+    try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 120) : String(a); }
+    catch (_) { return String(a); }
+  }).join(' ');
+  // Forward to our debug panel (logE defined later - use deferred log if not ready)
+  if (typeof logE === 'function') logE('console', msg);
+  else setTimeout(() => { if (typeof logE === 'function') logE('console', msg); }, 100);
+  _origConsoleError(...args);
+};
+
+console.warn = function (...args) {
+  const msg = args.map(a => {
+    try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 120) : String(a); }
+    catch (_) { return String(a); }
+  }).join(' ');
+  if (typeof logW === 'function') logW('console', msg);
+  else setTimeout(() => { if (typeof logW === 'function') logW('console', msg); }, 100);
+  _origConsoleWarn(...args);
+};
+
+// console.log hook: captures SDK internal errors (SDK uses console.log for grabFrame/WASM failures).
+// SAFE: logBase now uses _origConsoleWarn/_origConsoleLog → no recursion possible.
+let _inConsoleHook = false;
+console.log = function (...args) {
+  if (_inConsoleHook) { _origConsoleLog(...args); return; }
+  const msg = args.map(a => {
+    try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 120) : String(a); }
+    catch (_) { return String(a); }
+  }).join(' ');
+  if (/error|fail|exception|grab|muted|track|wasm|seeso/i.test(msg)) {
+    _inConsoleHook = true;
+    try {
+      if (typeof logW === 'function') logW('sdk-log', msg);
+    } finally { _inConsoleHook = false; }
+  }
+  _origConsoleLog(...args);
+};
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [POLYFILL] ImageCapture.grabFrame() for Safari/WebKit — POST-SDK PATCH
+//
+// IMPORTANT: This file uses ES module `import`, which means all imports
+// (including seeso.min.js) are evaluated BEFORE this module body runs.
+// Patching window.ImageCapture here is TOO LATE for the SDK's import-time check.
+//
+// The SeeSo SDK has its own internal ImageCapture polyfill that DOES implement
+// grabFrame(), but it has a critical Safari bug:
+//   grabFrame() waits for `self.videoElementPlaying` — a Promise that resolves
+//   on the 'playing' DOM event. On iOS/iPadOS Safari, if the page is not
+//   in the foreground or the video is created off-screen, 'playing' NEVER fires.
+//   Result: grabFrame() hangs forever → processFrame_ stalls → FPS = 0.
+//
+// Fix Strategy (post-SDK patch):
+//   After the SDK initializes and calls initStreamTrack_(), the SDK sets
+//   `seeso.seeso.imageCapture` to an instance of *its own* ImageCapture class.
+//   We patch the PROTOTYPE of that instance's constructor, replacing grabFrame()
+//   with a readyState-based implementation that does NOT wait for 'playing'.
+//   This is applied in patchSdkImageCapture() called after startTracking().
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** @returns {boolean} true if this is a Safari/WebKit browser */
+function isSafariWebKit() {
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+    || /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+/**
+ * Patch the SDK's internal ImageCapture instance's grabFrame() method.
+ * Must be called AFTER seeso.startTracking() has set seeso.seeso.imageCapture.
+ * @param {object} rawSeeso - The raw Seeso instance (seeso.seeso)
+ */
+
+// [FIX #3] Global pool: reuse a single hidden video element per MediaStream track id.
+// Prevents orphaned <video> elements accumulating in <body> across stopTracking/startTracking cycles.
+const _safariVideoPool = new Map(); // trackId -> {video, canvas, ctx}
+
+function _getOrCreateSafariVideo(track) {
+  if (!track) return null;
+  const id = track.id || '__default__';
+  if (_safariVideoPool.has(id)) return _safariVideoPool.get(id);
+
+  const video = document.createElement('video');
+  video.setAttribute('playsinline', '');
+  video.setAttribute('autoplay', '');
+  video.muted = true;
+  video.style.cssText = 'position:fixed;width:1px;height:1px;top:0;left:-2px;opacity:0.01;pointer-events:none;z-index:-1';
+  document.body.appendChild(video);
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  const entry = { video, canvas, ctx };
+  _safariVideoPool.set(id, entry);
+  return entry;
+}
+
+function patchSdkImageCapture(rawSeeso) {
+  if (!isSafariWebKit()) return; // Chrome/Firefox: grabFrame works natively
+
+  const ic = rawSeeso?.imageCapture;
+  if (!ic) {
+    setTimeout(() => patchSdkImageCapture(rawSeeso), 100); // retry until available
+    return;
+  }
+
+  // Already patched? (but re-check if track changed — SDK may replace imageCapture on restart)
+  if (ic.__grabFramePatched) return;
+  ic.__grabFramePatched = true;
+
+  // Seed video with current track (if available)
+  const initialTrack = ic._videoStreamTrack || ic.track || rawSeeso.track;
+  const initialEntry = _getOrCreateSafariVideo(initialTrack);
+  if (initialEntry && initialTrack) {
+    initialEntry.video.srcObject = new MediaStream([initialTrack]);
+    initialEntry.video.play().catch(() => { });
+  }
+
+  // Replace grabFrame on the INSTANCE (not prototype)
+  ic.grabFrame = function safariGrabFrame() {
+    return new Promise((resolve, reject) => {
+      // [FIX #3-A] Get current live track — may differ from initialTrack after restart
+      const currentTrack = rawSeeso.track;
+
+      // [FIX #3-B] null/ended track: don't reject immediately.
+      // stopTracking() → startTracking() race: track briefly becomes null/ended.
+      // Wait up to 500ms for it to recover before giving up.
+      if (!currentTrack || currentTrack.readyState !== 'live') {
+        let waitRetries = 10; // 10 × 50ms = 500ms
+        const waitForTrack = () => {
+          const t = rawSeeso.track;
+          if (t && t.readyState === 'live') {
+            // Track recovered — re-enter normal attempt flow
+            ic.grabFrame().then(resolve).catch(reject);
+          } else if (waitRetries-- > 0) {
+            setTimeout(waitForTrack, 50);
+          } else {
+            reject(new DOMException('Safari grabFrame: track not live after 500ms wait', 'InvalidStateError'));
+          }
+        };
+        setTimeout(waitForTrack, 50);
+        return;
+      }
+
+      // Get or create pooled video for this track
+      const entry = _getOrCreateSafariVideo(currentTrack);
+      if (!entry) {
+        reject(new DOMException('Safari grabFrame: failed to create video entry', 'InvalidStateError'));
+        return;
+      }
+
+      const { video, canvas, ctx } = entry;
+
+      // Sync srcObject if track changed
+      const existingTracks = video.srcObject?.getVideoTracks?.() || [];
+      if (!existingTracks.includes(currentTrack)) {
+        video.srcObject = new MediaStream([currentTrack]);
+        video.play().catch(() => { });
+      }
+
+      // [FIX #3-C] Increased retries: 30 × 30ms = 900ms max wait.
+      // Low-power mode / slow iPhones need more than 450ms for video.readyState >= 2.
+      const attempt = (retries) => {
+        if (video.readyState >= 2 && video.videoWidth > 0) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          createImageBitmap(canvas).then(resolve).catch(reject);
+        } else if (retries > 0) {
+          setTimeout(() => attempt(retries - 1), 30);
+        } else {
+          reject(new DOMException('Safari grabFrame: video not ready after 900ms', 'InvalidStateError'));
+        }
+      };
+      attempt(30); // [FIX] 30 × 30ms = 900ms (was 15 × 30ms = 450ms)
+    });
+  };
+
+  if (typeof logW === 'function') {
+    logW('polyfill', '[Safari] SDK imageCapture.grabFrame() patched v26 — null-track guard + 900ms timeout + video pool');
+  }
+}
+
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = e.reason?.message || e.reason?.toString?.() || String(e.reason);
+  if (typeof logE === 'function') logE('sdk', 'Unhandled rejection: ' + msg);
+});
+
+window.addEventListener('error', (e) => {
+  if (typeof logE === 'function') logE('sdk', 'Uncaught error: ' + e.message + ' (' + e.filename + ':' + e.lineno + ')');
+});
 
 // Initialize Manager
 const gazeDataManager = new GazeDataManager();
@@ -30,15 +231,202 @@ const LICENSE_KEY = window.location.hostname === "selfso2014.github.io"
   : "dev_1ntzip9admm6g0upynw3gooycnecx0vl93hz8nox";
 
 const DEBUG_LEVEL = (() => {
-  const v = new URLSearchParams(location.search).get("debug");
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0; // Default: 0 (Hidden)
+  const params = new URLSearchParams(location.search);
+  // [MOD] Default: 1 (Enabled) if no param, or ?debug=1
+  // If ?debug=0, then 0 (Hidden)
+  if (!params.has("debug")) return 1;
+
+  const n = Number(params.get("debug"));
+  return Number.isFinite(n) ? n : 0;
+})();
+
+// --- [NEW] Debug Meter: Memory Leak Tracker ---
+const activeRafs = new Set();
+const listenerCounts = {};
+let totalListeners = 0;
+
+// Hook RAF
+const originalRAF = window.requestAnimationFrame;
+const originalCAF = window.cancelAnimationFrame;
+
+window.requestAnimationFrame = (cb) => {
+  // [FIX-iOS] Reuse wrapper to avoid per-frame anonymous closure creation.
+  // Old code: originalRAF((t) => { ... }) created a new function every frame.
+  // SeeSo SDK calls RAF at 30fps internally = 30 closures/sec × session = GC pressure.
+  const id = originalRAF(function rafWrapper(t) {
+    activeRafs.delete(id);
+    if (cb) cb(t);
+  });
+  activeRafs.add(id);
+  return id;
+};
+
+window.cancelAnimationFrame = (id) => {
+  activeRafs.delete(id);
+  originalCAF(id);
+};
+
+// Hook Event Listeners
+const originalAdd = EventTarget.prototype.addEventListener;
+const originalRemove = EventTarget.prototype.removeEventListener;
+
+EventTarget.prototype.addEventListener = function (type, listener, options) {
+  listenerCounts[type] = (listenerCounts[type] || 0) + 1;
+  totalListeners++;
+  return originalAdd.call(this, type, listener, options);
+};
+
+EventTarget.prototype.removeEventListener = function (type, listener, options) {
+  if (listenerCounts[type] > 0) {
+    listenerCounts[type]--;
+    totalListeners--;
+  }
+  return originalRemove.call(this, type, listener, options);
+};
+
+// Start 1s Metric Loop
+setInterval(() => {
+  const rafCount = activeRafs.size;
+
+  // [NEW] HEAP monitoring — Chrome/Android only (Safari blocks performance.memory for privacy).
+  // Reads 3 numbers from an existing browser object: negligible overhead (<0.01ms/call).
+  let heapStr = 'N/A'; // Default for Safari / unsupported browsers
+  let heapPct = -1;
+  if (performance.memory) {
+    const usedMB = Math.round(performance.memory.usedJSHeapSize / 1048576);
+    const limitMB = Math.round(performance.memory.jsHeapSizeLimit / 1048576);
+    heapPct = Math.round((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100);
+    heapStr = `${usedMB}MB(${heapPct}%)`;
+  }
+
+  logBase("INFO", "Meter", `RAF:${rafCount} | LSN:${totalListeners} | HEAP:${heapStr}`);
+
+  // RAF Warnings — tiered thresholds
+  // Normal gameplay peak: RAF:7 (gaze + revealChunk + flying ink particles)
+  // > 5  : WARN  — slightly above normal, worth watching
+  // > 10 : CRITICAL — likely a runaway loop (OOM risk)
+  if (rafCount > 10) {
+    logE("CRITICAL", `RAF > 10: count=${rafCount}`);
+  } else if (rafCount > 5) {
+    logBase("WARN", "Meter", `RAF > 5: count=${rafCount}`);
+  }
+  if (totalListeners > 60) {
+    logE("CRITICAL", `LSN > 60: total=${totalListeners}`);
+  }
+
+  // HEAP Warnings (Chrome/Android only — heapPct === -1 means unsupported, skip)
+  // > 70% : WARN     — memory climbing, watch trend
+  // > 85% : CRITICAL — high pressure, iOS OOM risk zone
+  if (heapPct >= 0) {
+    if (heapPct > 85) {
+      logE("CRITICAL", `HEAP > 85%: ${heapStr} — OOM risk`);
+    } else if (heapPct > 70) {
+      logBase("WARN", "Meter", `HEAP > 70%: ${heapStr}`);
+    }
+  }
+
+}, 1000);
+
+// ---------- iOS Visibility Guard ----------
+// [FIX-iOS] When user backgrounds the tab (notification, home button, social app switch),
+// iOS does NOT suspend JS immediately — RAF loops keep running, burning CPU & memory.
+// iOS may then kill the WebContent process after a short period of high memory pressure.
+// This handler pauses all known RAF loops on hide and resumes on return.
+// This covers ALL 4 crash cases: whether the crash happened before or after calibration.
+(function attachVisibilityGuard() {
+  let wasCalRunning = false;
+  let wasTracking = false;
+  let wasReading = false;     // [FIX #6] Track if reading session was active
+  let wasSdkOn = false;       // [FIX #6] Track if SDK gate was open
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // ── TAB HIDDEN ──────────────────────────────────────────────────────
+      logW('sys', '[iOS Guard] Tab hidden — pausing all RAF loops to prevent OOM Kill');
+
+      // 1. Stop overlay calibration tick
+      if (overlay && overlay.calRunning) {
+        wasCalRunning = true;
+        overlay.calRunning = false;           // tick() will exit on next frame
+        if (overlay.rafId) {
+          cancelAnimationFrame(overlay.rafId);
+          overlay.rafId = null;
+        }
+      } else {
+        wasCalRunning = false;
+      }
+
+      // 2. Stop Game-level RAF tracker (spawnFlyingResource etc.)
+      if (window.Game && window.Game.activeRAFs && window.Game.activeRAFs.length > 0) {
+        logW('sys', `[iOS Guard] Cancelling ${window.Game.activeRAFs.length} Game RAFs`);
+        window.Game.activeRAFs.forEach(id => cancelAnimationFrame(id));
+        window.Game.activeRAFs = [];
+      }
+
+      // 3. Stop TextRenderer replay RAF if running
+      const tr = window.Game?.typewriter?.renderer;
+      if (tr && typeof tr.cancelAllAnimations === 'function') {
+        tr.cancelAllAnimations();
+      }
+
+      // 4. Stop AliceBattle RAF if running
+      if (window.AliceBattleRef && typeof window.AliceBattleRef.destroy === 'function') {
+        window.AliceBattleRef.destroy();
+      }
+
+      // 5. Track game tracking state
+      wasTracking = window.Game?.state?.isTracking || false;
+
+      // [FIX #6] Track reading session state
+      const activeScreen = document.querySelector('.screen.active')?.id;
+      wasReading = activeScreen === 'screen-read';
+      wasSdkOn = window._seesoSdkOn === true;
+      logW('sys', `[iOS Guard] wasReading=${wasReading} wasSdkOn=${wasSdkOn} screen=${activeScreen}`);
+
+    } else {
+      // ── TAB VISIBLE AGAIN ───────────────────────────────────────────────
+      logW('sys', '[iOS Guard] Tab visible — resuming');
+
+      // Resume overlay tick only if calibration was actually running
+      if (wasCalRunning && overlay && window.startCalibrationRoutine) {
+        logW('sys', '[iOS Guard] Resuming calibration overlay tick');
+        overlay.calRunning = true;
+        const tick = () => {
+          if (!overlay.calRunning) { overlay.rafId = null; return; }
+          renderOverlay();
+          overlay.rafId = requestAnimationFrame(tick);
+        };
+        tick();
+      }
+      wasCalRunning = false;
+
+      // [FIX #6] Resume reading session if it was active when tab was hidden
+      if (wasReading) {
+        logW('sys', '[iOS Guard] Reading session was active — attempting to restore');
+
+        // Re-open gaze gate if it was open (SDK may need restart)
+        if (wasSdkOn && typeof window.setSeesoTracking === 'function' && window._seesoSdkOn !== true) {
+          logW('sys', '[iOS Guard] Re-opening gaze gate after tab restore');
+          window.setSeesoTracking(true, 'visibility_restore');
+        }
+
+        // Restart typewriter tick if it was paused
+        const typewriter = window.Game?.typewriter;
+        if (typewriter && typewriter.isPaused === true) {
+          logW('sys', '[iOS Guard] Resuming typewriter tick (was paused on hide)');
+          typewriter.isPaused = false;
+        }
+      }
+      wasReading = false;
+      wasSdkOn = false;
+    }
+  });
 })();
 
 // ---------- DOM ----------
 const els = {
   hud: document.getElementById("hud"),
-  video: document.getElementById("preview"),
+  video: document.getElementById("camera-preview"),
   canvas: document.getElementById("output"),
   status: document.getElementById("status"),
   pillCoi: document.getElementById("pillCoi"),
@@ -69,108 +457,232 @@ function safeJson(v) {
 }
 
 function ensureLogPanel() {
-  if (DEBUG_LEVEL === 0) return null; // Don't create panel if debug is off
+  // Always create panel structure, but hide if debug=0
+  // (We want it available for activation via secret gesture or URL param changes if we implement that later)
+  // For now, respect DEBUG_LEVEL
+  if (DEBUG_LEVEL === 0) return null;
 
-  let panel = document.getElementById("debugLogPanel");
-  if (panel) return panel;
+  let container = document.getElementById("debugContainer");
+  if (container) return document.getElementById("debugLogPanel");
 
-  panel = document.createElement("pre");
+  // Main Container
+  container = document.createElement("div");
+  container.id = "debugContainer";
+  container.style.position = "fixed";
+  container.style.right = "20px";
+  container.style.bottom = "80px"; // Moved up to avoid bottom nav bars
+  container.style.zIndex = "99999";
+  container.style.display = "flex";
+  container.style.flexDirection = "column";
+  container.style.alignItems = "flex-end";
+  container.style.gap = "10px"; // Increased gap
+
+  // Toggle Button (Mini Mode)
+  const btnToggle = document.createElement("button");
+  btnToggle.textContent = "🐞";
+  btnToggle.style.fontSize = "32px"; // Bigger icon
+  btnToggle.style.width = "56px"; // Bigger touch target
+  btnToggle.style.height = "56px";
+  btnToggle.style.borderRadius = "50%";
+  btnToggle.style.border = "2px solid rgba(255,255,255,0.4)";
+  btnToggle.style.background = "rgba(0,0,0,0.7)";
+  btnToggle.style.color = "#fff";
+  btnToggle.style.cursor = "pointer";
+  btnToggle.style.boxShadow = "0 4px 12px rgba(0,0,0,0.6)";
+  btnToggle.style.transition = "transform 0.2s";
+
+  // Panel (Hidden by default)
+  const panel = document.createElement("pre");
   panel.id = "debugLogPanel";
-  panel.style.position = "fixed";
-  panel.style.right = "12px";
-  panel.style.bottom = "12px";
-  panel.style.width = "560px";
-  panel.style.maxWidth = "calc(100vw - 24px)";
-  panel.style.height = "320px";
-  panel.style.maxHeight = "40vh";
+  panel.style.display = "none";
+  panel.style.width = "340px"; // Slightly wider
+  panel.style.height = "250px"; // Slightly taller
   panel.style.overflow = "auto";
-  panel.style.padding = "10px";
-  panel.style.borderRadius = "10px";
-  panel.style.background = "rgba(0,0,0,0.75)";
-  panel.style.color = "#d7f7d7";
-  panel.style.fontFamily =
-    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
-  panel.style.fontSize = "12px";
-  panel.style.lineHeight = "1.35";
-  panel.style.zIndex = "99999";
+  panel.style.padding = "12px";
+  panel.style.borderRadius = "12px";
+  panel.style.background = "rgba(0,0,0,0.9)";
+  panel.style.color = "#0f0";
+  panel.style.fontFamily = "monospace";
+  panel.style.fontSize = "11px";
   panel.style.whiteSpace = "pre-wrap";
   panel.style.wordBreak = "break-word";
-  panel.style.userSelect = "text";
+  panel.style.border = "1px solid #444";
+  panel.style.marginBottom = "5px";
 
-  const header = document.createElement("div");
-  header.style.position = "fixed";
-  header.style.right = "12px";
-  header.style.bottom = "340px";
-  header.style.width = panel.style.width;
-  header.style.maxWidth = panel.style.maxWidth;
-  header.style.display = "flex";
-  header.style.gap = "8px";
-  header.style.zIndex = "99999";
+  // Toolbar
+  const toolbar = document.createElement("div");
+  toolbar.style.display = "none";
+  toolbar.style.gap = "8px"; // Increased gap
+  toolbar.style.flexWrap = "wrap"; // Allow wrapping
+  toolbar.style.justifyContent = "flex-end";
 
-  const btnCopy = document.createElement("button");
-  btnCopy.textContent = "Copy Logs";
-  btnCopy.style.padding = "6px 10px";
-  btnCopy.style.borderRadius = "8px";
-  btnCopy.style.border = "1px solid rgba(255,255,255,0.2)";
-  btnCopy.style.background = "rgba(255,255,255,0.08)";
-  btnCopy.style.color = "white";
-  btnCopy.onclick = async () => {
+  let isExpanded = false;
+
+  const createBtn = (text, onClick, color = "#fff", bg = "#333") => {
+    const b = document.createElement("button");
+    b.textContent = text;
+    b.style.padding = "8px 14px"; // Larger touch area
+    b.style.fontSize = "13px";
+    b.style.fontWeight = "bold";
+    b.style.borderRadius = "6px";
+    b.style.border = "1px solid #666";
+    b.style.background = bg;
+    b.style.color = color;
+    b.style.cursor = "pointer";
+    b.onclick = onClick;
+    return b;
+  };
+
+  // Copy
+  toolbar.appendChild(createBtn("📋 Copy", async () => {
     try {
-      await navigator.clipboard.writeText(panel.textContent || "");
-      logI("ui", "Logs copied to clipboard");
+      await navigator.clipboard.writeText(JSON.stringify(LOG_BUFFER, null, 2));
+      const originalText = panel.textContent;
+      panel.textContent += "\n[System] Copied to Clipboard!";
+      panel.scrollTop = panel.scrollHeight;
+      setTimeout(() => alert("Logs Copied!"), 100);
+    } catch (e) { alert("Copy Failed"); }
+  }));
+
+  // Clear
+  toolbar.appendChild(createBtn("🗑️ Clear", () => {
+    LOG_BUFFER.length = 0;
+    panel.textContent = "";
+    // [NEW] Clear LocalStorage too
+    try { localStorage.removeItem("debug_log_backup"); } catch (e) { }
+  }, "#ff8a80"));
+
+  // Upload (DB)
+  const btnUpload = createBtn("☁️ Upload DB", async () => {
+    // UI Feedback: Loading
+    const originalText = btnUpload.textContent;
+    btnUpload.textContent = "⏳ Sending...";
+    btnUpload.disabled = true;
+    btnUpload.style.opacity = "0.7";
+    btnUpload.style.cursor = "wait";
+
+    if (!window.firebase) {
+      alert("Error: Firebase SDK not loaded.");
+      resetBtn();
+      return;
+    }
+
+    try {
+      // [FIX] Ensure Firebase App is initialized
+      if (!firebase.apps.length) {
+        if (window.FIREBASE_CONFIG) {
+          firebase.initializeApp(window.FIREBASE_CONFIG);
+        } else {
+          throw new Error("Missing window.FIREBASE_CONFIG");
+        }
+      }
+
+      const db = firebase.database();
+      const sessionId = "session_" + Date.now();
+
+      // [NEW] Retrieve Crashed Logs from LocalStorage
+      let crashLogs = [];
+      try {
+        const stored = localStorage.getItem("debug_log_backup");
+        if (stored) crashLogs = JSON.parse(stored);
+      } catch (e) { console.warn("No crash logs found"); }
+
+      // Merge: Crash Logs (Old) + Current Logs (New)
+      // If crash logs exist, they are likely from the session that just died.
+      const uploadData = {
+        ua: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+        logs: LOG_BUFFER, // Current Session (Post-Crash)
+        crashLogs: crashLogs.length > 0 ? crashLogs : null // Previous Session (Pre-Crash)
+      };
+
+      // Timeout Promise (10s)
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout (10s)")), 10000)
+      );
+
+      // Race: Upload vs Timeout
+      await Promise.race([
+        db.ref("logs/" + sessionId).set(uploadData),
+        timeout
+      ]);
+
+      let msg = `✅ Upload Success!\nSession ID: ${sessionId}`;
+      if (crashLogs.length > 0) msg += `\n(Recovered ${crashLogs.length} lines from crash)`;
+      alert(msg);
+
+      panel.textContent += `\n[System] Uploaded to: logs/${sessionId}`;
+      // Clear backup after successful upload to avoid duplicate uploads
+      localStorage.removeItem("debug_log_backup");
+
     } catch (e) {
-      logE("ui", "Failed to copy logs", e);
+      console.error(e);
+      alert("❌ Upload Failed: " + e.message);
+    } finally {
+      resetBtn();
+    }
+
+    function resetBtn() {
+      btnUpload.textContent = originalText;
+      btnUpload.disabled = false;
+      btnUpload.style.opacity = "1";
+      btnUpload.style.cursor = "pointer";
+    }
+  }, "#40c4ff", "#01579b"); // Blue color
+
+  toolbar.appendChild(btnUpload);
+
+  // Toggle Logic
+  btnToggle.onclick = () => {
+    isExpanded = !isExpanded;
+    panel.style.display = isExpanded ? "block" : "none";
+    toolbar.style.display = isExpanded ? "flex" : "none";
+    btnToggle.textContent = isExpanded ? "❌" : "🐞";
+    if (isExpanded) {
+      panel.scrollTop = panel.scrollHeight;
+      btnToggle.style.transform = "scale(0.9)";
+    } else {
+      btnToggle.style.transform = "scale(1)";
     }
   };
 
-  const btnClear = document.createElement("button");
-  btnClear.textContent = "Clear Logs";
-  btnClear.style.padding = "6px 10px";
-  btnClear.style.borderRadius = "8px";
-  btnClear.style.border = "1px solid rgba(255,255,255,0.2)";
-  btnClear.style.background = "rgba(255,255,255,0.08)";
-  btnClear.style.color = "white";
-  btnClear.onclick = () => {
-    LOG_BUFFER.length = 0;
-    panel.textContent = "";
-    logI("ui", "Logs cleared");
-  };
+  container.appendChild(panel);
+  container.appendChild(toolbar);
+  container.appendChild(btnToggle);
+  document.body.appendChild(container);
 
-  const badge = document.createElement("div");
-  badge.textContent = `debug=${DEBUG_LEVEL}`;
-  badge.style.marginLeft = "auto";
-  badge.style.padding = "6px 10px";
-  badge.style.borderRadius = "999px";
-  badge.style.border = "1px solid rgba(255,255,255,0.2)";
-  badge.style.background = "rgba(255,255,255,0.08)";
-  badge.style.color = "white";
-  badge.style.fontSize = "12px";
-
-  header.appendChild(btnCopy);
-  header.appendChild(btnClear);
-  header.appendChild(badge);
-
-  document.body.appendChild(header);
-  document.body.appendChild(panel);
   return panel;
 }
 
 const panel = ensureLogPanel();
 
+// [FIX-iOS] Batch DOM updates — at most 4 textContent rebuilds per second.
+// Old code rebuilt 225KB string on EVERY log call.
+let _logDirty = false;
+let _logFlushTimer = null;
 function pushLog(line) {
-  if (!panel) return; // No panel, no display
+  if (!panel) return;
   LOG_BUFFER.push(line);
   if (LOG_BUFFER.length > LOG_MAX) LOG_BUFFER.splice(0, LOG_BUFFER.length - LOG_MAX);
-  panel.textContent = LOG_BUFFER.join("\n");
-  panel.scrollTop = panel.scrollHeight;
+  if (!_logDirty) {
+    _logDirty = true;
+    _logFlushTimer = setTimeout(() => {
+      _logDirty = false;
+      panel.textContent = LOG_BUFFER.join("\n");
+      panel.scrollTop = panel.scrollHeight;
+    }, 250);
+  }
 }
 
 function logBase(level, tag, msg, data) {
-  const line = `[${ts()}] ${level.padEnd(5)} ${tag.padEnd(10)} ${msg}${data !== undefined ? " " + JSON.stringify(safeJson(data)) : ""
-    }`;
-  if (level === "ERROR") console.error(line);
-  else if (level === "WARN") console.warn(line);
-  else console.log(line);
+  // [FIX-iOS] Removed double-serialization: old code did JSON.stringify(safeJson(data))
+  // which is JSON.stringify(JSON.parse(JSON.stringify(data))) = 2x serialize.
+  const dataStr = data !== undefined ? " " + (typeof data === 'string' ? data : JSON.stringify(data)) : "";
+  const line = `[${ts()}] ${level.padEnd(5)} ${tag.padEnd(10)} ${msg}${dataStr}`;
+  // Use original console methods to prevent recursion with our console.error/warn hooks
+  if (level === "ERROR") _origConsoleError(line);
+  else if (level === "WARN") _origConsoleWarn(line);
+  else _origConsoleLog(line);
   pushLog(line);
 }
 
@@ -208,6 +720,8 @@ function setPill(el, text) {
 function setStatus(text) {
   if (els.status) els.status.textContent = text;
 }
+// [FIX #7] Expose globally so IntroManager / other modules can show non-blocking status messages
+window.setStatus = setStatus;
 
 function showRetry(show, reason) {
   if (!els.btnRetry) return;
@@ -310,6 +824,17 @@ const calManager = new CalibrationManager({
     if (typeof window.Game !== "undefined") {
       window.Game.onCalibrationFinish();
     }
+  },
+  // [FIX-iOS] Explicitly stop the calibration RAF tick loop.
+  // calibration.js finishSequence() calls this before triggering game start.
+  // Prevents orphaned RAF loop stacking with game loops on iOS -> Tab Kill.
+  stopCalibrationLoop: () => {
+    overlay.calRunning = false; // tick() exit condition
+    if (overlay.rafId) {
+      cancelAnimationFrame(overlay.rafId); // force-cancel as double safety
+      overlay.rafId = null;
+    }
+    logI("cal", "[FIX] Calibration RAF loop stopped.");
   },
   onFaceCheckSuccess: () => {
     logI("cal", "Face Check Success -> Triggering Real Calibration");
@@ -491,39 +1016,77 @@ async function ensureCamera() {
   }
 
   if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-    alert("Camera requires HTTPS! Redirecting...");
+    setStatus("Camera requires HTTPS! Redirecting...");
     location.replace(`https:${location.href.substring(location.protocol.length)}`);
     return false;
   }
 
-  setState("perm", "requesting");
-  try {
-    // 1st Attempt: Ideal constraints
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "user",
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 30, max: 60 },
-      },
-      audio: false,
-    });
-  } catch (e1) {
-    console.warn("[Camera] 1st attempt failed (constraints). Retrying with basic constraints...");
+  // [FIX #5] 이전에 ended된 트랙이 있으면 명시적으로 stop() → 카메라 핸들 해제.
+  // iOS에서 이전 트랙이 살아있으면 새 getUserMedia가 NotReadableError를 낼 수 있음.
+  if (mediaStream) {
     try {
-      // 2nd Attempt: Basic constraints (Laptop Friendly)
-      mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-      });
-    } catch (e2) {
-      // Final Failure
-      setState("perm", "denied");
-      showRetry(true, "camera permission denied");
-      logE("camera", "getUserMedia all attempts failed", e2);
-      alert("Camera access failed! Please check permissions or close other apps using the camera.");
-      return false;
+      mediaStream.getTracks().forEach(t => t.stop());
+    } catch (e) { /* silent */ }
+    mediaStream = null;
+  }
+
+  setState("perm", "requesting");
+
+  // [FIX #5] 3-단계 getUserMedia 전략:
+  // 1st: facingMode:user (표준 전면 카메라)
+  // 2nd: video:true (제약 없이 사용 가능한 카메라)
+  // 3rd: 2s 대기 후 재시도 (다른 앱이 카메라 점유 중인 경우 release 대기)
+  const CAM_ATTEMPTS = [
+    { video: { facingMode: "user" }, audio: false },
+    { video: true, audio: false },
+  ];
+
+  let lastError = null;
+
+  for (let i = 0; i < CAM_ATTEMPTS.length; i++) {
+    try {
+      logI("camera", `[FIX #5] getUserMedia attempt ${i + 1}/${CAM_ATTEMPTS.length}`);
+      mediaStream = await navigator.mediaDevices.getUserMedia(CAM_ATTEMPTS[i]);
+      lastError = null;
+      break; // Success
+    } catch (e) {
+      lastError = e;
+      logW("camera", `Attempt ${i + 1} failed: ${e.name} — ${e.message}`);
     }
+  }
+
+  // [FIX #5] 3rd attempt: 2s 재시도 (NotReadableError = 카메라 일시 점유 상황 대응)
+  if (lastError) {
+    const isPermDenied = lastError.name === 'NotAllowedError' || lastError.name === 'PermissionDeniedError';
+    if (!isPermDenied) {
+      // 권한 거부가 아닌 경우 (NotReadableError 등)는 다른 앱의 카메라 점유가 풀릴 때까지 대기
+      logW("camera", "[FIX #5] Camera busy (NotReadable?). Waiting 2s and retrying...");
+      setStatus("⏳ 카메라를 초기화하는 중... (다른 앱이 카메라를 사용 중일 수 있습니다)");
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        logI("camera", "[FIX #5] getUserMedia 3rd attempt (after 2s wait)");
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        lastError = null;
+      } catch (e3) {
+        lastError = e3;
+        logE("camera", "3rd attempt also failed", e3);
+      }
+    } else {
+      logE("camera", "Camera permission denied — no point retrying", lastError);
+    }
+  }
+
+  if (lastError) {
+    // All attempts failed
+    setState("perm", "denied");
+    showRetry(true, `camera_failed_${lastError.name}`);
+    logE("camera", "getUserMedia all attempts failed", lastError);
+    const isPermDenied = lastError.name === 'NotAllowedError' || lastError.name === 'PermissionDeniedError';
+    setStatus(isPermDenied
+      ? "⚠️ 카메라 권한이 거부되었습니다. 브라우저 설정에서 카메라를 허용해주세요."
+      : "⚠️ 카메라 접근 실패. 다른 앱을 닫고 재시도하세요."
+    );
+    return false;
   }
 
   // Success Handling
@@ -580,96 +1143,18 @@ function enumName(enumObj, value) {
 function attachSeesoCallbacks() {
   if (!seeso) return;
 
-  // ---- Gaze callback (log + HUD) ----
-  const logGazeXY = throttle((g) => {
-    const xRaw = g?.x ?? g?.gazeInfo?.x ?? g?.data?.x ?? g?.screenX ?? g?.gazeX ?? g?.rawX;
-    const yRaw = g?.y ?? g?.gazeInfo?.y ?? g?.data?.y ?? g?.screenY ?? g?.gazeY ?? g?.rawY;
-    const stVal = g?.trackingState;
-    const conf = g?.confidence;
-
-    const stName = SDK?.TrackingState ? enumName(SDK.TrackingState, stVal) : String(stVal);
-
-    // IMPORTANT: string message so NaN/undefined remains visible
-    logI("gaze", `xy x=${fmt(xRaw)} y=${fmt(yRaw)} state=${stName}(${fmt(stVal)}) conf=${fmt(conf)}`);
-
-    // Also reflect on HUD
-    setGazeInfo(`gaze: x=${fmt(xRaw)}  y=${fmt(yRaw)}  state=${stName}(${fmt(stVal)})  conf=${fmt(conf)}`);
-
-    if ((typeof xRaw !== "number" || typeof yRaw !== "number") && DEBUG_LEVEL >= 2) {
-      logD("gaze", "schema", { keys: g ? Object.keys(g) : null });
-    }
-  }, 150);
-
-  // For debug=2, keep a lightweight sample object (throttled)
-  const logGazeSample = throttle(() => {
-    if (DEBUG_LEVEL >= 2 && overlay.gazeRaw) {
-      logD("gaze", "sample", {
-        x: overlay.gazeRaw.x,
-        y: overlay.gazeRaw.y,
-        trackingState: overlay.gazeRaw.trackingState,
-      });
-    }
-  }, 60);
-
-  if (typeof seeso.addGazeCallback === "function") {
-    seeso.addGazeCallback((gazeInfo) => {
-      lastGazeAt = performance.now();
-
-      // Raw values (for HUD/log)
-      const xRaw = gazeInfo?.x;
-      const yRaw = gazeInfo?.y;
-
-      // [NEW] Face Check Logic
-      if (calManager && calManager.handleFaceCheckGaze) {
-        calManager.handleFaceCheckGaze(gazeInfo?.trackingState);
-      }
-
-      overlay.gazeRaw = {
-        x: xRaw,
-        y: yRaw,
-        trackingState: gazeInfo?.trackingState,
-        confidence: gazeInfo?.confidence,
-      };
-
-      // Use finite numbers only for drawing
-      overlay.gaze = {
-        x: typeof xRaw === "number" && Number.isFinite(xRaw) ? xRaw : null,
-        y: typeof yRaw === "number" && Number.isFinite(yRaw) ? yRaw : null,
-        trackingState: gazeInfo?.trackingState,
-        confidence: gazeInfo?.confidence,
-      };
-
-      // --- GAME INTEGRATION (First Update Context/Game State) ---
-      if (typeof window.Game !== "undefined" && overlay.gaze.x !== null) {
-        window.Game.onGaze(overlay.gaze.x, overlay.gaze.y);
-      }
-
-      // --- DATA LOGGING (Then Save Data with Updated Context) ---
-      if (window.gazeDataManager) {
-        window.gazeDataManager.processGaze(gazeInfo);
-      }
-      // ------------------------
-
-      // Log + HUD
-      logGazeXY(gazeInfo);
-      logGazeSample();
-
-      renderOverlay();
-    });
-
-    logI("sdk", "addGazeCallback bound (xy HUD/log enabled)");
-  } else {
-    logW("sdk", "addGazeCallback not found on seeso instance");
-  }
-
-  // ---- Debug callback (optional) ----
-  if (typeof seeso.addDebugCallback === "function") {
-    seeso.addDebugCallback((info) => logD("sdkdbg", "debug", info));
-    logI("sdk", "addDebugCallback bound");
-  }
+  // NOTE: EasySeeSo 패턴에서 gaze/debug 콜백은 startTracking(onGaze, onDebug)으로 전달.
+  // 여기서는 calibration 콜백만 바인딩.
 
   // ---- Calibration callbacks (Delegated to CalibrationManager) ----
-  calManager.bindTo(seeso);
+  // EasySeeSo는 내부적으로 seeso.seeso (raw Seeso 인스턴스)를 갖고 있음
+  // calManager.bindTo는 raw Seeso 인스턴스가 필요할 수 있음
+  if (seeso.seeso) {
+    calManager.bindTo(seeso.seeso);
+  } else {
+    calManager.bindTo(seeso);
+  }
+  logI("sdk", "attachSeesoCallbacks: calibration callbacks bound");
 }
 
 // --- Preload Logic ---
@@ -682,72 +1167,220 @@ async function preloadSDK() {
   initPromise = (async () => {
     try {
       setState("sdk", "loading");
-      SDK = await loadWebpackModule("./seeso/dist/seeso.js?v=FINAL_FIX_NOW");
-      const SeesoClass = SDK?.default || SDK?.Seeso || SDK;
-      if (!SeesoClass) throw new Error("Seeso export not found");
 
-      seeso = new SeesoClass();
-      window.__seeso = { SDK, seeso };
-
+      // README 공식 패턴: EasySeeSo 사용
+      // EasySeeSo.init() 내부에서 initialize + addGazeCallback 처리
+      seeso = new EasySeeSo();
+      window.__seeso = seeso;
       setState("sdk", "constructed");
 
-      // Bind callbacks early
+      logI("sdk", "initializing engine via EasySeeSo.init()...");
+      setStatus("Loading AI model...");
+
+      const SDK_INIT_TIMEOUT_MS = 30000; // 30s — WASM CDN download can be slow on mobile
+      await Promise.race([
+        new Promise((resolve, reject) => {
+          seeso.init(
+            LICENSE_KEY,
+            () => resolve(),          // afterInitialized
+            () => reject(new Error("EasySeeSo init failed (afterFailed — license or WASM error)"))
+          );
+        }),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`SDK initialize timeout after ${SDK_INIT_TIMEOUT_MS / 1000}s`)),
+            SDK_INIT_TIMEOUT_MS
+          )
+        )
+      ]);
+
+      // EasySeeSo.init() 성공 후 gaze 콜백은 startTracking() 실행 시 등록됨
+      // 여기서는 calibration 콜백만 별도 등록
       attachSeesoCallbacks();
-
-      // Initialize Engine
-      const userStatusOption = SDK?.UserStatusOption
-        ? new SDK.UserStatusOption(true, true, true)
-        : { useAttention: true, useBlink: true, useDrowsiness: true };
-
-      logI("sdk", "initializing engine...");
-      const errCode = await seeso.initialize(LICENSE_KEY, userStatusOption);
-
-      if (errCode !== 0) {
-        setState("sdk", "init_failed");
-        throw new Error("Initialize returned: " + errCode);
-      }
-
       setState("sdk", "initialized");
+      setStatus("Initializing...");
       console.log("[Seeso] Preload Complete! Ready for Tracking.");
       return true;
     } catch (e) {
       logE("sdk", "Preload Failed", e);
       setState("sdk", "init_exception");
+      // [FIX #1] Reset initPromise so next boot() call gets a fresh attempt (not cached rejection)
+      initPromise = null;
+      // Always show retry UI regardless of failure type
+      const isTimeout = e.message && e.message.includes("timeout");
+      setStatus(isTimeout
+        ? "⚠️ 로딩 시간 초과. 네트워크를 확인 후 재시도 중..."
+        : `⚠️ SDK 초기화 실패: ${e.message}. 새로고침 해주세요.`
+      );
+      if (!isTimeout) {
+        // Non-timeout errors (license, WASM corrupt) → show retry button immediately
+        showRetry(true, "sdk_init_failed");
+      }
+      // For timeouts: boot() will auto-retry once before showing the button
       throw e;
+
     }
   })();
 
   return initPromise;
 }
 
-// Auto-start preload after short delay
-setTimeout(preloadSDK, 500);
 
-// Modified initSeeso (now just waits for preload)
+// [FIX-iOS Cases 3&4] REMOVED auto-start preload.
+// Previously: setTimeout(preloadSDK, 500) ran WASM init 500ms after page load.
+// On low-memory iPhones, iOS detects large WASM allocation with no user gesture
+// and kills the WebContent process in ~1.4 seconds (before any user interaction).
+// Fix: SDK now initializes ONLY when the user has touched the screen and boot() is called.
+// This gives iOS the user-gesture signal it requires to allocate memory fairly.
+
 async function initSeeso() {
-  if (!initPromise) preloadSDK();
+  // [FIX] Prevent multiple initializations/preloads
+  if (seeso && (state.sdk === "initialized" || state.sdk === "tracking")) {
+    logI("sdk", "initSeeso skipped: already initialized");
+    return true;
+  }
+
+  // First call: starts the preload. Subsequent calls: waits for existing promise.
+  if (!initPromise) {
+    logI("sdk", "[FIX] initSeeso: starting SDK init on-demand (user-gesture path).");
+    preloadSDK();
+  }
   try {
     await initPromise;
     return true;
   } catch (e) {
+    logE("sdk", "initSeeso failed", e);
+    // [FIX #1] Reset so next attempt is fresh (don't cache the rejection)
+    initPromise = null;
     return false;
   }
 }
+
+// Stored callbacks for SDK restart (setSeesoTracking reuse)
+let _onGazeCb = null;
+let _onDebugCb = null;
 
 function startTracking() {
-  if (!seeso || !mediaStream) return false;
+  if (!seeso) return false;
 
-  try {
-    const ok = seeso.startTracking(mediaStream);
-    logI("track", "startTracking returned", { ok });
-    setState("track", ok ? "running" : "failed");
-    return !!ok;
-  } catch (e) {
-    setState("track", "failed");
-    logE("track", "startTracking threw", e);
-    return false;
+  // README 공식 패턴: EasySeeSo.startTracking(onGaze, onDebug)
+  // 내부에서 getUserMedia를 직접 호출 → 별도 스트림 → SDK 전용
+  // 외부 mediaStream을 전달하지 않음!
+
+  // 우선 preview video용 stream이 있으면 camera 탭 피드백 유지
+  if (mediaStream) {
+    const vid = els.video;
+    if (vid && !vid.srcObject) {
+      vid.srcObject = mediaStream;
+      vid.playsInline = true;
+      vid.muted = true;
+      vid.play().catch(() => { });
+    }
   }
+
+  _onGazeCb = (gazeInfo) => {
+    lastGazeAt = performance.now();
+    const xRaw = gazeInfo?.x;
+    const yRaw = gazeInfo?.y;
+
+    // [DIAG] 첫 발화 로그
+    if (!startTracking._gazeFirstFired) {
+      startTracking._gazeFirstFired = true;
+      logI("gaze", "[DIAG] FIRST gazeCallback fired via EasySeeSo!", {
+        x: xRaw, y: yRaw,
+        trackingState: gazeInfo?.trackingState,
+        keys: gazeInfo ? Object.keys(gazeInfo) : null
+      });
+    }
+
+    if (calManager && calManager.handleFaceCheckGaze) {
+      calManager.handleFaceCheckGaze(gazeInfo?.trackingState);
+    }
+
+    overlay.gazeRaw = { x: xRaw, y: yRaw, trackingState: gazeInfo?.trackingState, confidence: gazeInfo?.confidence };
+    overlay.gaze = {
+      x: typeof xRaw === "number" && Number.isFinite(xRaw) ? xRaw : null,
+      y: typeof yRaw === "number" && Number.isFinite(yRaw) ? yRaw : null,
+      trackingState: gazeInfo?.trackingState,
+      confidence: gazeInfo?.confidence,
+    };
+
+    if (!window._gazeActive) { renderOverlay(); return; }
+    if (typeof window.Game !== "undefined" && overlay.gaze.x !== null) {
+      window.Game.onGaze(overlay.gaze.x, overlay.gaze.y);
+    }
+    if (window.gazeDataManager) {
+      window.gazeDataManager.processGaze(gazeInfo);
+    }
+    renderOverlay();
+  };
+
+  _onDebugCb = (fps, latMin, latMax, latAvg) => {
+    logI("sdkdbg", `FPS=${fps} lat(min=${latMin} max=${latMax} avg=${latAvg?.toFixed ? latAvg.toFixed(1) : latAvg}ms)`);
+  };
+
+  // EasySeeSo.startTracking에 기존 mediaStream 전달
+  // → 두 번째 getUserMedia 호출 없이 같은 스트림 재사용
+  // → Android 카메라 충돌(muted track → FPS=0) 방지
+  seeso.startTracking(_onGazeCb, _onDebugCb, mediaStream || undefined).then((ok) => {
+    logI("track", "EasySeeSo.startTracking returned", { ok });
+    setState("track", ok ? "running" : "failed");
+
+    // [DIAG v18] Patch raw Seeso processFrame_ to surface internal errors
+    // seeso = EasySeeSo instance, seeso.seeso = raw Seeso instance
+    const rawSeeso = seeso.seeso;
+    if (ok && rawSeeso && typeof rawSeeso.processFrame_ === "function") {
+      const _origPF = rawSeeso.processFrame_.bind(rawSeeso);
+      let _pfCallCount = 0;
+      let _pfLastLog = 0;
+      rawSeeso.processFrame_ = async function diagProcessFrame(imageCapture) {
+        _pfCallCount++;
+        const now = performance.now();
+        if (now - _pfLastLog > 3000) { // log every 3s
+          _pfLastLog = now;
+          logI("diag", `processFrame_ call #${_pfCallCount} | track.readyState=${rawSeeso.track?.readyState} muted=${rawSeeso.track?.muted} enabled=${rawSeeso.track?.enabled}`);
+        }
+        try {
+          const result = await _origPF(imageCapture);
+          return result;
+        } catch (e) {
+          logE("diag", `processFrame_ THREW: ${e?.message || String(e)}`);
+          throw e;
+        }
+      };
+      logI("diag", "processFrame_ patch applied to rawSeeso (seeso.seeso)");
+
+      // [SAFARI FIX] Patch imageCapture.grabFrame() to bypass videoElementPlaying hang
+      patchSdkImageCapture(rawSeeso);
+      // Also patch checkStreamTrack_ to see if it's blocking
+      if (typeof rawSeeso.checkStreamTrack_ === "function") {
+        const _origCST = rawSeeso.checkStreamTrack_.bind(rawSeeso);
+        let _cstFalseCount = 0;
+        rawSeeso.checkStreamTrack_ = function diagCheckStreamTrack(track) {
+          const result = _origCST(track);
+          if (!result) {
+            _cstFalseCount++;
+            if (_cstFalseCount <= 5 || _cstFalseCount % 100 === 0) {
+              logW("diag", `checkStreamTrack_ returned FALSE #${_cstFalseCount} | readyState=${track?.readyState} muted=${track?.muted} enabled=${track?.enabled} null=${track === null}`);
+            }
+          }
+          return result;
+        };
+        logI("diag", "checkStreamTrack_ patch applied");
+      }
+    } else {
+      logW("diag", `processFrame_ patch SKIPPED: ok=${ok} rawSeeso=${!!rawSeeso} hasFn=${typeof rawSeeso?.processFrame_}`);
+    }
+  }).catch((e) => {
+    setState("track", "failed");
+    logE("track", "EasySeeSo.startTracking threw", e?.message || String(e));
+  });
+
+  // startTracking은 async이므로 즉시 true 반환 (상태는 위 then/catch에서 처리)
+  setState("track", "starting");
+  return true;
 }
+
 
 /**
  * Entry Point for Game: Enters Face Check Mode.
@@ -755,7 +1388,6 @@ function startTracking() {
 function startCalibration() {
   if (!seeso) return false;
 
-  // Start tracking first if not already
   logI("cal", "Entering Face Check Mode...");
   calManager.startFaceCheck();
   return true;
@@ -789,33 +1421,32 @@ function startActualCalibration() {
     calManager.reset();
     const mode = 1;
 
-    const ok = seeso.startCalibration(mode, criteria);
+    // EasySeeSo.startCalibration()은 콜백 기반 시그니처 (onNextPoint, onProgress, onFinish, points)
+    // calManager는 이미 seeso.seeso(raw Seeso)에 직접 바인딩됨 → raw Seeso API 직접 호출
+    const rawSeeso = seeso.seeso || seeso;
+    const ok = rawSeeso.startCalibration(mode, criteria);
 
     overlay.calRunning = !!ok;
     overlay.calProgress = 0;
     overlay.calPointCount = 0;
 
     if (ok) {
+      // [FIX] Prevent duplicate loops
+      if (overlay.rafId) {
+        cancelAnimationFrame(overlay.rafId);
+        overlay.rafId = null;
+      }
+
       // Start single animation loop for calibration
       const tick = () => {
-        if (!overlay.calRunning) return;
+        if (!overlay.calRunning) {
+          overlay.rafId = null;
+          return;
+        }
         renderOverlay();
-        requestAnimationFrame(tick);
+        overlay.rafId = requestAnimationFrame(tick);
       };
       tick();
-
-      // [EMERGENCY SKIP REMOVED FOR PRODUCTION]
-      /*
-      setTimeout(() => {
-        if (overlay.calRunning) {
-          const skipBtn = document.createElement('button');
-          skipBtn.innerText = "⚠️ Emergency Skip";
-           // ... (removed)
-          document.body.appendChild(skipBtn);
-          setTimeout(() => skipBtn.remove(), 10000);
-        }
-      }, 3000);
-      */
     }
 
     logI("cal", "startActualCalibration returned", { ok, criteria });
@@ -863,7 +1494,8 @@ setInterval(() => {
   }
 
   // If tracking is running but gaze callbacks stopped, surface it
-  if (state.track === "running" && lastGazeAt && now - lastGazeAt > 1500) {
+  // Skip warning when SDK is intentionally OFF (replay/battle phase)
+  if (state.track === "running" && lastGazeAt && now - lastGazeAt > 1500 && window._seesoSdkOn !== false) {
     logW("hb", "No gaze samples for >1.5s while tracking is running.", hb);
   }
 }, 2000);
@@ -919,8 +1551,6 @@ async function boot() {
   resizeCanvas();
   renderOverlay();
 
-  // (In-app browser check moved to immediate execution)
-
   setStatus("Initializing...");
   setGazeInfo("gaze: -");
   showRetry(false);
@@ -931,11 +1561,28 @@ async function boot() {
     return;
   }
 
-  const camOk = await ensureCamera();
-  if (!camOk) return false; // Return false on failure
+  // [EasySeeSo pattern] SDK init FIRST, then camera.
+  // [FIX #1] Auto-retry SDK init once on timeout before showing manual retry button.
+  let sdkOk = await initSeeso();
+  if (!sdkOk) {
+    const isTimeout = state.sdk === 'init_exception';
+    if (isTimeout) {
+      logW('boot', '[FIX #1] SDK init timed out — auto-retrying once...');
+      setStatus('⏳ AI 모델 로딩 재시도 중... (네트워크가 느린 환경)');
+      // Small wait before retry so GC can run
+      await new Promise(r => setTimeout(r, 1500));
+      sdkOk = await initSeeso();
+    }
+    if (!sdkOk) {
+      setStatus('⚠️ 초기화 실패. 아래 버튼을 눌러 다시 시도하세요.');
+      showRetry(true, 'sdk_init_failed_after_retry');
+      return false;
+    }
+  }
 
-  const sdkOk = await initSeeso();
-  if (!sdkOk) return false;
+  // Camera AFTER init (matches EasySeeSo flow)
+  const camOk = await ensureCamera();
+  if (!camOk) return false;
 
   const trackOk = startTracking();
   if (!trackOk) {
@@ -952,5 +1599,154 @@ async function boot() {
 // Expose boot control to Game
 window.startEyeTracking = boot;
 
-// (Auto-check removed to allow UI access)
+// ---------- SeeSo Tracking On/Off Control ----------
+/**
+ * [iOS OOM Fix] 읽기 구간 = SDK ON / replay·전투 구간 = SDK OFF
+ *
+ * 새 SDK (v2.5.2): stopTracking() 후 같은 mediaStream으로 startTracking() 재시작 가능.
+ * → WASM Worker 종료 → SAB(~150MB) 해제 → iOS OOM 방지
+ *
+ * OFF: gaze replay 시작 시 (game.js:setSeesoTracking(false))
+ * ON:  다음 읽기 구간 시작 직전 (game.js:setSeesoTracking(true))
+ */
+window._gazeActive = true;
+window._seesoSdkOn = true; // SDK 실제 실행 상태
+
+window.setSeesoTracking = function (on, reason) {
+  if (window._seesoSdkOn === on) {
+    logI('seeso', `[Gate] already ${on ? 'OPEN' : 'CLOSED'}, skipping (${reason})`);
+    return;
+  }
+  window._seesoSdkOn = on;
+
+  const heapMB = performance.memory
+    ? Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB'
+    : 'N/A';
+
+  if (!on) {
+    // ── SDK OFF: stopTracking → WASM → 메모리 해제 ──
+    window._gazeActive = false; // Close gate immediately
+    try {
+      if (seeso) {
+        seeso.stopTracking();
+        logI('seeso', `[Gate] CLOSED← SDK stopTracking() | reason: ${reason} | heap: ${heapMB}`);
+      }
+    } catch (e) {
+      logW('seeso', '[Gate] stopTracking() threw:', e);
+    }
+  } else {
+    // ── SDK ON: startTracking() 완료 후에만 gaze gate 열기 ──
+    // [FIX #2] _gazeActive=false 유지, startTracking.then() 내부에서만 true로 설정.
+    // 이전: setSeesoTracking(true) 호출 즉시 _gazeActive=true → SDK 미준비 상태에서 gaze 처리 시작.
+    // 수정: SDK startTracking이 ok=true를 반환한 후에만 gate 개방.
+    window._gazeActive = false; // [FIX] Keep closed until SDK is actually ready
+
+    const attemptStart = (retriesLeft) => {
+      if (!seeso || !_onGazeCb || !_onDebugCb) {
+        logW('seeso', `[Gate] Cannot restart SDK — seeso=${!!seeso} cb=${!!_onGazeCb}`);
+        // Fallback: open gate anyway so game doesn't freeze, but gaze won't be processed
+        window._gazeActive = true;
+        return;
+      }
+
+      seeso.startTracking(_onGazeCb, _onDebugCb) // NO existingStream → fresh camera
+        .then((ok) => {
+          logI('seeso', `[Gate] OPEN  ← SDK startTracking() ok=${ok} retries_left=${retriesLeft} | reason: ${reason} | heap: ${heapMB}`);
+          if (ok) {
+            // 새 스트림으로 mediaStream 참조 업데이트
+            mediaStream = seeso.stream || mediaStream;
+            if (els && els.video && mediaStream) {
+              els.video.srcObject = mediaStream;
+            }
+            // [SAFARI FIX] 재시작 시 새 imageCapture 인스턴스 생성 → 패치 재적용
+            const rawSeeso = seeso?.seeso;
+            if (rawSeeso) patchSdkImageCapture(rawSeeso);
+
+            // [FIX #2] SDK 준비 확인 후 gate 개방
+            window._gazeActive = true;
+            logI('seeso', '[Gate] _gazeActive = true (SDK confirmed ready)');
+          } else {
+            logW('seeso', `[Gate] startTracking() returned false (retriesLeft=${retriesLeft})`);
+            if (retriesLeft > 0) {
+              logW('seeso', `[Gate] Retrying startTracking in 1s... (${retriesLeft} left)`);
+              setTimeout(() => attemptStart(retriesLeft - 1), 1000);
+            } else {
+              // 재시도 실패: gate 강제 개방 (gaze 없어도 게임은 진행되도록)
+              logW('seeso', '[Gate] All retries failed. Opening gate anyway (no-gaze fallback).');
+              window._gazeActive = true;
+            }
+          }
+        })
+        .catch((e) => {
+          logW('seeso', '[Gate] startTracking() threw:', e);
+          if (retriesLeft > 0) {
+            logW('seeso', `[Gate] Retrying after error in 1s... (${retriesLeft} left)`);
+            setTimeout(() => attemptStart(retriesLeft - 1), 1000);
+          } else {
+            logW('seeso', '[Gate] All retries exhausted. Opening gate (no-gaze fallback).');
+            window._gazeActive = true;
+          }
+        });
+    };
+
+    try {
+      attemptStart(3); // 최대 3회 재시도
+    } catch (e) {
+      logW('seeso', '[Gate] restart threw:', e);
+      window._gazeActive = true; // Fallback
+    }
+  }
+};
+
+
+// ---------- Shutdown: Camera + SDK Cleanup ----------
+/**
+ * [FIX] Release all SeeSo and camera resources.
+ * Previously, seeso.startTracking() was never paired with stopTracking(),
+ * causing the camera to stay active (LED on) for the entire browser session.
+ * This function should be called:
+ *   - On page unload (beforeunload)
+ *   - When the user reaches the final score/share screen (optional: camera no longer needed)
+ */
+function shutdownEyeTracking() {
+  try {
+    if (seeso && typeof seeso.stopTracking === 'function') {
+      seeso.stopTracking();
+      logI('sys', '[Shutdown] seeso.stopTracking() called.');
+    }
+  } catch (e) {
+    logW('sys', '[Shutdown] seeso.stopTracking() threw:', e);
+  }
+
+  // Stop all camera tracks (turns off camera LED)
+  try {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => {
+        track.stop();
+        logI('sys', `[Shutdown] Camera track stopped: ${track.kind} (${track.label})`);
+      });
+      mediaStream = null;
+    }
+  } catch (e) {
+    logW('sys', '[Shutdown] mediaStream.getTracks() threw:', e);
+  }
+
+  // Stop video element feed
+  try {
+    if (els && els.video) {
+      els.video.pause();
+      els.video.srcObject = null;
+    }
+  } catch (e) { /* silent */ }
+
+  logI('sys', '[Shutdown] Eye tracking resources released.');
+}
+
+// [FIX] Auto-shutdown on page unload (covers: tab close, refresh, navigation)
+window.addEventListener('beforeunload', () => {
+  shutdownEyeTracking();
+});
+
+// Expose so Game can call manually on final screen
+window.shutdownEyeTracking = shutdownEyeTracking;
 
