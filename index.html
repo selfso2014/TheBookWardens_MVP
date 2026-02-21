@@ -381,7 +381,9 @@
 <body>
   <!-- 1. Eye Tracking Layer (Background/Debug) -->
   <div id="stage">
-    <video id="preview" autoplay muted playsinline></video>
+    <video id="camera-preview" autoplay muted playsinline></video>
+    <!-- SDK(seeso.js)가 id="preview" canvas를 내부에서 찾음 → video와 충돌 방지를 위해 분리 -->
+    <canvas id="preview" style="display:none; position:absolute; top:0; left:0;"></canvas>
     <canvas id="output"></canvas>
   </div>
 
@@ -1257,7 +1259,7 @@
 
   <!-- Scripts -->
   <!-- 1. Eye Tracking Core -->
-  <script type="module" src="./js/app.js?v=SDK_v21_OnOff"></script>
+  <script type="module" src="./js/app.js?v=SDK_v22_PreviewFix"></script>
   <!-- Alice Battle Logic (Latest - Single Bar Logic) -->
   <script src="./js/alice-battle-simple.js?v=FINAL_FIX_NOW"></script>
   <!-- Linked Game.AliceBattle to AliceBattleRef Logic moved to GameLogic -->
