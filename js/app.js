@@ -1148,64 +1148,18 @@ function startTracking() {
   if (!seeso || !mediaStream) return false;
 
   try {
+    // SDK 공식 API만 호출. 내부 구현(imageCapture, grabFrame 등) 절대 건드리지 않음.
     const ok = seeso.startTracking(mediaStream);
     logI("track", "startTracking returned", { ok });
 
-    // [FIX v2] Patch grabFrame + verify it's actually being called by camera thread.
-    // If call count stays 0, SDK captured original grabFrame in a closure → need restart.
-    if (ok && seeso.imageCapture && window.ImageCapture && seeso.track) {
-      try {
-        const nativeIC = new window.ImageCapture(seeso.track);
-        nativeIC.grabFrame().then(bmp => {
-          logI("track", "[FIX] Native OK " + bmp.width + "x" + bmp.height);
-          // Patch grabFrame with call counter
-          let _grabCount = 0;
-          seeso.imageCapture.grabFrame = () => {
-            _grabCount++;
-            return nativeIC.grabFrame();
-          };
-          logI("track", "[FIX] grabFrame patched (+counter)");
-
-          // Check after 2s if our patch is being called by camera thread
-          setTimeout(() => {
-            logI("track", "[FIX] grabFrame call count after 2s: " + _grabCount);
-            if (_grabCount === 0) {
-              logW("track", "[FIX] Camera thread NOT using patched grabFrame! Trying stopTracking+restart...");
-              // Stop and restart tracking with native IC pre-substituted
-              seeso.stopTracking();
-              setTimeout(() => {
-                const ok2 = seeso.startTracking(mediaStream);
-                logI("track", "[FIX] Restarted tracking: " + ok2);
-                if (ok2) {
-                  // Patch again after restart
-                  let _grabCount2 = 0;
-                  seeso.imageCapture.grabFrame = () => { _grabCount2++; return nativeIC.grabFrame(); };
-                  setTimeout(() => logI("track", "[FIX] After restart grabFrame count: " + _grabCount2), 2000);
-                }
-              }, 200);
-            } else {
-              logI("track", "[FIX] Camera thread IS calling patched grabFrame. Checking gaze...");
-            }
-          }, 2000);
-        }).catch(e2 => {
-          logW("track", "[FIX] Native grabFrame also failed: " + (e2?.message ?? String(e2)));
-        });
-      } catch (icErr) {
-        logW("track", "[FIX] ImageCapture patch error: " + icErr.message);
-      }
-    }
-
     setState("track", ok ? "running" : "failed");
     return !!ok;
-
-
 
   } catch (e) {
     setState("track", "failed");
     logE("track", "startTracking threw", e);
     return false;
   }
-
 }
 
 /**

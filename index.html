@@ -430,8 +430,8 @@
         <!-- WPM (Speed) -->
         <div class="resource-item wpm-badge" title="Reading Speed">
           <span style="font-size: 0.8rem; color: #aaa; margin-right: 5px;">??/span>
-          <span id="wpm-display">0</span>
-          <small style="font-size: 0.7rem; color: #888; margin-left: 2px;">WPM</small>
+            <span id="wpm-display">0</span>
+            <small style="font-size: 0.7rem; color: #888; margin-left: 2px;">WPM</small>
         </div>
 
       </div>
@@ -719,80 +719,81 @@
         <div class="entity-area villain"
           style="display: flex; flex-direction: column; align-items: center; width: 100%;">
           <div class="avatar" id="villain-avatar" style="font-size: 3rem;">???/div>
-          <div class="card-container" style="display: flex; gap: 5px; justify-content: center; margin: 5px 0;">
-            <!-- Static Cards (No Click) -->
-            <div class="card"
-              style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px;">
-              <i style="color:red;">????/i><span>QUEEN</span>
-              <div class="power-val" style="color:#aaa;">100</div>
+            <div class="card-container" style="display: flex; gap: 5px; justify-content: center; margin: 5px 0;">
+              <!-- Static Cards (No Click) -->
+              <div class="card"
+                style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px;">
+                <i style="color:red;">????/i><span>QUEEN</span>
+                  <div class="power-val" style="color:#aaa;">100</div>
+              </div>
+              <div class="card"
+                style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px;">
+                <i style="color:red;">????????/i><span>KING</span>
+                  <div class="power-val" style="color:#aaa;">60</div>
+              </div>
+              <div class="card"
+                style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px;">
+                <i style="color:red;">?????????곌떽?깃뎀??/i><span>JOKER</span>
+                  <div class="power-val" style="color:#aaa;">40</div>
+              </div>
             </div>
-            <div class="card"
-              style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px;">
-              <i style="color:red;">????????/i><span>KING</span>
-              <div class="power-val" style="color:#aaa;">60</div>
+
+            <!-- Health Bar -->
+            <div class="status-bar"
+              style="width: 200px; height: 10px; background: #555; border-radius: 5px; overflow: hidden; margin-top: 5px;">
+              <div class="hp" style="width: 100%; height: 100%; background: #ff4d4d;"></div>
             </div>
-            <div class="card"
-              style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px;">
-              <i style="color:red;">?????????곌떽?깃뎀??/i><span>JOKER</span>
-              <div class="power-val" style="color:#aaa;">40</div>
-            </div>
+            <div class="entity-name" style="color: #ff4d4d; font-weight: bold; margin-top: 5px;">RED QUEEN</div>
           </div>
 
-          <!-- Health Bar -->
-          <div class="status-bar"
-            style="width: 200px; height: 10px; background: #555; border-radius: 5px; overflow: hidden; margin-top: 5px;">
-            <div class="hp" style="width: 100%; height: 100%; background: #ff4d4d;"></div>
-          </div>
-          <div class="entity-name" style="color: #ff4d4d; font-weight: bold; margin-top: 5px;">RED QUEEN</div>
-        </div>
-
-        <!-- Middle Text -->
-        <div class="middle-text" id="alice-text"
-          style="text-align: center; color: #ccc; font-family: 'Crimson Text', serif; font-size: 1.1rem; padding: 20px; font-style: italic;">
-          "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once
-          or twice she had peeped into the book her sister was reading..."
-        </div>
-
-        <!-- Bottom Entity Area (WARDEN ALICE) -->
-        <div class="entity-area warden"
-          style="display: flex; flex-direction: column; align-items: center; width: 100%;">
-          <div class="entity-name" style="color: #4da6ff; font-weight: bold; margin-bottom: 5px;">WARDEN ALICE</div>
-
-          <!-- Health Bar -->
-          <div class="status-bar"
-            style="width: 200px; height: 10px; background: #555; border-radius: 5px; overflow: hidden; margin-bottom: 5px;">
-            <div class="hp" style="width: 100%; height: 100%; background: #4da6ff;"></div>
+          <!-- Middle Text -->
+          <div class="middle-text" id="alice-text"
+            style="text-align: center; color: #ccc; font-family: 'Crimson Text', serif; font-size: 1.1rem; padding: 20px; font-style: italic;">
+            "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do:
+            once
+            or twice she had peeped into the book her sister was reading..."
           </div>
 
-          <div class="card-container" style="display: flex; gap: 5px; justify-content: center; margin: 5px 0;">
-            <!-- Static Cards (No Click) -->
-            <div class="card"
-              style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px; cursor: default;">
-              <i style="color:cyan;">?????/i><span>INK</span>
-              <div class="power-val" style="color:#aaa;">190</div>
+          <!-- Bottom Entity Area (WARDEN ALICE) -->
+          <div class="entity-area warden"
+            style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <div class="entity-name" style="color: #4da6ff; font-weight: bold; margin-bottom: 5px;">WARDEN ALICE</div>
+
+            <!-- Health Bar -->
+            <div class="status-bar"
+              style="width: 200px; height: 10px; background: #555; border-radius: 5px; overflow: hidden; margin-bottom: 5px;">
+              <div class="hp" style="width: 100%; height: 100%; background: #4da6ff;"></div>
             </div>
-            <div class="card"
-              style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px; cursor: default;">
-              <i style="color:cyan;">??</i><span>RUNE</span>
-              <div class="power-val" style="color:#aaa;">30</div>
+
+            <div class="card-container" style="display: flex; gap: 5px; justify-content: center; margin: 5px 0;">
+              <!-- Static Cards (No Click) -->
+              <div class="card"
+                style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px; cursor: default;">
+                <i style="color:cyan;">?????/i><span>INK</span>
+                  <div class="power-val" style="color:#aaa;">190</div>
+              </div>
+              <div class="card"
+                style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px; cursor: default;">
+                <i style="color:cyan;">??</i><span>RUNE</span>
+                <div class="power-val" style="color:#aaa;">30</div>
+              </div>
+              <div class="card"
+                style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px; cursor: default;">
+                <i style="color:cyan;">???/i><span>GEM</span>
+                  <div class="power-val" style="color:#aaa;">50</div>
+              </div>
             </div>
-            <div class="card"
-              style="border: 1px solid #444; padding: 5px; background: #222; text-align: center; width: 60px; cursor: default;">
-              <i style="color:cyan;">???/i><span>GEM</span>
-              <div class="power-val" style="color:#aaa;">50</div>
+            <div class="avatar" id="warden-avatar" style="font-size: 3rem;">???/div>
             </div>
+
+            <div class="battle-log" id="al-log"
+              style="text-align: center; color: #888; font-size: 0.8rem; margin-top: 10px;">Battle started...</div>
           </div>
-          <div class="avatar" id="warden-avatar" style="font-size: 3rem;">???/div>
-        </div>
 
-        <div class="battle-log" id="al-log"
-          style="text-align: center; color: #888; font-size: 0.8rem; margin-top: 10px;">Battle started...</div>
-      </div>
-
-      <!-- Click to Win Trigger Overlay (Functionality Placeholder) -->
-      <div id="dummy-overlay-removed"
-        style="position:absolute; top:0; left:0; width:100%; height:100%; z-index: 1000; cursor: pointer;"
-        title="Click to Proceed (Dummy Mode)"></div>
+          <!-- Click to Win Trigger Overlay (Functionality Placeholder) -->
+          <div id="dummy-overlay-removed"
+            style="position:absolute; top:0; left:0; width:100%; height:100%; z-index: 1000; cursor: pointer;"
+            title="Click to Proceed (Dummy Mode)"></div>
 
     </section>
 
@@ -826,42 +827,42 @@
         <!-- Stat 1: WPM -->
         <div class="stat-card" style="border-color: #00e5ff;">
           <div class="stat-icon">??/div>
-          <div class="stat-value" id="stat-wpm">0</div>
-          <div class="stat-label">Avg. WPM</div>
-        </div>
+            <div class="stat-value" id="stat-wpm">0</div>
+            <div class="stat-label">Avg. WPM</div>
+          </div>
 
-        <!-- Stat 2: Ink -->
-        <div class="stat-card" style="border-color: #8b2fc9;">
-          <div class="stat-icon">???????/div>
-          <div class="stat-value" id="stat-ink">0</div>
-          <div class="stat-label">Ink Collected</div>
-        </div>
+          <!-- Stat 2: Ink -->
+          <div class="stat-card" style="border-color: #8b2fc9;">
+            <div class="stat-icon">???????/div>
+              <div class="stat-value" id="stat-ink">0</div>
+              <div class="stat-label">Ink Collected</div>
+            </div>
 
-        <!-- Stat 3: Gems -->
-        <div class="stat-card" style="border-color: #ff4444;">
-          <div class="stat-icon">???/div>
-          <div class="stat-value" id="stat-gems">0</div>
-          <div class="stat-label">Gems Earned</div>
-        </div>
+            <!-- Stat 3: Gems -->
+            <div class="stat-card" style="border-color: #ff4444;">
+              <div class="stat-icon">???/div>
+                <div class="stat-value" id="stat-gems">0</div>
+                <div class="stat-label">Gems Earned</div>
+              </div>
 
-        <!-- Stat 4: Words -->
-        <div class="stat-card" style="border-color: #ffd700;">
-          <div class="stat-icon">???/div>
-          <div class="stat-value" id="stat-words">0</div>
-          <div class="stat-label">Words Mastered</div>
-        </div>
-      </div>
+              <!-- Stat 4: Words -->
+              <div class="stat-card" style="border-color: #ffd700;">
+                <div class="stat-icon">???/div>
+                  <div class="stat-value" id="stat-words">0</div>
+                  <div class="stat-label">Words Mastered</div>
+                </div>
+              </div>
 
-      <!-- Accordion Text Log -->
-      <div id="full-text-container" style="width: 90%; max-width: 600px; margin-bottom: 30px;">
-        <!-- Injected via JS -->
-      </div>
+              <!-- Accordion Text Log -->
+              <div id="full-text-container" style="width: 90%; max-width: 600px; margin-bottom: 30px;">
+                <!-- Injected via JS -->
+              </div>
 
-      <!-- Action Buttons -->
-      <div style="display:flex; gap:15px; margin-top: 10px; z-index: 10;">
-        <button id="btn-share-summary" class="btn-primary">Share Victory</button>
-        <button id="btn-export" class="btn-primary" style="background:#444;">Export Data</button>
-      </div>
+              <!-- Action Buttons -->
+              <div style="display:flex; gap:15px; margin-top: 10px; z-index: 10;">
+                <button id="btn-share-summary" class="btn-primary">Share Victory</button>
+                <button id="btn-export" class="btn-primary" style="background:#444;">Export Data</button>
+              </div>
     </section>
 
     <!-- SCREEN 6: SUMMARY & SHARE -->
@@ -1111,182 +1112,184 @@
       <div id="reward-container"
         style="display:none; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 200px;">
         <div style="font-size: 3rem; margin-bottom: 15px;">???????/div>
-        <h2
-          style="color: #f0c420; margin: 0 0 10px 0; font-size: 1.8rem; text-transform: uppercase; letter-spacing: 2px;">
-          Ink Collected</h2>
-        <div id="reward-ink-value"
-          style="font-size: 3.5rem; font-weight: bold; color: #fff; text-shadow: 0 0 15px #f0c420; font-family: 'Cinzel', serif;">
-          +0</div>
+          <h2
+            style="color: #f0c420; margin: 0 0 10px 0; font-size: 1.8rem; text-transform: uppercase; letter-spacing: 2px;">
+            Ink Collected</h2>
+          <div id="reward-ink-value"
+            style="font-size: 3.5rem; font-weight: bold; color: #fff; text-shadow: 0 0 15px #f0c420; font-family: 'Cinzel', serif;">
+            +0</div>
+        </div>
+
+        <!-- Quiz Container -->
+        <div id="quiz-container">
+          <img src="./ink_shadow_boss.png" class="villain-img" alt="The Timekeeper">
+          <h2 class="villain-title">The Timekeeper</h2>
+          <div id="line-detect-result" style="color: #0f0; margin-bottom: 10px; font-weight: bold;"></div>
+          <p id="quiz-text" class="quiz-question">...</p>
+          <div id="quiz-options" class="quiz-options"></div>
+        </div>
+
       </div>
-
-      <!-- Quiz Container -->
-      <div id="quiz-container">
-        <img src="./ink_shadow_boss.png" class="villain-img" alt="The Timekeeper">
-        <h2 class="villain-title">The Timekeeper</h2>
-        <div id="line-detect-result" style="color: #0f0; margin-bottom: 10px; font-weight: bold;"></div>
-        <p id="quiz-text" class="quiz-question">...</p>
-        <div id="quiz-options" class="quiz-options"></div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- SCREEN: Alice Battlefield (Reordered Conflict) -->
-  <div id="screen-alice-battle" class="screen"
-    style="display:none; flex-direction: column; overflow: hidden; background: #000; width: 100%; height: 100vh; align-items: center; justify-content: space-between;">
-    <canvas id="alice-canvas"
-      style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none;"></canvas>
-
-    <div id="alice-game-ui"
-      style="position: relative; z-index: 10; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
-
-      <!-- Top Entity Area (RED DRAGON VILLAIN BACKGROUND) -->
-      <div class="entity-area villain"
-        style="position: relative; width: 100%; height: 34vh; min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 0vh; margin-top: -1vh; overflow: hidden;">
-
-        <!-- Villain Background Image -->
-        <div id="villain-visual-container"
-          style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; display: flex; justify-content: center; align-items: flex-start; padding-top: 2vh;">
-          <img id="villain-bg-img" src="finalredvillain.png" alt="Red Villain"
-            style="width: auto; height: 95%; max-width: 95%; object-fit: contain; object-position: center top; mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); opacity: 0.9;">
-        </div>
-
-
-        <!-- Villain Cards Overlay (Lowered to show face) -->
-        <div class="card-container"
-          style="position: relative; z-index: 2; margin-top: 18vh; display: flex; gap: 10px; justify-content: center;">
-          <div id="v-card-queen" class="card" style="border-color: #ff4444; background: rgba(40, 0, 0, 0.8);">
-            <i style="color:red;">????/i><span>QUEEN</span>
-            <div class="power-val" id="v-val-queen">100</div>
-          </div>
-          <div id="v-card-king" class="card" style="border-color: #ff4444; background: rgba(40, 0, 0, 0.8);">
-            <i style="color:red;">????????/i><span>KING</span>
-            <div class="power-val" id="v-val-king">60</div>
-          </div>
-          <div id="v-card-joker" class="card" style="border-color: #ff4444; background: rgba(40, 0, 0, 0.8);">
-            <i style="color:red;">?????????곌떽?깃뎀??/i><span>JOKER</span>
-            <div class="power-val" id="v-val-joker">40</div>
-          </div>
-        </div>
-
-        <!-- Villain HP Bar Overlay -->
-        <div class="status-bar"
-          style="position: absolute; bottom: 10px; width: 60%; height: 6px; background: #333; border: 1px solid #555; z-index: 2;">
-          <div class="hp" id="villain-hp" style="background: #ff4d4d; width: 100%; height: 100%;"></div>
-        </div>
-      </div>
-
-      <!-- Middle Area: Rift Textfield -->
-      <div id="rift-textfield-container"
-        style="flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 10px; position: relative;">
-
-        <div class="rift-textfield"
-          style="border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(0, 0, 0, 0.4); padding: 10px 15px; border-radius: 6px; max-width: 850px; width: 98%; max-height: 170px; overflow: hidden; position: relative; backdrop-filter: blur(2px);">
-
-          <div
-            style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #000; padding: 0 10px; font-size: 0.8rem; color: #aaa; border: 1px solid #444; border-radius: 4px; white-space: nowrap;">
-            Rift Textfield
-          </div>
-
-          <div class="middle-text" id="alice-text"
-            style="text-align: center; color: #eee; font-family: 'Crimson Text', serif; font-size: 1.0rem; line-height: 1.6; font-style: italic; max-height: 120px; overflow: hidden;">
-            "For it flashed across her mind that she had never before seen a rabbit with either a waistcoat-pocket, or a
-            watch to take out of it. Burning with curiosity, she ran across the field after it, and was just in time to
-            see it pop down a large rabbit-hole under the hedge..."
-          </div>
-        </div>
-      </div>
-
-      <!-- Bottom Entity Area (WARDEN CONTROLS) -->
-      <div class="entity-area warden"
-        style="width: 100%; height: 38vh; min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 110px; background: linear-gradient(to top, rgba(0,0,20,0.8), transparent);">
-
-        <div class="battle-log" id="al-log"
-          style="text-align: center; color: #888; font-size: 0.8rem; margin-bottom: 5px; min-height: 1.2em;">
-          Battle started...
-        </div>
-
-        <!-- Warden HP -->
-        <div class="status-bar"
-          style="width: 200px; height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin-bottom: 15px; border: 1px solid #444;">
-          <div class="hp" id="warden-hp" style="background: #4da6ff; width: 100%; height: 100%;"></div>
-        </div>
-
-        <!-- Warden Cards (No Avatar) -->
-        <div class="card-container" style="display: flex; gap: 15px; justify-content: center;">
-          <div id="card-ink" class="card"
-            style="cursor: pointer; border-radius: 12px; border: 1px solid #b300ff; background: rgba(20, 0, 40, 0.85); box-shadow: 0 4px 12px rgba(179, 0, 255, 0.3); transition: transform 0.1s, box-shadow 0.1s;">
-            <img src="./ink.png"
-              style="width: 30px; height: 30px; margin-bottom: 5px; filter: drop-shadow(0 0 5px cyan);">
-            <span>INK</span>
-            <div class="power-val" id="val-ink">190</div>
-          </div>
-          <div id="card-rune" class="card"
-            style="cursor: pointer; border-radius: 12px; border: 1px solid #00f2ff; background: rgba(0, 40, 40, 0.85); box-shadow: 0 4px 12px rgba(0, 242, 255, 0.3); transition: transform 0.1s, box-shadow 0.1s;">
-            <img src="./rune.png"
-              style="width: 30px; height: 30px; margin-bottom: 5px; filter: drop-shadow(0 0 5px cyan);">
-            <span>RUNE</span>
-            <div class="power-val" id="val-rune">30</div>
-          </div>
-          <div id="card-gem" class="card"
-            style="cursor: pointer; border-radius: 12px; border: 1px solid #ffffff; background: rgba(40, 40, 50, 0.85); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3); transition: transform 0.1s, box-shadow 0.1s;">
-            <img src="./gem.png"
-              style="width: 30px; height: 30px; margin-bottom: 5px; filter: drop-shadow(0 0 5px cyan);">
-            <span>GEM</span>
-            <div class="power-val" id="val-gem">50</div>
-          </div>
-        </div>
-      </div>
-
     </div>
 
-    <!-- Final Result Overlay -->
-    <div id="alice-final-screen"
-      style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transition: opacity 1s;">
-      <div id="result-header" class="result-header"
-        style="font-family: 'Cinzel', serif; font-size: 3rem; margin-bottom: 20px;">RESULT</div>
-      <div id="story-display" class="story-container"
-        style="max-width: 600px; text-align: center; color: #ddd; font-family: serif; font-size: 1.2rem; line-height: 1.6; padding: 20px;">
+    <!-- SCREEN: Alice Battlefield (Reordered Conflict) -->
+    <div id="screen-alice-battle" class="screen"
+      style="display:none; flex-direction: column; overflow: hidden; background: #000; width: 100%; height: 100vh; align-items: center; justify-content: space-between;">
+      <canvas id="alice-canvas"
+        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none;"></canvas>
+
+      <div id="alice-game-ui"
+        style="position: relative; z-index: 10; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+
+        <!-- Top Entity Area (RED DRAGON VILLAIN BACKGROUND) -->
+        <div class="entity-area villain"
+          style="position: relative; width: 100%; height: 34vh; min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 0vh; margin-top: -1vh; overflow: hidden;">
+
+          <!-- Villain Background Image -->
+          <div id="villain-visual-container"
+            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; display: flex; justify-content: center; align-items: flex-start; padding-top: 2vh;">
+            <img id="villain-bg-img" src="finalredvillain.png" alt="Red Villain"
+              style="width: auto; height: 95%; max-width: 95%; object-fit: contain; object-position: center top; mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); opacity: 0.9;">
+          </div>
+
+
+          <!-- Villain Cards Overlay (Lowered to show face) -->
+          <div class="card-container"
+            style="position: relative; z-index: 2; margin-top: 18vh; display: flex; gap: 10px; justify-content: center;">
+            <div id="v-card-queen" class="card" style="border-color: #ff4444; background: rgba(40, 0, 0, 0.8);">
+              <i style="color:red;">????/i><span>QUEEN</span>
+                <div class="power-val" id="v-val-queen">100</div>
+            </div>
+            <div id="v-card-king" class="card" style="border-color: #ff4444; background: rgba(40, 0, 0, 0.8);">
+              <i style="color:red;">????????/i><span>KING</span>
+                <div class="power-val" id="v-val-king">60</div>
+            </div>
+            <div id="v-card-joker" class="card" style="border-color: #ff4444; background: rgba(40, 0, 0, 0.8);">
+              <i style="color:red;">?????????곌떽?깃뎀??/i><span>JOKER</span>
+                <div class="power-val" id="v-val-joker">40</div>
+            </div>
+          </div>
+
+          <!-- Villain HP Bar Overlay -->
+          <div class="status-bar"
+            style="position: absolute; bottom: 10px; width: 60%; height: 6px; background: #333; border: 1px solid #555; z-index: 2;">
+            <div class="hp" id="villain-hp" style="background: #ff4d4d; width: 100%; height: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- Middle Area: Rift Textfield -->
+        <div id="rift-textfield-container"
+          style="flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 10px; position: relative;">
+
+          <div class="rift-textfield"
+            style="border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(0, 0, 0, 0.4); padding: 10px 15px; border-radius: 6px; max-width: 850px; width: 98%; max-height: 170px; overflow: hidden; position: relative; backdrop-filter: blur(2px);">
+
+            <div
+              style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #000; padding: 0 10px; font-size: 0.8rem; color: #aaa; border: 1px solid #444; border-radius: 4px; white-space: nowrap;">
+              Rift Textfield
+            </div>
+
+            <div class="middle-text" id="alice-text"
+              style="text-align: center; color: #eee; font-family: 'Crimson Text', serif; font-size: 1.0rem; line-height: 1.6; font-style: italic; max-height: 120px; overflow: hidden;">
+              "For it flashed across her mind that she had never before seen a rabbit with either a waistcoat-pocket, or
+              a
+              watch to take out of it. Burning with curiosity, she ran across the field after it, and was just in time
+              to
+              see it pop down a large rabbit-hole under the hedge..."
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Entity Area (WARDEN CONTROLS) -->
+        <div class="entity-area warden"
+          style="width: 100%; height: 38vh; min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 110px; background: linear-gradient(to top, rgba(0,0,20,0.8), transparent);">
+
+          <div class="battle-log" id="al-log"
+            style="text-align: center; color: #888; font-size: 0.8rem; margin-bottom: 5px; min-height: 1.2em;">
+            Battle started...
+          </div>
+
+          <!-- Warden HP -->
+          <div class="status-bar"
+            style="width: 200px; height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin-bottom: 15px; border: 1px solid #444;">
+            <div class="hp" id="warden-hp" style="background: #4da6ff; width: 100%; height: 100%;"></div>
+          </div>
+
+          <!-- Warden Cards (No Avatar) -->
+          <div class="card-container" style="display: flex; gap: 15px; justify-content: center;">
+            <div id="card-ink" class="card"
+              style="cursor: pointer; border-radius: 12px; border: 1px solid #b300ff; background: rgba(20, 0, 40, 0.85); box-shadow: 0 4px 12px rgba(179, 0, 255, 0.3); transition: transform 0.1s, box-shadow 0.1s;">
+              <img src="./ink.png"
+                style="width: 30px; height: 30px; margin-bottom: 5px; filter: drop-shadow(0 0 5px cyan);">
+              <span>INK</span>
+              <div class="power-val" id="val-ink">190</div>
+            </div>
+            <div id="card-rune" class="card"
+              style="cursor: pointer; border-radius: 12px; border: 1px solid #00f2ff; background: rgba(0, 40, 40, 0.85); box-shadow: 0 4px 12px rgba(0, 242, 255, 0.3); transition: transform 0.1s, box-shadow 0.1s;">
+              <img src="./rune.png"
+                style="width: 30px; height: 30px; margin-bottom: 5px; filter: drop-shadow(0 0 5px cyan);">
+              <span>RUNE</span>
+              <div class="power-val" id="val-rune">30</div>
+            </div>
+            <div id="card-gem" class="card"
+              style="cursor: pointer; border-radius: 12px; border: 1px solid #ffffff; background: rgba(40, 40, 50, 0.85); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3); transition: transform 0.1s, box-shadow 0.1s;">
+              <img src="./gem.png"
+                style="width: 30px; height: 30px; margin-bottom: 5px; filter: drop-shadow(0 0 5px cyan);">
+              <span>GEM</span>
+              <div class="power-val" id="val-gem">50</div>
+            </div>
+          </div>
+        </div>
+
       </div>
-      <button id="alice-restart-btn"
-        style="margin-top: 30px; padding: 10px 25px; background: transparent; border: 1px solid #555; color: #fff; cursor: pointer; transition: all 0.3s; font-family: 'Cinzel', serif;">
-        Play Again
-      </button>
+
+      <!-- Final Result Overlay -->
+      <div id="alice-final-screen"
+        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transition: opacity 1s;">
+        <div id="result-header" class="result-header"
+          style="font-family: 'Cinzel', serif; font-size: 3rem; margin-bottom: 20px;">RESULT</div>
+        <div id="story-display" class="story-container"
+          style="max-width: 600px; text-align: center; color: #ddd; font-family: serif; font-size: 1.2rem; line-height: 1.6; padding: 20px;">
+        </div>
+        <button id="alice-restart-btn"
+          style="margin-top: 30px; padding: 10px 25px; background: transparent; border: 1px solid #555; color: #fff; cursor: pointer; transition: all 0.3s; font-family: 'Cinzel', serif;">
+          Play Again
+        </button>
+      </div>
     </div>
-  </div>
 
-  <!-- Scripts -->
-  <!-- 1. Eye Tracking Core -->
-  <script type="module" src="./js/app.js?v=SDK_v10"></script>
-  <!-- Alice Battle Logic (Latest - Single Bar Logic) -->
-  <script src="./js/alice-battle-simple.js?v=FINAL_FIX_NOW"></script>
-  <!-- Linked Game.AliceBattle to AliceBattleRef Logic moved to GameLogic -->
-  <!-- 2. Game Logic -->
-  <script type="module" src="./js/calibration.js?v=FINAL_FIX_NOW"></script>
-  <!-- WardenManager removed (Imported by game.js) -->
-  <script type="module" src="./js/game.js?v=FINAL_FIX_NOW"></script>
+    <!-- Scripts -->
+    <!-- 1. Eye Tracking Core -->
+    <script type="module" src="./js/app.js?v=SDK_v11"></script>
+    <!-- Alice Battle Logic (Latest - Single Bar Logic) -->
+    <script src="./js/alice-battle-simple.js?v=FINAL_FIX_NOW"></script>
+    <!-- Linked Game.AliceBattle to AliceBattleRef Logic moved to GameLogic -->
+    <!-- 2. Game Logic -->
+    <script type="module" src="./js/calibration.js?v=FINAL_FIX_NOW"></script>
+    <!-- WardenManager removed (Imported by game.js) -->
+    <script type="module" src="./js/game.js?v=FINAL_FIX_NOW"></script>
 
-  <!-- 3. Explicit Event Binding for Debug Button (With STANDALONE BATTLE LOGIC) -->
+    <!-- 3. Explicit Event Binding for Debug Button (With STANDALONE BATTLE LOGIC) -->
 
-  <!-- CUSTOM SUBMISSION SUCCESS MODAL -->
-  <div id="success-modal"
-    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 50000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s;">
-    <div
-      style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 15px; border: 2px solid #ffd700; text-align: center; box-shadow: 0 0 30px rgba(255, 215, 0, 0.3); max-width: 400px; width: 90%; transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
-      <div style="font-size: 3rem; margin-bottom: 15px;">???/div>
-      <h2
-        style="font-family: 'Cinzel', serif; color: #ffd700; margin: 0 0 10px 0; font-size: 1.8rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
-        ACCESS GRANTED</h2>
-      <p style="color: #ddd; font-size: 1rem; line-height: 1.5; margin-bottom: 25px;">
-        Eye-Tracking data secured.<br>
-        The <strong>Secret Chapter</strong> key has been sent to your email.
-      </p>
-      <button id="btn-modal-confirm"
-        style="background: #ffd700; color: #1a1a2e; border: none; padding: 12px 30px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; font-family: 'Cinzel', serif; transition: all 0.2s;">
-        ENTER THE PORTAL
-      </button>
-    </div>
-  </div>
+    <!-- CUSTOM SUBMISSION SUCCESS MODAL -->
+    <div id="success-modal"
+      style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 50000; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s;">
+      <div
+        style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; border-radius: 15px; border: 2px solid #ffd700; text-align: center; box-shadow: 0 0 30px rgba(255, 215, 0, 0.3); max-width: 400px; width: 90%; transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);">
+        <div style="font-size: 3rem; margin-bottom: 15px;">???/div>
+          <h2
+            style="font-family: 'Cinzel', serif; color: #ffd700; margin: 0 0 10px 0; font-size: 1.8rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+            ACCESS GRANTED</h2>
+          <p style="color: #ddd; font-size: 1rem; line-height: 1.5; margin-bottom: 25px;">
+            Eye-Tracking data secured.<br>
+            The <strong>Secret Chapter</strong> key has been sent to your email.
+          </p>
+          <button id="btn-modal-confirm"
+            style="background: #ffd700; color: #1a1a2e; border: none; padding: 12px 30px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; font-family: 'Cinzel', serif; transition: all 0.2s;">
+            ENTER THE PORTAL
+          </button>
+        </div>
+      </div>
 </body>
 
 </html>
