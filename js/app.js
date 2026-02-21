@@ -1298,14 +1298,25 @@ window.startEyeTracking = boot;
  * Call setSeesoTracking(false) to release camera + ML memory during replay / battles.
  * Call setSeesoTracking(true)  to resume before the next reading passage starts.
  */
-// [iOS Fix] Gaze Processing Gate
-// SeeSo SDK cannot be stopped and restarted mid-session on iOS:
-// stopTracking() works, but startTracking() does NOT resume gaze callbacks.
-// Solution: Keep SDK running 100% of the time. Use _gazeActive flag to
-// enable/disable GAME LOGIC processing only (not the SDK itself).
-// This keeps tracking stable while allowing replay/battle phases to skip
-// unnecessary processing.
-window._gazeActive = true; // true = game processes gaze; false = SDK runs but game ignores it
+// Gaze Processing Gate + SAB Memory Management
+// ─────────────────────────────────────────────
+// SeeSo WASM uses SharedArrayBuffer (SAB) — ~150MB, NOT garbage-collected.
+// SAB is only freed when the Worker is terminated (seeso.stopTracking()).
+//
+// Strategy (same for ALL devices):
+//   Gate CLOSE (replay/battle) → stopTracking() → Worker done → SAB freed (~150MB)
+//   4 s later (mid-replay)    → startTracking() + re-bind callbacks (pre-emptive restart)
+//   Gate OPEN  (reading)      → tracking already running; _gazeActive=true resumes game logic
+//
+// Why pre-emptive restart at 4 s (not at gate-open)?
+//   Replay lasts ~7-10 s. Restarting mid-replay gives iOS time to re-acquire the
+//   camera stream before reading begins, so there's no gaze gap at the paragraph start.
+//
+// Why attachSeesoCallbacks() after restart?
+//   stopTracking() terminates the Worker, which clears all registered callbacks.
+//   startTracking() alone does not restore them. Re-calling attachSeesoCallbacks()
+//   re-binds addGazeCallback / addDebugCallback / CalibrationManager hooks.
+window._gazeActive = true; // true = game processes gaze; false = gated
 
 window.setSeesoTracking = function (on, reason) {
   if (window._gazeActive === on) {
@@ -1317,10 +1328,55 @@ window.setSeesoTracking = function (on, reason) {
     ? Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB'
     : 'N/A';
   logI('seeso', `[Gate] ${on ? 'OPEN  ← reading' : 'CLOSED← replay/battle'} | reason: ${reason} | JS heap: ${heapMB}`);
-  // NOTE: seeso.stopTracking() / startTracking() are intentionally NOT called here.
-  // On iOS, startTracking() after stopTracking() does not restore gaze callbacks.
-  // The SDK stays running. Only JS processing is gated.
+
+  if (!on) {
+    // ── Gate CLOSING: free SharedArrayBuffer immediately ──
+    try {
+      if (seeso && typeof seeso.stopTracking === 'function') {
+        seeso.stopTracking();
+        logI('seeso', '[SAB] stopTracking() → Worker terminated, SharedArrayBuffer freed');
+      }
+    } catch (e) {
+      logW('seeso', '[SAB] stopTracking() threw:', e.message);
+    }
+    // Schedule pre-emptive restart mid-replay (4 s after stop).
+    // By the time reading begins, tracking will already be running.
+    _scheduleSeesoRestart(3, 4000, 1000);
+  }
+  // When on=true: _gazeActive flag is enough — restart already happened pre-emptively.
 };
+
+// Pre-emptive SeeSo restart with retry.
+// Runs during replay so tracking is ready before reading begins.
+function _scheduleSeesoRestart(retriesLeft, delay, retryInterval) {
+  setTimeout(() => {
+    if (!seeso || !window.mediaStream) {
+      logW('seeso', '[SAB] Restart skipped: SDK or mediaStream unavailable');
+      return;
+    }
+    try {
+      const ok = seeso.startTracking(window.mediaStream);
+      if (ok) {
+        // Re-bind callbacks cleared when Worker was terminated by stopTracking()
+        attachSeesoCallbacks();
+        logI('seeso', `[SAB] startTracking() success → SAB reallocated, callbacks re-bound (gate: ${window._gazeActive ? 'OPEN' : 'gated until reading'})`);
+      } else if (retriesLeft > 0) {
+        logW('seeso', `[SAB] startTracking() returned falsy, retry in ${retryInterval}ms (${retriesLeft} left)`);
+        _scheduleSeesoRestart(retriesLeft - 1, retryInterval, retryInterval);
+      } else {
+        logW('seeso', '[SAB] All retries exhausted → next paragraph runs without eye-tracking restart');
+      }
+    } catch (e) {
+      if (retriesLeft > 0) {
+        logW('seeso', `[SAB] startTracking() threw: ${e.message}, retry in ${retryInterval}ms`);
+        _scheduleSeesoRestart(retriesLeft - 1, retryInterval, retryInterval);
+      } else {
+        logW('seeso', `[SAB] startTracking() permanently failed: ${e.message}`);
+      }
+    }
+  }, delay);
+}
+
 
 // ---------- Shutdown: Camera + SDK Cleanup ----------
 /**
