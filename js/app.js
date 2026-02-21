@@ -1151,27 +1151,28 @@ function startTracking() {
     const ok = seeso.startTracking(mediaStream);
     logI("track", "startTracking returned", { ok });
 
-    // [FIX] SDK's ImageCapture polyfill fails on this device (grabFrame rejects with undefined).
-    // Replace with native window.ImageCapture immediately after startTracking.
-    if (ok && seeso.track && window.ImageCapture) {
+    // [FIX] SDK polyfill's grabFrame rejects with undefined on this device.
+    // Camera thread holds a closure ref to seeso.imageCapture (object replacement won't work).
+    // SOLUTION: patch grabFrame METHOD on the polyfill IC instance in-place.
+    if (ok && seeso.imageCapture && window.ImageCapture && seeso.track) {
       try {
         const nativeIC = new window.ImageCapture(seeso.track);
-        // Test native grabFrame first
         nativeIC.grabFrame().then(bmp => {
-          logI("track", "[FIX] Native ImageCapture works! " + bmp.width + "x" + bmp.height + " - replacing polyfill");
-          seeso.imageCapture = nativeIC;
+          logI("track", "[FIX] Native grabFrame OK " + bmp.width + "x" + bmp.height + " - patching polyfill.grabFrame");
+          // Patch only the grabFrame method → camera thread picks it up on next call
+          seeso.imageCapture.grabFrame = () => nativeIC.grabFrame();
+          logI("track", "[FIX] grabFrame patched. Face detection should start now.");
         }).catch(e2 => {
-          logW("track", "[FIX] Native grabFrame also failed: " + (e2?.message ?? e2) + " - keeping polyfill");
+          logW("track", "[FIX] Native grabFrame also failed: " + (e2?.message ?? String(e2)));
         });
       } catch (icErr) {
-        logW("track", "[FIX] Native ImageCapture constructor failed: " + icErr.message);
+        logW("track", "[FIX] ImageCapture patch error: " + icErr.message);
       }
-    } else if (!window.ImageCapture) {
-      logW("track", "[FIX] window.ImageCapture not available - polyfill will be used");
     }
 
     setState("track", ok ? "running" : "failed");
     return !!ok;
+
 
   } catch (e) {
     setState("track", "failed");
