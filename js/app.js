@@ -1186,7 +1186,10 @@ function startActualCalibration() {
     calManager.reset();
     const mode = 1;
 
-    const ok = seeso.startCalibration(mode, criteria);
+    // EasySeeSo.startCalibration()은 콜백 기반 시그니처 (onNextPoint, onProgress, onFinish, points)
+    // calManager는 이미 seeso.seeso(raw Seeso)에 직접 바인딩됨 → raw Seeso API 직접 호출
+    const rawSeeso = seeso.seeso || seeso;
+    const ok = rawSeeso.startCalibration(mode, criteria);
 
     overlay.calRunning = !!ok;
     overlay.calProgress = 0;
