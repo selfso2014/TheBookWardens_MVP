@@ -1154,6 +1154,32 @@ function startTracking() {
     logI("track", "startTracking returned", { ok });
 
     setState("track", ok ? "running" : "failed");
+
+    // [DIAG] Patch seeso.processFrame_ to surface internal errors
+    // SDK's startCameraThread_ swallows all errors with catch(e){console.log(e)}
+    // Error objects JSON.stringify to {} so they were invisible. Now we log properly.
+    if (ok && seeso && typeof seeso.processFrame_ === "function") {
+      const _origPF = seeso.processFrame_.bind(seeso);
+      let _pfCallCount = 0;
+      let _pfLastLogAt = 0;
+      seeso.processFrame_ = async function patchedProcessFrame(imageCapture) {
+        _pfCallCount++;
+        const _t = performance.now();
+        if (_t - _pfLastLogAt > 3000) {
+          _pfLastLogAt = _t;
+          logI("diag", `[PF] processFrame_ call #${_pfCallCount}`);
+        }
+        try {
+          return await _origPF(imageCapture);
+        } catch (e) {
+          // Properly surface the real error (Error.message, not JSON.stringify)
+          logE("diag", `[PF] processFrame_ THREW: ${e?.message || String(e)}`);
+          throw e;
+        }
+      };
+      logI("diag", "[PF] processFrame_ patched for diagnostics");
+    }
+
     return !!ok;
 
   } catch (e) {
