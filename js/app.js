@@ -1151,34 +1151,28 @@ function startTracking() {
     const ok = seeso.startTracking(mediaStream);
     logI("track", "startTracking returned", { ok });
 
-    // [DIAG] Check seeso internal state to understand why gaze callback isn't firing
-    setTimeout(() => {
-      const s = seeso;
-      logI("track", "[DIAG] seeso internal state after 1s:", {
-        hasGazeCallback: typeof s.gazeCallback === 'function',
-        hasFaceCallback: typeof s.faceCallback === 'function',
-        hasTrackerModule: !!s.trackerModule,
-        hasEyeTracker: s.eyeTracker != null ? String(s.eyeTracker).substring(0, 20) : 'null',
-        hasThread: !!s.thread,
-        hasDebugThread: !!s.debugThread,
-        hasImageCapture: !!s.imageCapture,
-        hasTrack: !!s.track,
-        trackState: s.track?.readyState,
-      });
-      // Force one manual frame grab to test
-      if (s.imageCapture) {
-        s.imageCapture.grabFrame().then(bmp => {
-          logI("track", "[DIAG] grabFrame OK: " + bmp.width + "x" + bmp.height);
-        }).catch(e => {
-          logE("track", "[DIAG] grabFrame FAILED: " + e.message);
+    // [FIX] SDK's ImageCapture polyfill fails on this device (grabFrame rejects with undefined).
+    // Replace with native window.ImageCapture immediately after startTracking.
+    if (ok && seeso.track && window.ImageCapture) {
+      try {
+        const nativeIC = new window.ImageCapture(seeso.track);
+        // Test native grabFrame first
+        nativeIC.grabFrame().then(bmp => {
+          logI("track", "[FIX] Native ImageCapture works! " + bmp.width + "x" + bmp.height + " - replacing polyfill");
+          seeso.imageCapture = nativeIC;
+        }).catch(e2 => {
+          logW("track", "[FIX] Native grabFrame also failed: " + (e2?.message ?? e2) + " - keeping polyfill");
         });
-      } else {
-        logW("track", "[DIAG] imageCapture is null - frame grabbing not initialized!");
+      } catch (icErr) {
+        logW("track", "[FIX] Native ImageCapture constructor failed: " + icErr.message);
       }
-    }, 1000);
+    } else if (!window.ImageCapture) {
+      logW("track", "[FIX] window.ImageCapture not available - polyfill will be used");
+    }
 
     setState("track", ok ? "running" : "failed");
     return !!ok;
+
   } catch (e) {
     setState("track", "failed");
     logE("track", "startTracking threw", e);
