@@ -8,8 +8,6 @@ import { GazeDataManager } from "./gaze-data-manager.js"; // Import
 // Must be set up BEFORE SDK loads.
 const _origConsoleError = console.error.bind(console);
 const _origConsoleWarn = console.warn.bind(console);
-const _origConsoleLog = console.log.bind(console);
-
 const _fmtArgs = (args) => args.map(a => {
   try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 150) : String(a); }
   catch (_) { return String(a); }
@@ -29,20 +27,6 @@ console.warn = function (...args) {
   _origConsoleWarn(...args);
 };
 
-// console.log: captures SDK error keywords. Recursion guard prevents infinite loop.
-let _inConsoleHook = false;
-console.log = function (...args) {
-  if (_inConsoleHook) { _origConsoleLog(...args); return; }
-  const msg = _fmtArgs(args);
-  if (/error|fail|exception|track|ready|muted|grab/i.test(msg)) {
-    _inConsoleHook = true;
-    try {
-      if (typeof logW === 'function') logW('console.log', msg);
-      else setTimeout(() => { if (typeof logW === 'function') logW('console.log', msg); }, 100);
-    } finally { _inConsoleHook = false; }
-  }
-  _origConsoleLog(...args);
-};
 
 
 // Initialize Manager
