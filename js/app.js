@@ -1086,8 +1086,10 @@ function startTracking() {
     logI("sdkdbg", `FPS=${fps} lat(min=${latMin} max=${latMax} avg=${latAvg?.toFixed ? latAvg.toFixed(1) : latAvg}ms)`);
   };
 
-  // EasySeeSo.startTracking은 async — 내부에서 getUserMedia + SDK startTracking 처리
-  seeso.startTracking(onGaze, onDebug).then((ok) => {
+  // EasySeeSo.startTracking에 기존 mediaStream 전달
+  // → 두 번째 getUserMedia 호출 없이 같은 스트림 재사용
+  // → Android 카메라 충돌(muted track → FPS=0) 방지
+  seeso.startTracking(onGaze, onDebug, mediaStream || undefined).then((ok) => {
     logI("track", "EasySeeSo.startTracking returned", { ok });
     setState("track", ok ? "running" : "failed");
   }).catch((e) => {

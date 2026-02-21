@@ -42,8 +42,12 @@ class EasySeeso {
     this.seeso.deinitialize();
   }
 
-  async startTracking(onGaze, onDebug) {
-    const stream = await navigator.mediaDevices.getUserMedia({ 'video': true });
+  async startTracking(onGaze, onDebug, existingStream) {
+    // If an existing stream is provided, use it directly (avoids Android dual-stream conflict).
+    // Android camera hardware can only serve one ImageCapture at a time;
+    // a second getUserMedia call returns a muted track → checkStreamTrack_ blocks processFrame_.
+    const stream = existingStream || await navigator.mediaDevices.getUserMedia({ 'video': true });
+    this.stream = stream; // expose for preview video use
     this.seeso.addDebugCallback(onDebug);
     if (this.seeso.startTracking(stream)) {
       this.onGaze = onGaze;
