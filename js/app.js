@@ -1001,10 +1001,27 @@ function attachSeesoCallbacks() {
     logW("sdk", "addGazeCallback not found on seeso instance");
   }
 
-  // ---- Debug callback (optional) ----
+  // ---- Debug callback (FORCED to INFO for new SDK diagnosis) ----
   if (typeof seeso.addDebugCallback === "function") {
-    seeso.addDebugCallback((info) => logD("sdkdbg", "debug", info));
+    seeso.addDebugCallback((info) => {
+      // [DIAG] Force INFO level so SDK debug events are visible in panel
+      logI("sdkdbg", JSON.stringify(info).substring(0, 200));
+    });
     logI("sdk", "addDebugCallback bound");
+  }
+
+  // ---- Face callback (new SDK 0.2.3 may use this for face detection) ----
+  if (typeof seeso.addFaceCallback === "function") {
+    let _faceFirst = false;
+    seeso.addFaceCallback((faceInfo) => {
+      if (!_faceFirst) {
+        _faceFirst = true;
+        logI("sdk", "[DIAG] First faceCallback fired!", { faceInfo: JSON.stringify(faceInfo).substring(0, 150) });
+      }
+    });
+    logI("sdk", "addFaceCallback bound (new SDK face detection)");
+  } else {
+    logW("sdk", "addFaceCallback not available on this Seeso instance");
   }
 
   // ---- Calibration callbacks (Delegated to CalibrationManager) ----
