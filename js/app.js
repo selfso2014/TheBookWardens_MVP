@@ -1040,11 +1040,11 @@ async function preloadSDK() {
   initPromise = (async () => {
     try {
       setState("sdk", "loading");
-      // [SDK-SWAP v4] seeso.min.js (SDK 0.2.3 production webpack bundle) via loadWebpackModule.
-      // seeso.min.js = 442KB new SDK (updated 2026-02-21). No eval, plain webpack bundle.
-      SDK = await loadWebpackModule("./seeso/dist/seeso.min.js");
-      const SeesoClass = SDK?.default || SDK;
-      if (!SeesoClass) throw new Error("Seeso export not found from ./seeso/dist/seeso.min.js");
+      // seeso.min.js is an ESM bundle → use dynamic import(), not loadWebpackModule.
+      // loadWebpackModule is for the old webpack/UMD seeso.js format only.
+      SDK = await import("../seeso/dist/seeso.min.js");
+      const SeesoClass = SDK?.default;
+      if (!SeesoClass) throw new Error("Seeso export not found from seeso.min.js");
 
 
 
