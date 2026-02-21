@@ -8,6 +8,7 @@ import { GazeDataManager } from "./gaze-data-manager.js"; // Import
 // Must be set up BEFORE SDK loads.
 const _origConsoleError = console.error.bind(console);
 const _origConsoleWarn = console.warn.bind(console);
+const _origConsoleLog = console.log.bind(console);
 const _fmtArgs = (args) => args.map(a => {
   try { return typeof a === 'object' ? JSON.stringify(a).substring(0, 150) : String(a); }
   catch (_) { return String(a); }
@@ -476,9 +477,9 @@ function logBase(level, tag, msg, data) {
   // which is JSON.stringify(JSON.parse(JSON.stringify(data))) = 2x serialize.
   const dataStr = data !== undefined ? " " + (typeof data === 'string' ? data : JSON.stringify(data)) : "";
   const line = `[${ts()}] ${level.padEnd(5)} ${tag.padEnd(10)} ${msg}${dataStr}`;
-  if (level === "ERROR") console.error(line);
-  else if (level === "WARN") console.warn(line);
-  else console.log(line);
+  if (level === "ERROR") _origConsoleError(line);
+  else if (level === "WARN") _origConsoleWarn(line);
+  else _origConsoleLog(line);
   pushLog(line);
 }
 
@@ -1028,11 +1029,11 @@ async function preloadSDK() {
   initPromise = (async () => {
     try {
       setState("sdk", "loading");
-      // [SDK-SWAP v2] Load new seeso.min.js (ESM) via dynamic import.
-      // NOTE: import() path is relative to THIS FILE (js/app.js).
-      SDK = await import("../seeso/dist/seeso.min.js?v=NEW_SDK_v2");
-      const SeesoClass = SDK?.default;
-      if (!SeesoClass) throw new Error("Seeso export not found");
+      // [SDK-SWAP v3] Load new seeso.js (0.2.3 dev webpack build) via loadWebpackModule.
+      // seeso.js replaced with SDK 0.2.3 build on 2026-02-21.
+      SDK = await loadWebpackModule("./seeso/dist/seeso.js");
+      const SeesoClass = SDK?.default || SDK;
+      if (!SeesoClass) throw new Error("Seeso export not found from ./seeso/dist/seeso.js");
 
       seeso = new SeesoClass();
       window.__seeso = { SDK, seeso };
