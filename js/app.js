@@ -1350,12 +1350,12 @@ window.setSeesoTracking = function (on, reason) {
 // Runs during replay so tracking is ready before reading begins.
 function _scheduleSeesoRestart(retriesLeft, delay, retryInterval) {
   setTimeout(() => {
-    if (!seeso || !window.mediaStream) {
+    if (!seeso || !mediaStream) {
       logW('seeso', '[SAB] Restart skipped: SDK or mediaStream unavailable');
       return;
     }
     try {
-      const ok = seeso.startTracking(window.mediaStream);
+      const ok = seeso.startTracking(mediaStream);
       if (ok) {
         // Re-bind callbacks cleared when Worker was terminated by stopTracking()
         attachSeesoCallbacks();
