@@ -564,17 +564,31 @@ export class TextRenderer {
                 });
 
                 if (revealedCount < revealData.length) {
-                    const rafId = requestAnimationFrame(animateReveal);
-                    this.activeRAFs.push(rafId);
+                    // [FIX-iOS] Self-cleaning RAF slot.
+                    // Old: push() every frame, never remove → activeRAFs grew O(frames) during reading.
+                    // New: single rolling slot — remove previous id before registering next.
+                    if (currentRevealRAFId !== null) {
+                        const idx = this.activeRAFs.indexOf(currentRevealRAFId);
+                        if (idx !== -1) this.activeRAFs.splice(idx, 1);
+                    }
+                    currentRevealRAFId = requestAnimationFrame(animateReveal);
+                    this.activeRAFs.push(currentRevealRAFId);
                 } else {
+                    // Done — remove slot from tracking
+                    if (currentRevealRAFId !== null) {
+                        const idx = this.activeRAFs.indexOf(currentRevealRAFId);
+                        if (idx !== -1) this.activeRAFs.splice(idx, 1);
+                        currentRevealRAFId = null;
+                    }
                     // Resolve after a small buffer
                     const finalTid = setTimeout(resolve, 100);
                     this.activeAnimations.push(finalTid);
                 }
             };
 
-            const initialRaf = requestAnimationFrame(animateReveal);
-            this.activeRAFs.push(initialRaf);
+            // [FIX-iOS] Single rolling slot for this chunk's reveal RAF
+            let currentRevealRAFId = requestAnimationFrame(animateReveal);
+            this.activeRAFs.push(currentRevealRAFId);
         });
     }
 
