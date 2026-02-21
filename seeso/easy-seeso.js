@@ -1,4 +1,5 @@
-import Seeso, {InitializationErrorType, CalibrationAccuracyCriteria} from './dist/seeso';
+import Seeso, { InitializationErrorType, CalibrationAccuracyCriteria } from './dist/seeso.min.js';
+
 
 class EasySeeso {
   constructor() {
@@ -20,7 +21,7 @@ class EasySeeso {
   }
 
   async init(licenseKey, afterInitialized, afterFailed, userStatusOption) {
-    await this.seeso.initialize(licenseKey, userStatusOption).then(function(errCode) {
+    await this.seeso.initialize(licenseKey, userStatusOption).then(function (errCode) {
       if (errCode === InitializationErrorType.ERROR_NONE) {
         afterInitialized();
         this.onCalibrationFinishedBind = this.onCalibrationFinished_.bind(this);
@@ -42,7 +43,7 @@ class EasySeeso {
   }
 
   async startTracking(onGaze, onDebug) {
-    const stream = await navigator.mediaDevices.getUserMedia({'video': true});
+    const stream = await navigator.mediaDevices.getUserMedia({ 'video': true });
     this.seeso.addDebugCallback(onDebug);
     if (this.seeso.startTracking(stream)) {
       this.onGaze = onGaze;
@@ -61,21 +62,21 @@ class EasySeeso {
     this.onDebug = null;
   }
 
-  setFaceCallback(onFace){
+  setFaceCallback(onFace) {
     this.seeso.addFaceCallback(onFace);
     this.onFace = onFace;
   }
-  
-  removeFaceCallbck(onFace){
+
+  removeFaceCallbck(onFace) {
     this.seeso.removeFaceCallbck(onFace);
   }
 
   setScreenSize(widthMm, heightMm) {
-    if(widthMm && widthMm > 0 && heightMm && heightMm > 0){
-      this.seeso.setScreenSize(widthMm,heightMm)
+    if (widthMm && widthMm > 0 && heightMm && heightMm > 0) {
+      this.seeso.setScreenSize(widthMm, heightMm)
     }
   }
-  
+
   setUserStatusCallback(onAttention, onBlink, onDrowsiness) {
     this.seeso.addAttentionCallback(onAttention);
     this.seeso.addBlinkCallback(onBlink);
@@ -91,7 +92,7 @@ class EasySeeso {
     this.seeso.removeDrowsinessCallback(this.onDrowsiness);
   }
 
-  startCalibration(onCalibrationNextPoint, onCalibrationProgress, onCalibrationFinished, calibrationPoints=5) {
+  startCalibration(onCalibrationNextPoint, onCalibrationProgress, onCalibrationFinished, calibrationPoints = 5) {
     this.seeso.addCalibrationNextPointCallback(onCalibrationNextPoint);
     this.seeso.addCalibrationProgressCallback(onCalibrationProgress);
     const isStart = this.seeso.startCalibration(calibrationPoints, CalibrationAccuracyCriteria.Default);
@@ -150,15 +151,15 @@ class EasySeeso {
     this.seeso.setCameraPosition(cameraX, cameraOnTop);
   }
 
-  setCameraConfiguration(cameraConfig){
+  setCameraConfiguration(cameraConfig) {
     this.seeso.setCameraConfiguration(cameraConfig)
   }
 
-  getCameraConfiguration(){
+  getCameraConfiguration() {
     this.seeso.getCameraConfiguration()
   }
 
-  getCameraPosition () {
+  getCameraPosition() {
     return this.seeso.getCameraPosition();
   }
 
@@ -166,7 +167,7 @@ class EasySeeso {
     return this.seeso.getFaceDistance();
   }
 
-  getMonitorSize () {
+  getMonitorSize() {
     return this.seeso.getMonitorSize();
   }
 
@@ -190,7 +191,7 @@ class EasySeeso {
     return this.seeso.getAttentionScore();
   }
 
-  static getVersionName () {
+  static getVersionName() {
     return Seeso.getVersionName();
   }
   /**
