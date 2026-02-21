@@ -1150,6 +1150,33 @@ function startTracking() {
   try {
     const ok = seeso.startTracking(mediaStream);
     logI("track", "startTracking returned", { ok });
+
+    // [DIAG] Check seeso internal state to understand why gaze callback isn't firing
+    setTimeout(() => {
+      const s = seeso;
+      logI("track", "[DIAG] seeso internal state after 1s:", {
+        hasGazeCallback: typeof s.gazeCallback === 'function',
+        hasFaceCallback: typeof s.faceCallback === 'function',
+        hasTrackerModule: !!s.trackerModule,
+        hasEyeTracker: s.eyeTracker != null ? String(s.eyeTracker).substring(0, 20) : 'null',
+        hasThread: !!s.thread,
+        hasDebugThread: !!s.debugThread,
+        hasImageCapture: !!s.imageCapture,
+        hasTrack: !!s.track,
+        trackState: s.track?.readyState,
+      });
+      // Force one manual frame grab to test
+      if (s.imageCapture) {
+        s.imageCapture.grabFrame().then(bmp => {
+          logI("track", "[DIAG] grabFrame OK: " + bmp.width + "x" + bmp.height);
+        }).catch(e => {
+          logE("track", "[DIAG] grabFrame FAILED: " + e.message);
+        });
+      } else {
+        logW("track", "[DIAG] imageCapture is null - frame grabbing not initialized!");
+      }
+    }, 1000);
+
     setState("track", ok ? "running" : "failed");
     return !!ok;
   } catch (e) {
@@ -1157,6 +1184,7 @@ function startTracking() {
     logE("track", "startTracking threw", e);
     return false;
   }
+
 }
 
 /**
