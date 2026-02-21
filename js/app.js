@@ -1027,6 +1027,10 @@ async function initSeeso() {
   }
 }
 
+// Stored callbacks for SDK restart (setSeesoTracking reuse)
+let _onGazeCb = null;
+let _onDebugCb = null;
+
 function startTracking() {
   if (!seeso) return false;
 
@@ -1045,7 +1049,7 @@ function startTracking() {
     }
   }
 
-  const onGaze = (gazeInfo) => {
+  _onGazeCb = (gazeInfo) => {
     lastGazeAt = performance.now();
     const xRaw = gazeInfo?.x;
     const yRaw = gazeInfo?.y;
@@ -1082,14 +1086,14 @@ function startTracking() {
     renderOverlay();
   };
 
-  const onDebug = (fps, latMin, latMax, latAvg) => {
+  _onDebugCb = (fps, latMin, latMax, latAvg) => {
     logI("sdkdbg", `FPS=${fps} lat(min=${latMin} max=${latMax} avg=${latAvg?.toFixed ? latAvg.toFixed(1) : latAvg}ms)`);
   };
 
   // EasySeeSo.startTracking에 기존 mediaStream 전달
   // → 두 번째 getUserMedia 호출 없이 같은 스트림 재사용
   // → Android 카메라 충돌(muted track → FPS=0) 방지
-  seeso.startTracking(onGaze, onDebug, mediaStream || undefined).then((ok) => {
+  seeso.startTracking(_onGazeCb, _onDebugCb, mediaStream || undefined).then((ok) => {
     logI("track", "EasySeeSo.startTracking returned", { ok });
     setState("track", ok ? "running" : "failed");
 
@@ -1351,47 +1355,56 @@ window.startEyeTracking = boot;
 
 // ---------- SeeSo Tracking On/Off Control ----------
 /**
- * [iOS OOM Fix] Selectively pause/resume SeeSo eye tracking.
+ * [iOS OOM Fix] 읽기 구간 = SDK ON / replay·전투 구간 = SDK OFF
  *
- * SeeSo (camera + ML model) is the single largest memory consumer (~100~190MB on iOS).
- * It only needs to run during:
- *   1. Face check / posture correction
- *   2. Calibration
- *   3. Rabbit eye animation
- *   4. Text reading  (NOT during replay)
+ * 새 SDK (v2.5.2): stopTracking() 후 같은 mediaStream으로 startTracking() 재시작 가능.
+ * → WASM Worker 종료 → SAB(~150MB) 해제 → iOS OOM 방지
  *
- * Call setSeesoTracking(false) to release camera + ML memory during replay / battles.
- * Call setSeesoTracking(true)  to resume before the next reading passage starts.
+ * OFF: gaze replay 시작 시 (game.js:setSeesoTracking(false))
+ * ON:  다음 읽기 구간 시작 직전 (game.js:setSeesoTracking(true))
  */
-// Gaze Processing Gate (JS-level only)
-// ─────────────────────────────────────
-// SeeSo WASM uses SharedArrayBuffer (SAB) — ~150MB, NOT garbage-collected.
-// SAB is freed ONLY when the Worker terminates (stopTracking()).
-//
-// [TESTED & CONFIRMED] stopTracking() + startTracking() mid-session does NOT work:
-//   - startTracking() returns ok:true but gaze callbacks never fire again.
-//   - attachSeesoCallbacks() called on restart causes LSN explosion (+4-6/s)
-//     because SeeSo SDK accumulates callbacks (addGazeCallback ADDS, not replaces).
-//   - Root cause: stopTracking() severs the camera→WASM feed; re-establishing
-//     it requires full SDK reinit (seeso.initialize()) which needs user gesture.
-//
-// Decision: SDK runs continuously for the full session. _gazeActive gates
-// game-logic processing only. SAB (150MB) is accepted as a fixed cost.
-// Memory savings come from JS-side optimizations (6 fixes applied separately).
-window._gazeActive = true; // true = game processes gaze; false = SDK runs but game ignores it
+window._gazeActive = true;
+window._seesoSdkOn = true; // SDK 실제 실행 상태
 
 window.setSeesoTracking = function (on, reason) {
-  if (window._gazeActive === on) {
+  if (window._seesoSdkOn === on) {
     logI('seeso', `[Gate] already ${on ? 'OPEN' : 'CLOSED'}, skipping (${reason})`);
     return;
   }
+  window._seesoSdkOn = on;
   window._gazeActive = on;
+
   const heapMB = performance.memory
     ? Math.round(performance.memory.usedJSHeapSize / 1048576) + 'MB'
     : 'N/A';
-  logI('seeso', `[Gate] ${on ? 'OPEN  ← reading' : 'CLOSED← replay/battle'} | reason: ${reason} | JS heap: ${heapMB}`);
-  // SDK stays running. Only JS processing is gated.
-  // stopTracking() is NOT called here — mid-session stop permanently breaks gaze on iOS/iPadOS.
+
+  if (!on) {
+    // ── SDK OFF: stopTracking → WASM 종료 → 메모리 해제 ──
+    try {
+      if (seeso) {
+        seeso.stopTracking();
+        logI('seeso', `[Gate] CLOSED← SDK stopTracking() | reason: ${reason} | heap: ${heapMB}`);
+      }
+    } catch (e) {
+      logW('seeso', '[Gate] stopTracking() threw:', e);
+    }
+  } else {
+    // ── SDK ON: 기존 mediaStream으로 재시작 ──
+    try {
+      if (seeso && _onGazeCb && _onDebugCb) {
+        seeso.startTracking(_onGazeCb, _onDebugCb, mediaStream || undefined)
+          .then((ok) => {
+            logI('seeso', `[Gate] OPEN  ← SDK startTracking() ok=${ok} | reason: ${reason} | heap: ${heapMB}`);
+            if (!ok) logW('seeso', '[Gate] startTracking() returned false');
+          })
+          .catch((e) => logW('seeso', '[Gate] startTracking() threw:', e));
+      } else {
+        logW('seeso', `[Gate] Cannot restart SDK — seeso=${!!seeso} cb=${!!_onGazeCb}`);
+      }
+    } catch (e) {
+      logW('seeso', '[Gate] restart threw:', e);
+    }
+  }
 };
 
 
