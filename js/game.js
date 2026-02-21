@@ -1519,17 +1519,38 @@ Game.typewriter = {
         // 4. INIT ALICE BATTLE (WITH DATA)
         console.log("[FinalBoss] AliceBattleRef:", window.AliceBattleRef ? "FOUND" : "NOT FOUND");
         setTimeout(() => {
-            if (window.AliceBattleRef) {
+            // Re-check AliceBattleRef in case it was set after page load
+            const ref = window.AliceBattleRef;
+            if (ref && typeof ref.init === 'function') {
                 const currentStats = {
                     ink: Game.state.ink,
                     rune: Game.state.rune,
                     gem: Game.state.gems
                 };
                 console.log("[FinalBoss] Calling AliceBattleRef.init() with stats:", currentStats);
-                window.AliceBattleRef.init(currentStats);
-                console.log("[FinalBoss] AliceBattleRef.init() called successfully");
+                try {
+                    ref.init(currentStats);
+                    console.log("[FinalBoss] AliceBattleRef.init() called successfully");
+                } catch (e) {
+                    console.error("[FinalBoss] AliceBattleRef.init() THREW:", e);
+                    // Show error on screen so it's not just black
+                    if (aliceScreen) {
+                        aliceScreen.innerHTML = `<div style="color:white;font-size:1.2rem;padding:40px;text-align:center;">
+                            <p>⚠️ Alice Battle Error</p>
+                            <p style="font-size:0.9rem;color:#aaa;margin-top:10px;">${e.message}</p>
+                            <button onclick="Game.goToNewScore()" style="margin-top:30px;padding:12px 24px;background:#5c35d5;color:white;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">결과 보기 →</button>
+                        </div>`;
+                    }
+                }
             } else {
-                console.error("FATAL: AliceBattleRef NOT FOUND!");
+                console.error("[FinalBoss] FATAL: AliceBattleRef NOT FOUND or missing init(). window.AliceBattleRef =", window.AliceBattleRef);
+                // Fallback: go to score screen directly
+                if (aliceScreen) {
+                    aliceScreen.innerHTML = `<div style="color:white;font-size:1.2rem;padding:40px;text-align:center;">
+                        <p>🎉 모든 지문을 완주했습니다!</p>
+                        <button onclick="Game.goToNewScore()" style="margin-top:30px;padding:12px 24px;background:#5c35d5;color:white;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">결과 보기 →</button>
+                    </div>`;
+                }
             }
         }, 100);
     },
