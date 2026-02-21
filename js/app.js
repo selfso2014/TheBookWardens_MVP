@@ -1145,8 +1145,12 @@ function startTracking() {
   if (!seeso || !mediaStream) return false;
 
   try {
-    // SDK 공식 API만 호출. 내부 구현(imageCapture, grabFrame 등) 절대 건드리지 않음.
-    const ok = seeso.startTracking(mediaStream);
+    // [FIX] SDK에게 clone된 별도 스트림 전달.
+    // 같은 MediaStream을 video element(preview, face-check)와 SDK ImageCapture가 동시에
+    // 소비하면 일부 Android 기기에서 ImageCapture.grabFrame()이 빈 프레임을 반환해
+    // gaze/face 콜백이 발화하지 않는 문제가 있음.
+    const seesoStream = mediaStream.clone();
+    const ok = seeso.startTracking(seesoStream);
     logI("track", "startTracking returned", { ok });
 
     setState("track", ok ? "running" : "failed");
@@ -1158,6 +1162,7 @@ function startTracking() {
     return false;
   }
 }
+
 
 /**
  * Entry Point for Game: Enters Face Check Mode.
