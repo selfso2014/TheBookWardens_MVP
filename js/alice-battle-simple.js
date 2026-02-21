@@ -917,7 +917,18 @@
                 // SHOW INTRO MODAL
                 showIntroModal();
 
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error("[AliceBattle] init() FAILED:", e.message, e.stack);
+                // Show error visually so it's not just a black screen
+                const container = document.getElementById('screen-alice-battle');
+                if (container) {
+                    const errDiv = document.createElement('div');
+                    errDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:white;background:rgba(200,0,0,0.8);padding:20px;border-radius:10px;z-index:99999;text-align:center;max-width:80vw;';
+                    errDiv.innerHTML = '<b>AliceBattle Error</b><br><small>' + e.message + '</small><br><button onclick="Game.goToNewScore()" style="margin-top:15px;padding:10px 20px;background:#5c35d5;color:white;border:none;border-radius:8px;font-size:1rem;cursor:pointer;">결과 보기 →</button>';
+                    container.appendChild(errDiv);
+                }
+            }
+
         },
 
         triggerAttack: function (type) {
