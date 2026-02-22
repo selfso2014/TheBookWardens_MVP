@@ -1511,9 +1511,19 @@ Game.typewriter = {
     triggerFinalBossBattleSequence() {
         console.log("[FinalBoss] Triggering Final Boss via switchScreen() lifecycle (v26)");
 
+        // [FIX-MEM A] Release TextRenderer before Final Boss to free word-span DOM memory.
+        // switchScreen().clearAllResources() only cancels RAF/Intervals.
+        // The renderer itself holds ~300 word span references + line/chunk arrays in heap.
+        // Nulling here makes them GC-eligible before AliceBattle canvas allocates.
+        if (Game.typewriter && Game.typewriter.renderer) {
+            if (typeof Game.typewriter.renderer.cancelAllAnimations === 'function') {
+                Game.typewriter.renderer.cancelAllAnimations();
+            }
+            Game.typewriter.renderer = null;
+            console.log('[FinalBoss] TextRenderer released (word spans eligible for GC).');
+        }
+
         // [FIX #4] Use switchScreen() instead of direct DOM manipulation.
-        // Previous code bypassed clearAllResources() + _unmountScreen(), leaving
-        // TextRenderer RAFs and intervals alive → accumulated → iOS crash on Final Boss.
         // switchScreen() enforces: UNMOUNT prev → DOM transition → MOUNT next.
         Game.switchScreen('screen-alice-battle');
 

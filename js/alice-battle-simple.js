@@ -364,15 +364,15 @@
 
         btn.onclick = (e) => {
             if (e) e.stopPropagation();
-            console.log("[Victory] Click! Scorched Earth Engaged.");
+            console.log("[Victory] Click! Navigating to Score.");
 
-            // 1. Kill Zombies (Stop Background Loops)
-            let id = window.requestAnimationFrame(function () { });
-            while (id--) {
-                window.cancelAnimationFrame(id);
+            // [FIX-MEM D] Removed brute-force while(id--) cancelAnimationFrame.
+            // Game.switchScreen() → _unmountScreen('screen-alice-battle') → AliceBattleRef.destroy()
+            // already cancels animFrameId and removes resize listener cleanly.
+            // Brute-force approach was also cancelling camera/SDK grabFrame RAFs → instability.
+            if (window.AliceBattleRef && typeof window.AliceBattleRef.destroy === 'function') {
+                window.AliceBattleRef.destroy(); // Explicit: stop animLoop + resize listener
             }
-            // Nullify global loop function referenced in other files
-            if (window.loop) window.loop = () => { };
 
             // 2. Hide Container Forcefully
             container.style.display = 'none';
@@ -428,14 +428,13 @@
 
         btn.onclick = (e) => {
             if (e) e.stopPropagation();
-            console.log("[Defeat] Click! Scorched Earth Engaged.");
+            console.log("[Defeat] Click! Navigating to Retry.");
 
-            // 1. Kill Zombies (Stop Background Loops)
-            let id = window.requestAnimationFrame(function () { });
-            while (id--) {
-                window.cancelAnimationFrame(id);
+            // [FIX-MEM D] Removed brute-force while(id--) cancelAnimationFrame.
+            // Game.switchScreen() → destroy() handles animFrameId + resize listener.
+            if (window.AliceBattleRef && typeof window.AliceBattleRef.destroy === 'function') {
+                window.AliceBattleRef.destroy();
             }
-            if (window.loop) window.loop = () => { };
 
             // 2. Hide Container Forcefully
             container.style.display = 'none';
@@ -763,6 +762,8 @@
                 // CRITICAL FIX: Scope to container
                 ui.textField = container.querySelector('#alice-text');
 
+                // [FIX-MEM C] Remove before add to prevent listener accumulation on repeated init() calls
+                window.removeEventListener('resize', resize);
                 window.addEventListener('resize', resize);
                 resize();
 
