@@ -104,7 +104,7 @@ function _getOrCreateSafariVideo(track) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
-  const entry = { video, canvas, ctx };
+  const entry = { video, canvas, ctx, _grabPending: false, _grabResolvers: [] }; // [FIX-v28]
   _safariVideoPool.set(id, entry);
   return entry;
 }
@@ -172,26 +172,47 @@ function patchSdkImageCapture(rawSeeso) {
         video.play().catch(() => { });
       }
 
-      // [FIX #3-C] Increased retries: 30 × 30ms = 900ms max wait.
-      // Low-power mode / slow iPhones need more than 450ms for video.readyState >= 2.
+      // [FIX-v28] Single in-flight guard — prevents concurrent attempt() closure chains.
+      // Root cause: SDK calls grabFrame() at 30fps. On iPhone Air, video.readyState < 2
+      // causes each call to spawn attempt(30) = 30 chained setTimeouts holding closures.
+      // At 30fps over 60s reading = 1800 grabFrame calls × 30 closures = 54,000 closures → heap OOM.
+      // Fix: only ONE polling chain runs per track at a time. Concurrent callers are
+      // queued in _grabResolvers and receive the same ImageBitmap when the chain settles.
+      if (entry._grabPending) {
+        entry._grabResolvers.push({ resolve, reject });
+        return;
+      }
+      entry._grabPending = true;
+
+      const settle = (isResolve, val) => {
+        entry._grabPending = false;
+        if (isResolve) resolve(val); else reject(val);
+        entry._grabResolvers.splice(0).forEach(r =>
+          isResolve ? r.resolve(val) : r.reject(val)
+        );
+      };
+
+      // 30 × 30ms = 900ms max wait for video.readyState >= 2
       const attempt = (retries) => {
         if (video.readyState >= 2 && video.videoWidth > 0) {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0);
-          createImageBitmap(canvas).then(resolve).catch(reject);
+          createImageBitmap(canvas)
+            .then(bmp => settle(true, bmp))
+            .catch(e => settle(false, e));
         } else if (retries > 0) {
           setTimeout(() => attempt(retries - 1), 30);
         } else {
-          reject(new DOMException('Safari grabFrame: video not ready after 900ms', 'InvalidStateError'));
+          settle(false, new DOMException('Safari grabFrame: video not ready after 900ms', 'InvalidStateError'));
         }
       };
-      attempt(30); // [FIX] 30 × 30ms = 900ms (was 15 × 30ms = 450ms)
+      attempt(30);
     });
   };
 
   if (typeof logW === 'function') {
-    logW('polyfill', '[Safari] SDK imageCapture.grabFrame() patched v26 — null-track guard + 900ms timeout + video pool');
+    logW('polyfill', '[Safari] SDK imageCapture.grabFrame() patched v28 — in-flight guard + settle queue + 900ms timeout + video pool');
   }
 }
 
@@ -658,9 +679,9 @@ const panel = ensureLogPanel();
 
 // ── BUILD VERSION BANNER ──────────────────────────────────────────────────────
 // 로그 수집 시 어느 빌드인지 즉시 식별
-const BUILD_VERSION = 'v27';
-const BUILD_TAG = 'iPhone_Firebase_Upload_Disabled';
-const BUILD_COMMIT = '7696bc2';
+const BUILD_VERSION = 'v28';
+const BUILD_TAG = 'grabFrame_InFlight_Guard';
+const BUILD_COMMIT = 'pending';
 const BUILD_DATE = '2026-02-22';
 const BUILD_BANNER = `[BUILD] ${BUILD_VERSION} | ${BUILD_TAG} | ${BUILD_COMMIT} | ${BUILD_DATE}`;
 // Panel에 즉시 삽입 (logBase 정의 이전이므로 직접 push)
