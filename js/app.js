@@ -565,16 +565,34 @@ function ensureLogPanel() {
     } catch (e) { return null; }
   })();
 
+  // [FIX] _crashLogPinned: while crash log is shown, block pushLog from overwriting panel
+  let _crashLogPinned = false;
+
   if (_savedCrashLog && _savedCrashLog.length > 0) {
-    const btnCrash = createBtn(`🔴 Crash(${_savedCrashLog.length})`, () => {
+    const btnCrash = createBtn(`🔴 Crash(${_savedCrashLog.length})`, async () => {
+      // 1) Pin panel so current-session logs can't overwrite
+      _crashLogPinned = true;
+      // 2) Show crash log in panel
       panel.textContent = _savedCrashLog.join('\n');
       panel.style.display = 'block';
       toolbar.style.display = 'flex';
       isExpanded = true;
       btnToggle.textContent = '❌';
       panel.scrollTop = panel.scrollHeight;
+      // 3) Auto-copy immediately — no manual step needed
+      try {
+        await navigator.clipboard.writeText(_savedCrashLog.join('\n'));
+        panel.textContent += '\n\n[✅ Crash log AUTO-COPIED to clipboard!]';
+        panel.scrollTop = panel.scrollHeight;
+      } catch (e) {
+        panel.textContent += '\n\n[⚠️ Auto-copy failed — tap 📋 Copy manually]';
+      }
     }, '#fff', '#b71c1c');
     toolbar.appendChild(btnCrash);
+    // Expose pin flag for pushLog
+    ensureLogPanel._pinFn = () => _crashLogPinned;
+  } else {
+    ensureLogPanel._pinFn = () => false;
   }
 
   // Copy
@@ -589,6 +607,7 @@ function ensureLogPanel() {
 
   // Clear
   toolbar.appendChild(createBtn("🗑️ Clear", () => {
+    _crashLogPinned = false; // unpin so live logs can flow again
     LOG_BUFFER.length = 0;
     panel.textContent = "";
     try {
@@ -761,6 +780,8 @@ function pushLog(line) {
   if (!panel) return;
   LOG_BUFFER.push(line);
   if (LOG_BUFFER.length > LOG_MAX) LOG_BUFFER.splice(0, LOG_BUFFER.length - LOG_MAX);
+  // [FIX] While crash log is pinned, don't overwrite panel with live logs
+  if (ensureLogPanel._pinFn && ensureLogPanel._pinFn()) return;
   if (!_logDirty) {
     _logDirty = true;
     _logFlushTimer = setTimeout(() => {
