@@ -717,8 +717,8 @@ const panel = ensureLogPanel();
 
 // ── BUILD VERSION BANNER ──────────────────────────────────────────────────────
 // 로그 수집 시 어느 빌드인지 즉시 식별
-const BUILD_VERSION = 'v32';
-const BUILD_TAG = 'Firebase_goOffline_OnFailOnly';
+const BUILD_VERSION = 'v33';
+const BUILD_TAG = 'Camera480cap_RenderCap30fps';
 const BUILD_COMMIT = 'pending';
 const BUILD_DATE = '2026-02-22';
 const BUILD_BANNER = `[BUILD] ${BUILD_VERSION} | ${BUILD_TAG} | ${BUILD_COMMIT} | ${BUILD_DATE}`;
@@ -1015,9 +1015,18 @@ function toCanvasLocalPoint(x, y) {
 }
 
 let frameCount = 0;
+// [FIX-iPhone15Pro] 30fps render cap.
+// gaze callback fires at 30fps → no new position data exists above 30fps.
+// On iPhone 15 Pro (120Hz ProMotion) the calibration RAF fires at 120fps AND
+// the gaze callback also calls renderOverlay() at 30fps → ~150 renders/sec.
+// Capping at 30fps (33.3ms) reduces GPU clear+draw from 150×/sec to 30×/sec (5× reduction).
+let _lastRenderMs = 0;
 
 function renderOverlay() {
   if (!els.canvas) return;
+  const now = performance.now();
+  if (now - _lastRenderMs < 33.3) return; // 30fps cap: gaze data max rate is 30fps
+  _lastRenderMs = now;
   frameCount++;
   clearCanvas();
 
