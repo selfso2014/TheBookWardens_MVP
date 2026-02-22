@@ -44,9 +44,8 @@ export class GazeDataManager {
         this.searchStartIndex = 0;
 
         // [FIX-iOS] Rolling window — cap gaze buffer to prevent OOM on long sessions.
-        // At 30fps × ~5min = 9000 frames. Beyond that, iOS kills the WebContent process.
-        // We trim the front of the array and adjust lastUploadedIndex accordingly.
-        this.MAX_BUFFER_SIZE = 9000; // ~5 minutes at 30fps
+        // At 15fps × ~5min = 4500 frames. setTrackingFps(15) applied in app.js startTracking().
+        this.MAX_BUFFER_SIZE = 4500; // ~5 minutes at 15fps
         this.lastPreprocessIndex = 0; // Track which entries have been smoothed
 
         // --- RGT (Relative-Gaze Trigger) State ---

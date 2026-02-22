@@ -1460,6 +1460,13 @@ function startTracking() {
     logI("track", "EasySeeSo.startTracking returned", { ok });
     setState("track", ok ? "running" : "failed");
 
+    // [FIX-iOS] Lower tracking FPS: 30 → 15 to reduce SDK CPU/memory load during reading.
+    // pang detection (line-level return sweep) works correctly at 15fps (67ms interval).
+    if (ok && seeso && typeof seeso.setTrackingFps === 'function') {
+      seeso.setTrackingFps(15);
+      logI('track', '[FPS] setTrackingFps(15) applied — SDK processing load halved.');
+    }
+
     // [DIAG v18] Patch raw Seeso processFrame_ to surface internal errors
     // seeso = EasySeeSo instance, seeso.seeso = raw Seeso instance
     const rawSeeso = seeso.seeso;
