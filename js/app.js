@@ -1494,8 +1494,13 @@ setInterval(() => {
   }
 
   // If tracking is running but gaze callbacks stopped, surface it
-  // Skip warning when SDK is intentionally OFF (replay/battle phase)
-  if (state.track === "running" && lastGazeAt && now - lastGazeAt > 1500 && window._seesoSdkOn !== false) {
+  // Skip warning when:
+  //   1. SDK is intentionally OFF (_seesoSdkOn===false) — replay/battle phase
+  //   2. gaze gate is closed (_gazeActive===false) — stopTracking/startTracking transition
+  //   3. within 10s of _gazeActive turning on — SDK spin-up latency on slow devices
+  const gazeGateOpen = window._gazeActive === true;
+  const sdkOn = window._seesoSdkOn !== false;
+  if (state.track === "running" && lastGazeAt && now - lastGazeAt > 1500 && sdkOn && gazeGateOpen) {
     logW("hb", "No gaze samples for >1.5s while tracking is running.", hb);
   }
 }, 2000);

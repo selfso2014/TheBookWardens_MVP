@@ -1492,8 +1492,8 @@ Game.typewriter = {
             }
         } catch (e) {
             console.error("[Game] checkBossAnswer Critical Error:", e);
-            alert("Error processing answer. Moving to next stage.");
-            // Force Advance
+            // [FIX #11] alert() 제거: iOS alert()는 async 흐름을 블록, SDK cleanup 방해
+            // forceAdvanceStage()는 그대로 유지하여 게임 진행이 멈추지 않도록 함
             this.forceAdvanceStage();
         }
     },

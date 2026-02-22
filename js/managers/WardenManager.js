@@ -46,26 +46,24 @@ export class WardenManager {
         setTimeout(() => {
             console.log("[WardenManager] Transitioning to Share Screen...");
 
-            // Use Game's SceneManager or direct DOM manipulation if SceneManager lacks this screen
-            const shareScreen = document.getElementById('screen-new-share');
-            if (shareScreen) {
-                // Reset styles first
-                shareScreen.style.display = 'flex';
-                shareScreen.classList.add('active');
-                shareScreen.style.zIndex = "100000"; // Ensure it's on top
-                shareScreen.style.pointerEvents = "auto";
-
-                // Hide previous screens
-                const oldScreen = document.getElementById('screen-new-score');
-                if (oldScreen) oldScreen.style.display = 'none';
-
-                // Notify SceneManager if available (Optional sync)
-                if (this.game.sceneManager) {
-                    // this.game.sceneManager.currentScreen = 'screen-new-share'; 
-                }
+            // [FIX #12] Use Game.switchScreen() instead of direct DOM manipulation.
+            // Direct DOM manipulation bypasses clearAllResources() + lifecycle hooks.
+            if (window.Game && typeof window.Game.switchScreen === 'function') {
+                window.Game.switchScreen('screen-new-share');
             } else {
-                alert("[ERROR] Share Screen Not Found Logic!");
-                console.error("[WardenManager] Share Screen Not Found!");
+                // Fallback: direct DOM (only if Game not ready)
+                const shareScreen = document.getElementById('screen-new-share');
+                if (shareScreen) {
+                    shareScreen.style.display = 'flex';
+                    shareScreen.classList.add('active');
+                    shareScreen.style.zIndex = "100000";
+                    shareScreen.style.pointerEvents = "auto";
+                    const oldScreen = document.getElementById('screen-new-score');
+                    if (oldScreen) oldScreen.style.display = 'none';
+                } else {
+                    // [FIX #12] alert() 제거 → console.error만
+                    console.error("[WardenManager] Share Screen Not Found!");
+                }
             }
         }, 500);
     }
