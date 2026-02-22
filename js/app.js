@@ -767,7 +767,10 @@ let _logDirty = false;
 let _logFlushTimer = null;
 
 // [CRASH RECOVERY] Throttled localStorage save — survives iOS Jetsam process kill.
-// Saves last 400 log lines every 2 seconds. Readable on next page load via 🔴 Crash Log button.
+// [FIX-iPhone15Pro] Reduced from 2000ms → 500ms.
+// Reason: iOS OOM Kill is instantaneous. At 2000ms save interval, the last 2 seconds
+// of logs (containing the crash cause) are ALWAYS lost. At 500ms, only the last 0.5s
+// of logs are lost, giving us a much better chance of capturing the actual crash event.
 const _LS_LOG_KEY = 'debug_log_backup';
 const _LS_LOG_TS_KEY = 'debug_log_backup_ts';
 let _crashSavePending = false;
@@ -780,7 +783,7 @@ function _scheduleCrashLogSave() {
       localStorage.setItem(_LS_LOG_KEY, JSON.stringify(LOG_BUFFER.slice(-400)));
       localStorage.setItem(_LS_LOG_TS_KEY, Date.now().toString());
     } catch (e) { /* localStorage full or unavailable — non-critical */ }
-  }, 2000);
+  }, 500); // [FIX] was 2000ms — reduced to capture crash logs more reliably
 }
 
 function pushLog(line) {

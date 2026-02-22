@@ -1520,13 +1520,17 @@ Game.typewriter = {
                     this.chunkIndex = 0;
                     this.lineStats.clear();
 
+                    // [FIX-iPhone15Pro] Increased transition delay before next paragraph.
+                    // Para 1 reading + Gaze Replay + Boss battle accumulates ~50-80MB on A17.
+                    // iOS GC needs idle time (no active RAF) to reclaim memory.
+                    // Sequence: screen stays on boss (dark, low GPU) for 2500ms → switch to read → 800ms settle → play
                     setTimeout(() => {
                         Game.switchScreen("screen-read");
                         setTimeout(() => {
                             this.chunkIndex = 0;
                             this.playNextParagraph();
-                        }, 500);
-                    }, 1500);
+                        }, 800); // was 500ms — increased for DOM settle + GC time
+                    }, 2500); // was 1500ms — increased for iOS memory reclaim before next RAF burst
                 }
             } else {
                 // FAILURE
