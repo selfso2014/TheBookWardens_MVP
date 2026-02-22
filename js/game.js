@@ -736,8 +736,7 @@ const Game = {
 
                 Promise.all(promises)
                     .then(() => {
-                        // [FIX-v29] 성공 후 WebSocket 즉시 종료 → 재연결 루프 차단
-                        try { db.goOffline(); } catch (_) { }
+                        // uploadToCloud() 내부 finally에서 goOffline() 처리 — 여기서 중복 호출 제거
                         this.showSuccessModal(() => {
                             this.goToNewShare();
                         });
@@ -746,10 +745,8 @@ const Game = {
                         if (emailInput) emailInput.disabled = true;
                     })
                     .catch((error) => {
-                        // [FIX-v29] 실패 후에도 WebSocket 즉시 종료
-                        try { db.goOffline(); } catch (_) { }
+                        // uploadToCloud() 내부 finally에서 goOffline() 처리 — 여기서 중복 호출 제거
                         console.error("Firebase Save Error:", error);
-                        // [FIX] alert() → console.error (iOS alert blocks async + SDK cleanup)
                         console.error("Transmission Failed: " + error.message);
                         newBtn.disabled = false;
                         newBtn.innerText = originalText;

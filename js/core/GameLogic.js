@@ -270,5 +270,20 @@ export class GameLogic {
         const emailInput = document.querySelector("#screen-new-signup input[type='email']");
         if (emailInput && emailInput.value) console.log("Email:", emailInput.value);
         this.game.switchScreen('screen-new-share');
+
+        // [FIX-v31] Firebase WebSocket Warm-up (share 화면 진입 시)
+        // Claim 후 uploadToCloud().finally의 goOffline()으로 연결이 끊긴 상태.
+        // 디버그 패널 업로드 버튼이 즉시 동작하려면 미리 goOnline()으로 연결을 복구해야 함.
+        setTimeout(() => {
+            try {
+                if (window.firebase && window.FIREBASE_CONFIG) {
+                    if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+                    firebase.database().goOnline();
+                    console.log('[Firebase] WebSocket warm-up started for share screen.');
+                }
+            } catch (e) {
+                console.warn('[Firebase] Share screen warm-up failed (non-critical):', e.message);
+            }
+        }, 300);
     }
 }
