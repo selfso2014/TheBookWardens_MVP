@@ -947,9 +947,17 @@ const calManager = new CalibrationManager({
   logI, logW, logE, setStatus, setState,
   requestRender: () => renderOverlay(),
   onCalibrationFinish: () => {
-    if (typeof window.Game !== "undefined") {
-      window.Game.onCalibrationFinish();
-    }
+    // [FIX-iPhone15Pro] 800ms delay between calibration end and game start.
+    // Reason: A17 GPU is still holding WASM neural engine + camera buffers at the
+    // moment calibration finishes. Starting playNextParagraph() immediately causes
+    // a DOM + RAF burst on top of the existing GPU load → OOM Kill on iPhone 14/15/16.
+    // 800ms gives iOS time to flush calibration GPU buffers before the reading RAF starts.
+    logI("cal", "[FIX] 800ms GPU flush delay before game start (iPhone 15 Pro OOM prevention)");
+    setTimeout(() => {
+      if (typeof window.Game !== "undefined") {
+        window.Game.onCalibrationFinish();
+      }
+    }, 800);
   },
   // [FIX-iOS] Explicitly stop the calibration RAF tick loop.
   // calibration.js finishSequence() calls this before triggering game start.
