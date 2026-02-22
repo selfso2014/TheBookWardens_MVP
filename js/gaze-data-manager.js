@@ -522,6 +522,10 @@ export class GazeDataManager {
             this.preprocessData();
 
             db = firebase.database();
+            // [FIX-v30] goOnline() — 이전 goOffline() 호출로 OFFLINE 상태가 된 경우 복구.
+            // uploadToCloud()는 finally에서 goOffline()을 호출하므로, 이후 재호출 시
+            // (디버그 패널 업로드 등) Firebase가 OFFLINE 상태. goOnline()으로 명시적 복구.
+            db.goOnline();
 
             // 2. Upload Metadata (Always update to reflect latest stats)
             const metaData = {

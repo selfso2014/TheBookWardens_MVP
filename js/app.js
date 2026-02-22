@@ -679,8 +679,8 @@ const panel = ensureLogPanel();
 
 // ── BUILD VERSION BANNER ──────────────────────────────────────────────────────
 // 로그 수집 시 어느 빌드인지 즉시 식별
-const BUILD_VERSION = 'v29';
-const BUILD_TAG = 'Firebase_goOffline_WarmUp';
+const BUILD_VERSION = 'v30';
+const BUILD_TAG = 'Firebase_goOnline_Before_Upload';
 const BUILD_COMMIT = 'pending';
 const BUILD_DATE = '2026-02-22';
 const BUILD_BANNER = `[BUILD] ${BUILD_VERSION} | ${BUILD_TAG} | ${BUILD_COMMIT} | ${BUILD_DATE}`;
