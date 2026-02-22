@@ -1130,13 +1130,19 @@ async function ensureCamera() {
 
   setState("perm", "requesting");
 
-  // [FIX #5] 3-단계 getUserMedia 전략:
-  // 1st: facingMode:user (표준 전면 카메라)
-  // 2nd: video:true (제약 없이 사용 가능한 카메라)
-  // 3rd: 2s 대기 후 재시도 (다른 앱이 카메라 점유 중인 경우 release 대기)
+  // [FIX-iPhone15Pro] Camera resolution constraints — portrait order.
+  // HISTORY: original code had width:640, height:480 (landscape) → SDK face detection failed
+  //          → removed in SDK_v13 commit. Now re-added in CORRECT portrait order.
+  // WHY: iPhone 15 Pro front camera default = very high resolution (e.g. 1920x1440).
+  //      SeeSo WASM allocates frame-processing buffers proportional to frame size.
+  //      iPad Mini delivers 480x640 → 1.2MB/frame buffer.
+  //      iPhone 15 Pro unconstrained → potentially 11MB+/frame buffer = ~9x more WASM memory.
+  //      Capping at max 480x640 (portrait) forces identical buffer size across all devices.
+  // width:max 480, height:max 640 → portrait (3:4) → correct axis for iOS face detection.
   const CAM_ATTEMPTS = [
-    { video: { facingMode: "user" }, audio: false },
-    { video: true, audio: false },
+    { video: { facingMode: "user", width: { max: 480 }, height: { max: 640 }, frameRate: { ideal: 30, max: 30 } }, audio: false },
+    { video: { facingMode: "user" }, audio: false },  // fallback: no resolution constraint
+    { video: true, audio: false },                    // last resort: any camera
   ];
 
   let lastError = null;
