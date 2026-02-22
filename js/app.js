@@ -656,6 +656,26 @@ function ensureLogPanel() {
 
 const panel = ensureLogPanel();
 
+// ── BUILD VERSION BANNER ──────────────────────────────────────────────────────
+// 로그 수집 시 어느 빌드인지 즉시 식별
+const BUILD_VERSION = 'v27';
+const BUILD_TAG = 'iPhone_Firebase_Upload_Disabled';
+const BUILD_COMMIT = '7696bc2';
+const BUILD_DATE = '2026-02-22';
+const BUILD_BANNER = `[BUILD] ${BUILD_VERSION} | ${BUILD_TAG} | ${BUILD_COMMIT} | ${BUILD_DATE}`;
+// Panel에 즉시 삽입 (logBase 정의 이전이므로 직접 push)
+if (panel) {
+  const LOG_BANNER = `[${BUILD_DATE}] INFO  sys        ${BUILD_BANNER}`;
+  // Will be prepended once LOG_BUFFER and pushLog are ready (deferred via setTimeout)
+  setTimeout(() => {
+    if (typeof logI === 'function') {
+      logI('sys', BUILD_BANNER);
+    }
+  }, 0);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+
 // [FIX-iOS] Batch DOM updates — at most 4 textContent rebuilds per second.
 // Old code rebuilt 225KB string on EVERY log call.
 let _logDirty = false;
