@@ -745,8 +745,8 @@ const panel = ensureLogPanel();
 // 로그 수집 시 어느 빌드인지 즉시 식별
 const BUILD_VERSION = 'v34';
 const BUILD_TAG = 'CalDelay800ms_GCDelay3300ms_LogSave500ms';
-const BUILD_COMMIT = '332aad2';
-const BUILD_DATE = '2026-02-23';
+const BUILD_COMMIT = '53b30d1';
+const BUILD_DATE = '2026-02-23 09:07 KST';
 const BUILD_BANNER = `[BUILD] ${BUILD_VERSION} | ${BUILD_TAG} | ${BUILD_COMMIT} | ${BUILD_DATE}`;
 // Panel에 즉시 삽입 (logBase 정의 이전이므로 직접 push)
 if (panel) {
