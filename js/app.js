@@ -762,10 +762,10 @@ const panel = ensureLogPanel();
 
 // ── BUILD VERSION BANNER ──────────────────────────────────────────────────────
 // 로그 수집 시 어느 빌드인지 즉시 식별
-const BUILD_VERSION = 'v38';
-const BUILD_TAG = 'DirectBitmap_50msClose';
+const BUILD_VERSION = 'v39';
+const BUILD_TAG = 'DirectBitmap_30fps_NoThrottle';
 const BUILD_COMMIT = 'pending';
-const BUILD_DATE = '2026-02-23 10:09 KST';
+const BUILD_DATE = '2026-02-23 10:22 KST';
 const BUILD_BANNER = `[BUILD] ${BUILD_VERSION} | ${BUILD_TAG} | ${BUILD_COMMIT} | ${BUILD_DATE}`;
 // Panel에 즉시 삽입 (logBase 정의 이전이므로 직접 push)
 if (panel) {
@@ -976,11 +976,6 @@ const calManager = new CalibrationManager({
     // 800ms gives iOS time to flush calibration GPU buffers before the reading RAF starts.
     logI("cal", "[FIX] 800ms GPU flush delay before game start (iPhone 15 Pro OOM prevention)");
     setTimeout(() => {
-      // [FIX-iPhone15Pro] Enable 15fps throttle now that calibration is done.
-      // processFrame_ runs at 30fps during calibration (needed for accuracy).
-      // After cal, 15fps is sufficient for reading gaze tracking.
-      window._calFinished = true;
-      logI("cal", "[FIX] _calFinished=true: 15fps WASM cap now active for reading phase");
       if (typeof window.Game !== "undefined") {
         window.Game.onCalibrationFinish();
       }
@@ -1509,7 +1504,6 @@ function startTracking() {
       const _origPF = rawSeeso.processFrame_.bind(rawSeeso);
       let _pfCallCount = 0;
       let _pfLastLog = 0;
-      let _pfLastProcess = 0; // [FIX-iPhone15Pro] 15fps throttle timestamp
       rawSeeso.processFrame_ = async function diagProcessFrame(imageCapture) {
         _pfCallCount++;
         const now = performance.now();
@@ -1523,13 +1517,6 @@ function startTracking() {
         // During Replay(3s)+Boss(3s) = 180 wasted frames of GPU memory pressure.
         // _sdkFrameSkip=true tells processFrame_ to return early without WASM computation.
         if (window._sdkFrameSkip) return;
-
-        // [FIX-iPhone15Pro] 15fps cap during reading (after calibration).
-        // At 30fps, iPhone 15 Pro hits OOM at ~990 frames (33s). At 15fps, threshold doubles.
-        // _calFinished=true is set 800ms after calibration completes (reading start).
-        // During calibration itself, full 30fps is maintained for accuracy.
-        if (window._calFinished && (now - _pfLastProcess < 66)) return; // 66ms = 15fps cap
-        _pfLastProcess = now;
 
         try {
           const result = await _origPF(imageCapture);
