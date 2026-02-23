@@ -195,8 +195,16 @@ function patchSdkImageCapture(rawSeeso) {
       // 30 × 30ms = 900ms max wait for video.readyState >= 2
       const attempt = (retries) => {
         if (video.readyState >= 2 && video.videoWidth > 0) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
+          // [FIX-iPhone15Pro ROOT CAUSE] Only resize canvas when dimensions actually change.
+          // BUG: previous code set canvas.width/height on EVERY frame, even when unchanged.
+          // HTML spec: setting canvas.width re-initializes the GPU backing texture every time.
+          // At 30fps: 2 assignments × 30fps = 60 GPU texture reallocations/sec × 1.2MB
+          // = 72MB/s GPU memory churn. iOS GC cannot keep up → OOM accumulation at ~990 frames.
+          // FIX: only resize when resolution actually changes (= 0 times per session in practice).
+          if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+          }
           ctx.drawImage(video, 0, 0);
           createImageBitmap(canvas)
             .then(bmp => {
@@ -743,10 +751,10 @@ const panel = ensureLogPanel();
 
 // ── BUILD VERSION BANNER ──────────────────────────────────────────────────────
 // 로그 수집 시 어느 빌드인지 즉시 식별
-const BUILD_VERSION = 'v36';
-const BUILD_TAG = 'WASM15fps_PostCal';
+const BUILD_VERSION = 'v37';
+const BUILD_TAG = 'CanvasResize_RootFix';
 const BUILD_COMMIT = 'pending';
-const BUILD_DATE = '2026-02-23 09:31 KST';
+const BUILD_DATE = '2026-02-23 09:36 KST';
 const BUILD_BANNER = `[BUILD] ${BUILD_VERSION} | ${BUILD_TAG} | ${BUILD_COMMIT} | ${BUILD_DATE}`;
 // Panel에 즉시 삽입 (logBase 정의 이전이므로 직접 push)
 if (panel) {
