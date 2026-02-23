@@ -84,6 +84,43 @@ export class TextRenderer {
         // Pang-marker-layer cleanup belongs exclusively in SCREEN_CLEANUP['screen-read'] (game.js).
     }
 
+    // [FIX-MEM] Full teardown — call when leaving screen-read permanently (screen transition).
+    // Releases all DOM nodes (.tr-word spans, cursor, impactElement) and clears all heap references.
+    // After destroy(), this instance must NOT be used again; Game.typewriter.renderer = null.
+    destroy() {
+        // 1. Stop all in-flight animation timers and RAF loops first
+        this.cancelAllAnimations();
+
+        // 2. Remove all .tr-word span elements from the DOM
+        //    container.innerHTML = '' is O(n) but guaranteed; avoids per-child removeChild calls.
+        if (this.container) {
+            try { this.container.innerHTML = ''; } catch (e) { /* silent */ }
+        }
+
+        // 3. Remove body-level fixed overlays created by this renderer
+        //    cursor   → appended to body in lockLayout()
+        //    impactElement → appended to body lazily in triggerReturnEffect()
+        if (this.cursor && this.cursor.parentNode) {
+            try { this.cursor.remove(); } catch (e) { /* silent */ }
+        }
+        if (this.impactElement && this.impactElement.parentNode) {
+            try { this.impactElement.remove(); } catch (e) { /* silent */ }
+        }
+
+        // 4. Release all heap references (word objects, rect caches, line arrays)
+        this.words = [];
+        this.chunks = [];
+        this.lines = [];
+        this.cursor = null;
+        this.impactElement = null;
+        this.validatedLines = null;
+        this.containerRect = null;
+        this._lineStartSet = null;
+        this.isLayoutLocked = false;
+
+        console.log('[Life] TextRenderer.destroy() complete — all DOM nodes and heap refs released.');
+    }
+
 
     // [FIX-iOS] Track a RAF id so cancelAllAnimations() can clean it up
     trackRAF(id) {

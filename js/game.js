@@ -242,11 +242,25 @@ const Game = {
 
         // ── Reading Screen ───────────────────────────────────────────────
         'screen-read': () => {
-            // 1. Stop all TextRenderer animations (timeouts + RAFs)
+            // [FIX-MEM] Fully destroy the TextRenderer to release:
+            //   - All .tr-word DOM spans (200~300 per passage)
+            //   - this.words / lines / chunks heap arrays + BoundingClientRect caches
+            //   - body-level cursor and impactElement nodes
+            // Previously: only cancelAllAnimations() was called → DOM/heap remained.
+            // After destroy(), Game.typewriter.init() will recreate the renderer on next paragraph.
             const renderer = window.Game?.typewriter?.renderer;
-            if (renderer && typeof renderer.cancelAllAnimations === 'function') {
-                renderer.cancelAllAnimations();
-                console.log('[Lifecycle] screen-read: TextRenderer cleared');
+            if (renderer) {
+                if (typeof renderer.destroy === 'function') {
+                    renderer.destroy();
+                } else if (typeof renderer.cancelAllAnimations === 'function') {
+                    renderer.cancelAllAnimations();
+                }
+                // Null the reference so GC can reclaim the instance itself.
+                // typewriter.init() recreates it on next paragraph start (guard: if (!this.renderer)).
+                if (window.Game?.typewriter) {
+                    window.Game.typewriter.renderer = null;
+                }
+                console.log('[Lifecycle] screen-read: TextRenderer.destroy() → renderer=null (DOM + heap freed)');
             }
             // 2. Remove all transient DOM overlays created during reading
             //    (Pang markers, mini scores, flying ink, impact flashes)
