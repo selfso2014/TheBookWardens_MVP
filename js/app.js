@@ -346,7 +346,15 @@ setInterval(() => {
     heapStr = `${usedMB}MB(${heapPct}%)`;
   }
 
-  logBase("INFO", "Meter", `RAF:${rafCount} | LSN:${totalListeners} | HEAP:${heapStr}`);
+  // [DIAG] DOM leak tracking — counts specific element types to identify accumulation.
+  // flying-ink / floating-text: game visual effects (should be created & removed rapidly)
+  // canvas: hidden camera canvas + gaze replay canvas (should be ≤2 at any time)
+  // word spans: text renderer elements (should clear on paragraph transition)
+  const fxCount = document.querySelectorAll('.flying-ink, .floating-text, .replay-mini-score').length;
+  const cvsCount = document.querySelectorAll('canvas').length;
+  const wordCount = document.querySelectorAll('.tr-word').length;
+
+  logBase("INFO", "Meter", `RAF:${rafCount} | LSN:${totalListeners} | HEAP:${heapStr} | DOM:FX=${fxCount},CVS=${cvsCount},WRD=${wordCount}`);
 
   // RAF Warnings — tiered thresholds
   // Normal gameplay peak: RAF:7 (gaze + revealChunk + flying ink particles)
@@ -762,10 +770,10 @@ const panel = ensureLogPanel();
 
 // ── BUILD VERSION BANNER ──────────────────────────────────────────────────────
 // 로그 수집 시 어느 빌드인지 즉시 식별
-const BUILD_VERSION = 'v39';
-const BUILD_TAG = 'DirectBitmap_30fps_NoThrottle';
+const BUILD_VERSION = 'v40';
+const BUILD_TAG = 'DOM_Diagnostics';
 const BUILD_COMMIT = 'pending';
-const BUILD_DATE = '2026-02-23 10:22 KST';
+const BUILD_DATE = '2026-02-23 10:26 KST';
 const BUILD_BANNER = `[BUILD] ${BUILD_VERSION} | ${BUILD_TAG} | ${BUILD_COMMIT} | ${BUILD_DATE}`;
 // Panel에 즉시 삽입 (logBase 정의 이전이므로 직접 push)
 if (panel) {
