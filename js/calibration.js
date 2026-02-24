@@ -143,7 +143,7 @@ export class CalibrationManager {
 
         if (faceScreen) {
             faceScreen.classList.add("active");
-            faceScreen.style.display = "flex"; // Ensure flex display
+            faceScreen.style.display = "flex";
         }
         if (calScreen) {
             calScreen.classList.remove("active");
@@ -157,23 +157,101 @@ export class CalibrationManager {
         const btnNext = document.getElementById("btn-face-next");
         if (btnNext) {
             btnNext.onclick = () => {
-                this.ctx.logI("cal", "Face Check Passed. Proceeding to Calibration.");
-                // Hide Face Check
+                this.ctx.logI("cal", "Face Check Passed. Showing Calibration Ready Screen.");
+
+                // Hide Face Check Screen
                 if (faceScreen) {
                     faceScreen.classList.remove("active");
                     faceScreen.style.display = "none";
                 }
+
                 // Show Calibration Screen
                 if (calScreen) {
                     calScreen.classList.add("active");
                     calScreen.style.display = "block";
                 }
 
-                // Start Actual Calibration
-                // This will trigger 'startCalibration' in app.js if wired correctly,
-                // But here we might need to callback to app.js or call seeso directly.
-                // Better pattern: The 'Start Game' button in app.js should call this manager,
-                // and this manager calculates when to call app.startCalibration().
+                // [NEW] Show a preview dot at screen center so user can see where to look
+                // The actual SDK calibration point will appear after OK is clicked.
+                this._showReadyDot();
+            };
+        }
+    }
+
+    /**
+     * Shows a static preview dot + instruction text + Start button
+     * at the center of the screen BEFORE SDK calibration begins.
+     * Clicking Start triggers onFaceCheckSuccess → startActualCalibration().
+     */
+    _showReadyDot() {
+        const W = window.innerWidth;
+        const H = window.innerHeight;
+        const cx = Math.round(W / 2);
+        const cy = Math.round(H / 2);
+
+        this.ctx.logI("cal", `_showReadyDot: preview at center (${cx}, ${cy})`);
+
+        // Make canvas layer visible so preview dot is drawn on screen
+        const stage = document.getElementById("stage");
+        if (stage) stage.classList.add("visible");
+
+        // Store preview position so render() can draw it
+        this.state.previewDot = { x: cx, y: cy };
+
+        // Start RAF loop so the pulse animation runs continuously
+        const tick = () => {
+            if (!this.state.previewDot) return; // Stop when cleared by OK click
+            this.ctx.requestRender();
+            this._previewRafId = requestAnimationFrame(tick);
+        };
+        if (this._previewRafId) cancelAnimationFrame(this._previewRafId);
+        this._previewRafId = requestAnimationFrame(tick);
+
+        // Show instruction text
+        const statusEl = document.getElementById("calibration-status");
+        if (statusEl) {
+            statusEl.textContent = "Look at the dot and press OK to start.";
+            statusEl.style.color = "#fff";
+            statusEl.style.textShadow = "0 0 8px rgba(255,255,255,0.5)";
+            statusEl.style.position = 'absolute';
+            statusEl.style.left = '50%';
+            statusEl.style.transform = 'translateX(-50%)';
+            statusEl.style.top = (cy + 60) + 'px';
+            statusEl.style.width = 'auto';
+            statusEl.style.whiteSpace = 'nowrap';
+            statusEl.style.textAlign = 'center';
+            statusEl.style.pointerEvents = 'none';
+            statusEl.style.display = 'block';
+        }
+
+        // Show Start button
+        const btn = document.getElementById("btn-calibration-start");
+        if (btn) {
+            btn.textContent = "OK";
+            btn.style.position = 'absolute';
+            btn.style.left = '50%';
+            btn.style.transform = 'translateX(-50%)';
+            btn.style.top = (cy + 130) + 'px';
+            btn.style.pointerEvents = 'auto';
+            btn.style.display = 'inline-block';
+
+            btn.onclick = () => {
+                this.ctx.logI("cal", "User pressed OK on ready screen → starting actual calibration");
+
+                // Stop preview RAF loop
+                if (this._previewRafId) {
+                    cancelAnimationFrame(this._previewRafId);
+                    this._previewRafId = null;
+                }
+
+                // Hide preview dot
+                this.state.previewDot = null;
+
+                // Hide button & status
+                btn.style.display = 'none';
+                if (statusEl) statusEl.style.display = 'none';
+
+                // Trigger SDK calibration start
                 if (this.ctx.onFaceCheckSuccess) {
                     this.ctx.onFaceCheckSuccess();
                 }
@@ -339,35 +417,8 @@ export class CalibrationManager {
         if (!seeso) return;
         const { logI, logW, logE, setStatus, setState, requestRender, onCalibrationFinish } = this.ctx;
 
-        // [FIX] Bind Start Button Click to Seeso SDK
-        const btnStart = document.getElementById("btn-calibration-start");
-        if (btnStart) {
-            btnStart.onclick = () => {
-                logI("cal", "User clicked Start Point -> Starting Watchdog & SDK");
-
-                // Hide button immediately
-                btnStart.style.display = "none";
-
-                // [NEW] Hide status text too (Focus on point)
-                const statusEl = document.getElementById("calibration-status");
-                if (statusEl) statusEl.style.display = 'none';
-
-                // 1. Start Watchdog FIRST
-                this.state.running = true; // [FIX] Ensure running=true so watchdog works
-                this.startCollection();
-
-                // 2. Trigger SDK Collection
-                try {
-                    if (typeof seeso.startCollectSamples === "function") {
-                        seeso.startCollectSamples();
-                    } else {
-                        logE("cal", "seeso.startCollectSamples is not a function!");
-                    }
-                } catch (e) {
-                    logE("cal", "SDK startCollectSamples threw error", e);
-                }
-            };
-        }
+        // [NOTE] btn-calibration-start initial binding is now handled by _showReadyDot().
+        // After SDK startCalibration fires, each onCalibrationNextPoint re-binds the button.
 
         // 1. Next Point
         if (typeof seeso.addCalibrationNextPointCallback === "function") {
@@ -535,7 +586,35 @@ export class CalibrationManager {
 
     // Draw Logic
     render(ctx, width, height, toCanvasLocalPoint) {
-        // ... (Keep existing renderer)
+        // [NEW] Draw static preview dot before SDK calibration starts
+        if (this.state.previewDot && !this.state.running) {
+            const pd = toCanvasLocalPoint(this.state.previewDot.x, this.state.previewDot.y) || this.state.previewDot;
+            const now = performance.now();
+            const pulse = 0.5 + 0.5 * Math.sin(now / 400); // 0~1 pulse
+
+            // Outer pulse ring
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(pd.x, pd.y, 18 + pulse * 8, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.2 + pulse * 0.3})`;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = 'rgba(255,255,255,0.5)';
+            ctx.stroke();
+            ctx.restore();
+
+            // Center dot
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(pd.x, pd.y, 7, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'white';
+            ctx.fill();
+            ctx.restore();
+            return;
+        }
+
         if (!this.state.running || !this.state.point) return;
 
         const pt = toCanvasLocalPoint(this.state.point.x, this.state.point.y) || this.state.point;
